@@ -146,8 +146,15 @@ async function main() {
 
   // ── PAREAR ───────────────────────────────────────────────────
   console.log('\nPareando...');
+  // shopeeByItemId: item_id → array de modelos (para Strategy 1 com SHOPEE_ prefix)
+  const shopeeByItemId = {};
+  for (const [sku, s] of Object.entries(skuToShopee)) {
+    if (!shopeeByItemId[s.item_id]) shopeeByItemId[s.item_id] = [];
+    shopeeByItemId[s.item_id].push({ ...s, sku });
+  }
+  // shopeeById: item_id → primeiro modelo (compatibilidade) — DEPRECATED, use shopeeByItemId
   const shopeeById = {};
-  for (const [sku, s] of Object.entries(skuToShopee)) shopeeById[s.item_id] = { ...s, sku };
+  for (const [id, arr] of Object.entries(shopeeByItemId)) shopeeById[id] = arr[0];
 
   const pairedShopeeIds = new Set();
   const pairedMeliSkus  = new Set();

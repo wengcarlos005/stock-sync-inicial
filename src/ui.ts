@@ -347,10 +347,16 @@ export const html = `<!DOCTYPE html>
           <div class="border-t pt-6">
             <h3 class="font-semibold mb-2">Limpar "Não Pareados"</h3>
             <p class="text-sm text-slate-500 mb-3">Remove da lista de "Não Pareados" todos os itens que já possuem um mapeamento criado (aparecem indevidamente após imports antigos).</p>
-            <button @click="cleanupUnmapped()" :disabled="loading.cleanup" class="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white font-medium rounded text-sm">
-              <span x-show="!loading.cleanup">🧹 Limpar já-mapeados</span>
-              <span x-show="loading.cleanup">Limpando...</span>
-            </button>
+            <div class="flex gap-2">
+              <button @click="cleanupUnmapped()" :disabled="loading.cleanup" class="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white font-medium rounded text-sm">
+                <span x-show="!loading.cleanup">🧹 Limpar já-mapeados</span>
+                <span x-show="loading.cleanup">Limpando...</span>
+              </button>
+              <button @click="restoreUnmapped()" :disabled="loading.cleanup" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium rounded text-sm">
+                <span x-show="!loading.cleanup">↩ Restaurar incorretamente resolvidos</span>
+                <span x-show="loading.cleanup">Restaurando...</span>
+              </button>
+            </div>
           </div>
 
           <div class="border-t pt-6">
@@ -703,6 +709,14 @@ function app() {
       this.linkTarget = null;
       this.loading.link = false;
       await this.loadAll();
+    },
+
+    async restoreUnmapped() {
+      this.loading.cleanup = true;
+      const r = await this.api('/api/restore-unmapped', { method: 'POST' });
+      this.loading.cleanup = false;
+      await this.loadAll();
+      alert('Restaurados: ' + (r?.meli_restored||0) + ' ML + ' + (r?.shopee_restored||0) + ' Shopee voltaram para não pareados.');
     },
 
     async cleanupUnmapped() {

@@ -138,27 +138,56 @@ add('POST', '/api/mappings', async (req, env) => {
       updated_at = excluded.updated_at
   `).bind(m.sku, m.meli_item_id ?? null, m.meli_variation_id ?? null, m.shopee_item_id ?? null, m.shopee_model_id ?? null, m.product_name ?? null, m.notes ?? null, now, now).run();
 
-  // Auto-resolve unmapped entries cujos item_id coincidem com o mapeamento criado
+  // Auto-resolve: só marca a variação EXATA — nunca outras variações do mesmo item
   if (m.meli_item_id) {
-    const q = m.meli_variation_id
-      ? `UPDATE unmapped SET resolved=1 WHERE platform='meli' AND item_id=? AND (variation_id=? OR variation_id IS NULL)`
-      : `UPDATE unmapped SET resolved=1 WHERE platform='meli' AND item_id=?`;
-    const stmt = m.meli_variation_id
-      ? env.DB.prepare(q).bind(m.meli_item_id, m.meli_variation_id)
-      : env.DB.prepare(q).bind(m.meli_item_id);
-    await stmt.run();
+    if (m.meli_variation_id) {
+      await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE platform='meli' AND item_id=? AND variation_id=?`)
+        .bind(m.meli_item_id, m.meli_variation_id).run();
+    } else {
+      await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE platform='meli' AND item_id=? AND (variation_id IS NULL OR variation_id='')`)
+        .bind(m.meli_item_id).run();
+    }
   }
   if (m.shopee_item_id) {
-    const q = m.shopee_model_id
-      ? `UPDATE unmapped SET resolved=1 WHERE platform='shopee' AND item_id=? AND (variation_id=? OR variation_id IS NULL)`
-      : `UPDATE unmapped SET resolved=1 WHERE platform='shopee' AND item_id=?`;
-    const stmt = m.shopee_model_id
-      ? env.DB.prepare(q).bind(m.shopee_item_id, m.shopee_model_id)
-      : env.DB.prepare(q).bind(m.shopee_item_id);
-    await stmt.run();
+    if (m.shopee_model_id) {
+      await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE platform='shopee' AND item_id=? AND variation_id=?`)
+        .bind(m.shopee_item_id, m.shopee_model_id).run();
+    } else {
+      await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE platform='shopee' AND item_id=? AND (variation_id IS NULL OR variation_id='')`)
+        .bind(m.shopee_item_id).run();
+    }
   }
 
   return json({ ok: true });
+});
+
+// Restaura itens ML incorretamente marcados como resolvidos (sem mapping exato)
+add('POST', '/api/restore-unmapped', async (_req, env) => {
+  const r = await env.DB.prepare(`
+    UPDATE unmapped SET resolved=0
+    WHERE resolved=1 AND platform='meli'
+    AND NOT EXISTS (
+      SELECT 1 FROM mappings
+      WHERE meli_item_id = unmapped.item_id
+        AND (
+          (meli_variation_id = unmapped.variation_id)
+          OR (meli_variation_id IS NULL AND (unmapped.variation_id IS NULL OR unmapped.variation_id = ''))
+        )
+    )
+  `).run();
+  const r2 = await env.DB.prepare(`
+    UPDATE unmapped SET resolved=0
+    WHERE resolved=1 AND platform='shopee'
+    AND NOT EXISTS (
+      SELECT 1 FROM mappings
+      WHERE shopee_item_id = unmapped.item_id
+        AND (
+          (shopee_model_id = unmapped.variation_id)
+          OR (shopee_model_id IS NULL AND (unmapped.variation_id IS NULL OR unmapped.variation_id = ''))
+        )
+    )
+  `).run();
+  return json({ ok: true, meli_restored: r.meta.changes, shopee_restored: r2.meta.changes });
 });
 
 // Limpa unmapped entries que já foram mapeadas (one-shot cleanup)
