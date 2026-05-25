@@ -122,3 +122,91 @@ export function getMeliVariationSku(variation: any): string | null {
   const attr = (variation.attributes || []).find((a: any) => a.id === 'SELLER_SKU');
   return attr?.value_name || null;
 }
+
+// ============ Orders ============
+
+/** Busca pedidos ML desde sinceMs. Retorna array normalizado. */
+export async function meliGetRecentOrders(env: MacEnv, userId: string, sinceMs: number): Promise<NormalizedOrder[]> {
+  // Pega últimos 50 pedidos ordenados por data (janela de 5min raramente passa disso)
+  const d = await meliRaw(env, 'GET', `/orders/search?seller=${userId}&sort=date_desc&limit=50`);
+  const results: any[] = d?.results || [];
+  const out: NormalizedOrder[] = [];
+  for (const o of results) {
+    const created = new Date(o.date_created || o.last_updated).getTime();
+    if (created <= sinceMs) continue; // já processado
+    const items = (o.order_items || []).map((oi: any) => ({
+      item_id: String(oi.item?.id || ''),
+      variation_id: oi.item?.variation_id ? String(oi.item.variation_id) : null,
+      qty: Number(oi.quantity || 1),
+      name: oi.item?.title || '',
+      sku: '',
+    }));
+    out.push({
+      platform: 'meli',
+      order_id: String(o.id),
+      status: o.status || '',
+      buyer: o.buyer?.nickname || '',
+      created_at: created,
+      items,
+    });
+  }
+  return out;
+}
+
+/** Busca pedidos Shopee desde sinceMs. Retorna array normalizado. */
+export async function shopeeGetRecentOrders(env: MacEnv, sinceMs: number): Promise<NormalizedOrder[]> {
+  const sinceUnix = Math.max(Math.floor(sinceMs / 1000), Math.floor(Date.now() / 1000) - 15 * 24 * 3600);
+  const nowUnix = Math.floor(Date.now() / 1000);
+
+  // 1. Listar order_sn
+  let listData: any;
+  try {
+    listData = await call(env, 'shopee_get_order_list', {
+      time_range_field: 'create_time',
+      time_from: sinceUnix,
+      time_to: nowUnix,
+      page_size: 50,
+    });
+  } catch { return []; } // se MAC não suporta, ignora silenciosamente
+
+  const orderSnList: string[] = (listData?.response?.order_list || []).map((o: any) => o.order_sn);
+  if (!orderSnList.length) return [];
+
+  // 2. Buscar detalhes em lote
+  let detailData: any;
+  try {
+    detailData = await call(env, 'shopee_get_order_detail', {
+      order_sn_list: orderSnList,
+      response_optional_fields: 'buyer_username,item_list',
+    });
+  } catch { return []; }
+
+  const out: NormalizedOrder[] = [];
+  for (const o of detailData?.response?.order_list || []) {
+    const items = (o.item_list || []).map((it: any) => ({
+      item_id: String(it.item_id || ''),
+      variation_id: it.model_id ? String(it.model_id) : null,
+      qty: Number(it.model_quantity_purchased || 1),
+      name: it.item_name || '',
+      sku: it.model_sku || it.item_sku || '',
+    }));
+    out.push({
+      platform: 'shopee',
+      order_id: String(o.order_sn),
+      status: o.order_status || '',
+      buyer: o.buyer_username || '',
+      created_at: (o.create_time || 0) * 1000,
+      items,
+    });
+  }
+  return out;
+}
+
+export interface NormalizedOrder {
+  platform: 'meli' | 'shopee';
+  order_id: string;
+  status: string;
+  buyer: string;
+  created_at: number;
+  items: Array<{ item_id: string; variation_id: string | null; qty: number; name: string; sku: string }>;
+}

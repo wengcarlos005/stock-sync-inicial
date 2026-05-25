@@ -85,6 +85,64 @@ export const html = `<!DOCTYPE html>
     <!-- Tab content -->
     <main class="max-w-7xl mx-auto px-6 py-6">
 
+      <!-- Pedidos -->
+      <section x-show="tab === 'orders'" x-cloak>
+        <div class="flex gap-3 mb-4 items-center">
+          <h2 class="text-sm font-semibold text-slate-700">Pedidos recentes detectados</h2>
+          <div class="flex gap-1">
+            <button @click="orderPlatform=''; loadOrders()" :class="orderPlatform==='' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'" class="text-xs px-3 py-1.5 rounded-lg">Todos</button>
+            <button @click="orderPlatform='meli'; loadOrders()" :class="orderPlatform==='meli' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'" class="text-xs px-3 py-1.5 rounded-lg">🟡 ML</button>
+            <button @click="orderPlatform='shopee'; loadOrders()" :class="orderPlatform==='shopee' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-600'" class="text-xs px-3 py-1.5 rounded-lg">🛒 Shopee</button>
+          </div>
+          <span class="text-xs text-slate-400 ml-auto">Atualizado a cada 5 min automaticamente</span>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="text-left px-4 py-3">Plataforma</th>
+                <th class="text-left px-4 py-3">Pedido</th>
+                <th class="text-left px-4 py-3">Comprador</th>
+                <th class="text-left px-4 py-3">Itens</th>
+                <th class="text-left px-4 py-3">Status</th>
+                <th class="text-left px-4 py-3">Data</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <template x-for="o in orders" :key="o.id">
+                <tr class="hover:bg-slate-50">
+                  <td class="px-4 py-3">
+                    <span x-show="o.platform==='meli'" class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">🟡 ML</span>
+                    <span x-show="o.platform==='shopee'" class="text-xs px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full font-medium">🛒 Shopee</span>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-xs text-slate-500" x-text="o.order_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="o.buyer || '—'"></td>
+                  <td class="px-4 py-3 text-xs">
+                    <template x-for="(it, idx) in parseItems(o.items_json)" :key="idx">
+                      <div class="flex gap-1">
+                        <span class="font-semibold" x-text="'×' + it.qty"></span>
+                        <span class="text-slate-600 truncate max-w-[200px]" x-text="it.name || it.sku || it.item_id"></span>
+                      </div>
+                    </template>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="text-xs px-2 py-0.5 rounded" :class="orderStatusClass(o.status)" x-text="o.status || '—'"></span>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(o.created_at)"></td>
+                </tr>
+              </template>
+              <tr x-show="orders.length === 0">
+                <td colspan="6" class="text-center py-10 text-slate-400">
+                  <div class="text-2xl mb-2">🛒</div>
+                  <div>Nenhum pedido ainda. O sistema detecta pedidos novos a cada 5 minutos.</div>
+                  <div class="text-xs mt-1 text-slate-300">Pedidos anteriores aparecem após o próximo ciclo de sync.</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- Produtos -->
       <section x-show="tab === 'products'" x-cloak>
         <div class="flex gap-3 mb-4">
@@ -373,6 +431,7 @@ function app() {
     loginError: '',
     tab: 'products',
     tabs: [
+      { id: 'orders', label: '🛒 Pedidos' },
       { id: 'products', label: '📦 Produtos' },
       { id: 'changes', label: '📜 Mudanças' },
       { id: 'conflicts', label: '⚠️ Conflitos' },
@@ -388,6 +447,8 @@ function app() {
     productSearch: '',
     productFilter: 'all',
     loading: { sync: false, discover: false, setStock: false, pair: false },
+    orders: [],
+    orderPlatform: '',
     discoverResult: null,
     setStockModal: null,
     newStockValue: 0,
@@ -428,6 +489,7 @@ function app() {
     async loadAll() {
       await Promise.all([
         this.loadStatus(),
+        this.loadOrders(),
         this.loadProducts(),
         this.loadChanges(),
         this.loadConflicts(),
@@ -457,6 +519,13 @@ function app() {
       const d = await this.api(url);
       this.products = d?.items || [];
       this.tabs.find(t => t.id === 'products').count = d?.total || 0;
+    },
+
+    async loadOrders() {
+      const q = this.orderPlatform ? '&platform=' + this.orderPlatform : '';
+      const d = await this.api('/api/orders?limit=100' + q);
+      this.orders = d?.items || [];
+      this.tabs.find(t => t.id === 'orders').count = this.orders.length;
     },
 
     async loadChanges() {
@@ -584,6 +653,19 @@ function app() {
     stockClass(a, b) {
       if (a == null || b == null) return '';
       return a !== b ? 'text-red-600 font-semibold' : '';
+    },
+
+    parseItems(json) {
+      try { return JSON.parse(json || '[]'); } catch { return []; }
+    },
+
+    orderStatusClass(s) {
+      if (!s) return 'bg-slate-100 text-slate-600';
+      s = s.toLowerCase();
+      if (s.includes('paid') || s.includes('completed') || s.includes('shipped') || s.includes('ready')) return 'bg-emerald-100 text-emerald-700';
+      if (s.includes('cancel')) return 'bg-red-100 text-red-700';
+      if (s.includes('pending') || s.includes('process')) return 'bg-amber-100 text-amber-700';
+      return 'bg-slate-100 text-slate-600';
     },
 
     triggerClass(t) {

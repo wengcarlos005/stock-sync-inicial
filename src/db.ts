@@ -54,6 +54,55 @@ export async function upsertUnmapped(db: D1Database, sku: string, platform: 'mel
   `).bind(sku, platform, itemId, variationId, name, now, now).run();
 }
 
+// ============ Config KV ============
+export async function getConfig(db: D1Database, key: string): Promise<string | null> {
+  try {
+    const r = await db.prepare(`SELECT value FROM config WHERE key=?`).bind(key).first<{ value: string }>();
+    return r?.value ?? null;
+  } catch { return null; }
+}
+
+export async function setConfig(db: D1Database, key: string, value: string): Promise<void> {
+  await db.prepare(`INSERT INTO config (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`)
+    .bind(key, value).run();
+}
+
+// ============ Orders ============
+export async function saveOrderIfNew(db: D1Database, order: {
+  platform: string; order_id: string; status: string; buyer: string;
+  created_at: number; items_json: string;
+}): Promise<boolean> {
+  const r = await db.prepare(`
+    INSERT OR IGNORE INTO orders (platform, order_id, status, buyer, created_at, items_json, processed_at)
+    VALUES (?,?,?,?,?,?,?)
+  `).bind(order.platform, order.order_id, order.status, order.buyer, order.created_at, order.items_json, Date.now()).run();
+  return (r.meta.changes ?? 0) > 0; // true = novo, false = já existia
+}
+
+// ============ Lookup mapping by marketplace ID ============
+export async function getMappingByMeliId(db: D1Database, itemId: string, variationId: string | null): Promise<Mapping | null> {
+  if (variationId) {
+    const r = await db.prepare(`SELECT * FROM mappings WHERE meli_item_id=? AND meli_variation_id=? AND active=1 LIMIT 1`)
+      .bind(itemId, variationId).first<Mapping>();
+    if (r) return r;
+  }
+  // fallback: sem variação (produto simples)
+  const r = await db.prepare(`SELECT * FROM mappings WHERE meli_item_id=? AND (meli_variation_id IS NULL OR meli_variation_id='') AND active=1 LIMIT 1`)
+    .bind(itemId).first<Mapping>();
+  return r ?? null;
+}
+
+export async function getMappingByShopeeId(db: D1Database, itemId: string, modelId: string | null): Promise<Mapping | null> {
+  if (modelId && modelId !== '0') {
+    const r = await db.prepare(`SELECT * FROM mappings WHERE shopee_item_id=? AND shopee_model_id=? AND active=1 LIMIT 1`)
+      .bind(itemId, modelId).first<Mapping>();
+    if (r) return r;
+  }
+  const r = await db.prepare(`SELECT * FROM mappings WHERE shopee_item_id=? AND (shopee_model_id IS NULL OR shopee_model_id='' OR shopee_model_id='0') AND active=1 LIMIT 1`)
+    .bind(itemId).first<Mapping>();
+  return r ?? null;
+}
+
 export async function getActiveMappings(db: D1Database, limit = 1000): Promise<Mapping[]> {
   // ORDER BY last_poll_at ASC: polls least-recently-polled items first,
   // so a capped batch rotates through all mappings across consecutive runs.

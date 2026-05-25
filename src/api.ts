@@ -25,17 +25,19 @@ function json(data: any, status = 200): Response {
 
 // ============= Dashboard summary =============
 add('GET', '/api/status', async (_req, env) => {
-  const [mappings, conflicts, unmapped, lastRun] = await Promise.all([
+  const [mappings, conflicts, unmapped, lastRun, orders] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) as n FROM mappings WHERE active=1').first<{ n: number }>(),
     env.DB.prepare('SELECT COUNT(*) as n FROM conflicts WHERE resolved_at IS NULL').first<{ n: number }>(),
     env.DB.prepare('SELECT COUNT(*) as n FROM unmapped WHERE resolved=0').first<{ n: number }>(),
     env.DB.prepare('SELECT * FROM runs ORDER BY started_at DESC LIMIT 1').first(),
+    env.DB.prepare('SELECT COUNT(*) as n FROM orders').first<{ n: number }>().catch(() => ({ n: 0 })),
   ]);
   return json({
     shadow_mode: env.SHADOW_MODE === 'true',
     active_mappings: mappings?.n ?? 0,
     unresolved_conflicts: conflicts?.n ?? 0,
     unmapped_items: unmapped?.n ?? 0,
+    total_orders: orders?.n ?? 0,
     last_run: lastRun,
   });
 });
@@ -307,6 +309,17 @@ add('GET', '/api/test-mac', async (_req, env) => {
   } catch (e: any) {
     return json({ error: String(e.message), key_prefix: key ? key.slice(0, 12) + '...' : 'MISSING' }, 500);
   }
+});
+
+// ============= Orders =============
+add('GET', '/api/orders', async (req, env) => {
+  const url = new URL(req.url);
+  const limit = Math.min(200, Number(url.searchParams.get('limit') || 100));
+  const platform = url.searchParams.get('platform') || '';
+  const r = platform
+    ? await env.DB.prepare(`SELECT * FROM orders WHERE platform=? ORDER BY created_at DESC LIMIT ?`).bind(platform, limit).all()
+    : await env.DB.prepare(`SELECT * FROM orders ORDER BY created_at DESC LIMIT ?`).bind(limit).all();
+  return json({ items: r.results });
 });
 
 // ============= Toggle shadow mode (requires re-deploy to persist via vars) =============
