@@ -224,7 +224,38 @@ add('GET', '/api/runs', async (_req, env) => {
 });
 
 // ============= Actions =============
-add('POST', '/api/discover', async (_req, env) => json(await runDiscovery(env)));
+add('POST', '/api/discover', async (_req, env) => {
+  const token = (env as any).GITHUB_TOKEN;
+  const repo  = (env as any).GITHUB_REPO || 'wengcarlos005/stock-sync-inicial';
+
+  if (!token) {
+    return json({ error: 'GITHUB_TOKEN não configurado. Rode: npx wrangler secret put GITHUB_TOKEN' }, 500);
+  }
+
+  // Dispara workflow_dispatch no GitHub Actions
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/actions/workflows/discovery.yml/dispatches`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+        'User-Agent': 'stock-sync-worker',
+      },
+      body: JSON.stringify({ ref: 'main' }),
+    }
+  );
+
+  if (!res.ok) {
+    const txt = await res.text();
+    return json({ error: `GitHub API ${res.status}: ${txt.slice(0, 300)}` }, 500);
+  }
+
+  return json({ ok: true, message: 'Discovery disparado no GitHub Actions! Aguarde ~5 minutos para concluir.' });
+});
+
 add('POST', '/api/sync', async (_req, env) => json(await runSync(env, 'manual')));
 
 // ============= Manual stock override =============

@@ -332,12 +332,16 @@ export const html = `<!DOCTYPE html>
         <div class="bg-white border border-slate-200 rounded-lg p-6 space-y-6">
           <div>
             <h3 class="font-semibold mb-2">Discovery</h3>
-            <p class="text-sm text-slate-500 mb-3">Varre seus produtos em ambos os marketplaces e cria os pareamentos por SKU. Rode quando criar produtos novos.</p>
+            <p class="text-sm text-slate-500 mb-3">Varre todos os produtos em ML e Shopee e pareia por SKU. Roda via <strong>GitHub Actions</strong> (sem limite de produtos). Também roda automaticamente todo dia às 6h.</p>
             <button @click="runDiscover()" :disabled="loading.discover" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">
-              <span x-show="!loading.discover">▶ Rodar discovery agora</span>
-              <span x-show="loading.discover">Rodando... (pode demorar 2-5 min)</span>
+              <span x-show="!loading.discover">▶ Disparar discovery agora</span>
+              <span x-show="loading.discover">Disparando no GitHub Actions...</span>
             </button>
-            <pre x-show="discoverResult" x-text="JSON.stringify(discoverResult, null, 2)" class="mt-3 text-xs bg-slate-50 p-3 rounded overflow-auto"></pre>
+            <div x-show="discoverResult?.ok" class="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-sm text-emerald-800">
+              ✅ <span x-text="discoverResult?.message"></span>
+              <a href="https://github.com/wengcarlos005/stock-sync-inicial/actions" target="_blank" class="underline ml-2">Acompanhar progresso →</a>
+            </div>
+            <div x-show="discoverResult?.error" class="mt-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800" x-text="discoverResult?.error"></div>
           </div>
 
           <div class="border-t pt-6">

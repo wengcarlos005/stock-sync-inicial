@@ -10,6 +10,8 @@ export interface Env extends SyncEnv {
   ADMIN_TOKEN: string;
   MELI_USER_ID: string;
   SHADOW_MODE: string;
+  GITHUB_TOKEN?: string;   // PAT com permissão actions:write para disparar discovery
+  GITHUB_REPO?: string;    // ex: "wengcarlos005/stock-sync-inicial"
 }
 
 export default {
