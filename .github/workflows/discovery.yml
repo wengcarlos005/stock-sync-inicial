@@ -1,0 +1,31 @@
+name: Discovery — Parear ML ↔ Shopee
+
+on:
+  # Roda toda segunda-feira às 6h (BRT = UTC-3, então 9h UTC)
+  schedule:
+    - cron: '0 9 * * 1'
+  # Ou dispara manualmente pelo GitHub (Actions → Run workflow)
+  workflow_dispatch:
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Rodar discovery
+        env:
+          MAC_API_KEY:   ${{ secrets.MAC_API_KEY }}
+          MAC_URL:       ${{ secrets.MAC_URL }}
+          MELI_USER_ID:  ${{ secrets.MELI_USER_ID }}
+          WORKER_URL:    ${{ secrets.WORKER_URL }}
+          ADMIN_TOKEN:   ${{ secrets.ADMIN_TOKEN }}
+        run: node discover-local.js

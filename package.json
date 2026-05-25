@@ -1,0 +1,22 @@
+{
+  "name": "stock-sync",
+  "version": "0.1.0",
+  "description": "Sincronização de estoque ML↔Shopee via Cloudflare Workers + D1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "db:create": "wrangler d1 create stock-sync",
+    "db:migrate:local": "wrangler d1 migrations apply stock-sync --local",
+    "db:migrate:prod": "wrangler d1 migrations apply stock-sync --remote",
+    "db:console:prod": "wrangler d1 execute stock-sync --remote --command",
+    "db:console:local": "wrangler d1 execute stock-sync --local --command",
+    "discover": "wrangler d1 execute stock-sync --remote --command \"SELECT COUNT(*) as mapped FROM mappings\""
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.78.0"
+  }
+}

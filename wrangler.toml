@@ -1,0 +1,25 @@
+name = "stock-sync"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Cron: a cada 5 minutos
+[triggers]
+crons = ["*/5 * * * *"]
+
+# D1 database (após criar via `npm run db:create`, cole o id aqui)
+[[d1_databases]]
+binding = "DB"
+database_name = "stock-sync"
+database_id = "8e0638b5-b394-403e-9853-c7ce043a0919"
+
+# Variáveis públicas
+[vars]
+SHADOW_MODE = "false"       # false = modo live, escreve estoque nas lojas.
+MAC_URL = "https://keymlnklhffwnleruvpy.supabase.co/functions/v1/marketplace-mcp"
+POLL_BATCH_SIZE = "50"
+MAX_RATE_PER_MIN = "60"
+
+# Secrets (configurar via: wrangler secret put MAC_API_KEY)
+# - MAC_API_KEY        → chave de autenticação MAC
+# - ADMIN_TOKEN        → token simples para chamar /discover e /sync manualmente
