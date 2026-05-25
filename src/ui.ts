@@ -161,8 +161,8 @@ export const html = `<!DOCTYPE html>
               <tr>
                 <th class="text-left px-4 py-3">SKU</th>
                 <th class="text-left px-4 py-3">Produto</th>
-                <th class="text-right px-4 py-3">ML</th>
-                <th class="text-right px-4 py-3">Shopee</th>
+                <th class="text-center px-4 py-3">🟡 ML</th>
+                <th class="text-center px-4 py-3">🛒 Shopee</th>
                 <th class="text-right px-4 py-3">Master</th>
                 <th class="text-left px-4 py-3">Última mudança</th>
                 <th class="text-center px-4 py-3">Ações</th>
@@ -173,12 +173,27 @@ export const html = `<!DOCTYPE html>
                 <tr :class="p.active ? '' : 'opacity-50'">
                   <td class="px-4 py-3 font-mono text-xs" x-text="p.sku"></td>
                   <td class="px-4 py-3" x-text="(p.product_name||'').slice(0,60)"></td>
-                  <td class="px-4 py-3 text-right font-mono" :class="stockClass(p.meli_stock, p.shopee_stock)" x-text="p.meli_stock ?? '—'"></td>
-                  <td class="px-4 py-3 text-right font-mono" :class="stockClass(p.shopee_stock, p.meli_stock)" x-text="p.shopee_stock ?? '—'"></td>
+                  <td class="px-4 py-3 text-center">
+                    <template x-if="p.meli_item_id">
+                      <span class="font-mono text-xs" :class="stockClass(p.meli_stock, p.shopee_stock)" x-text="p.meli_stock ?? '—'"></span>
+                    </template>
+                    <template x-if="!p.meli_item_id">
+                      <button @click="openLinkModal(p, 'meli')" class="text-xs px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear ML</button>
+                    </template>
+                  </td>
+                  <td class="px-4 py-3 text-center">
+                    <template x-if="p.shopee_item_id">
+                      <span class="font-mono text-xs" :class="stockClass(p.shopee_stock, p.meli_stock)" x-text="p.shopee_stock ?? '—'"></span>
+                    </template>
+                    <template x-if="!p.shopee_item_id">
+                      <button @click="openLinkModal(p, 'shopee')" class="text-xs px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded">+ Parear Shopee</button>
+                    </template>
+                  </td>
                   <td class="px-4 py-3 text-right font-mono font-semibold" x-text="p.master_stock ?? '—'"></td>
                   <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(p.last_change_at)"></td>
-                  <td class="px-4 py-3 text-center">
-                    <button @click="openSetStock(p)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded mr-1">setar</button>
+                  <td class="px-4 py-3 text-center flex gap-1 justify-center">
+                    <button @click="openSetStock(p)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">setar</button>
+                    <button @click="openLinkModal(p, p.meli_item_id ? 'shopee' : 'meli')" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">parear</button>
                     <button @click="toggleMapping(p.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="p.active ? 'pausar' : 'ativar'"></button>
                   </td>
                 </tr>
@@ -326,6 +341,15 @@ export const html = `<!DOCTYPE html>
           </div>
 
           <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Limpar "Não Pareados"</h3>
+            <p class="text-sm text-slate-500 mb-3">Remove da lista de "Não Pareados" todos os itens que já possuem um mapeamento criado (aparecem indevidamente após imports antigos).</p>
+            <button @click="cleanupUnmapped()" :disabled="loading.cleanup" class="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white font-medium rounded text-sm">
+              <span x-show="!loading.cleanup">🧹 Limpar já-mapeados</span>
+              <span x-show="loading.cleanup">Limpando...</span>
+            </button>
+          </div>
+
+          <div class="border-t pt-6">
             <h3 class="font-semibold mb-2">Modo Shadow</h3>
             <p class="text-sm text-slate-500 mb-3">No modo shadow, mudanças são <strong>detectadas e logadas</strong> mas <strong>não escritas</strong> nos marketplaces. Use pra validar antes de cancelar o Upseller.</p>
             <div class="bg-slate-50 p-3 rounded text-xs">
@@ -401,6 +425,41 @@ export const html = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Link modal (parear produto já mapeado com item não pareado) -->
+  <div x-show="linkModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="linkModal=null">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]" x-show="linkModal">
+      <div class="px-6 py-4 border-b border-slate-200">
+        <h3 class="font-semibold">Parear com produto existente</h3>
+        <p class="text-sm text-slate-500 mt-1">SKU: <span class="font-mono" x-text="linkModal?.sku"></span></p>
+        <p class="text-xs text-slate-400" x-text="'Buscando em: ' + (linkModal?.platform === 'meli' ? '🟡 Mercado Livre' : '🛒 Shopee')"></p>
+      </div>
+      <div class="px-6 py-3 border-b border-slate-200">
+        <input x-model="linkSearch" @input.debounce.300ms="searchLinkCatalog()" placeholder="Digite nome ou SKU para buscar..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" autofocus />
+      </div>
+      <div class="flex-1 overflow-y-auto divide-y divide-slate-100">
+        <template x-for="item in linkCatalog" :key="item.id">
+          <div class="px-4 py-3 hover:bg-indigo-50 cursor-pointer flex items-center gap-3" @click="linkTarget=item"
+               :class="linkTarget?.id === item.id ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm truncate" x-text="(item.product_name||'—').slice(0,65)"></div>
+              <div class="text-xs text-slate-400 font-mono" x-text="item.sku + ' | ID: ' + item.item_id + (item.variation_id ? '/' + item.variation_id : '')"></div>
+            </div>
+            <span x-show="linkTarget?.id === item.id" class="text-indigo-600">✓</span>
+          </div>
+        </template>
+        <div x-show="linkCatalog.length===0 && linkSearch" class="p-4 text-center text-sm text-slate-400">Nenhum resultado. Tente outro termo.</div>
+        <div x-show="linkCatalog.length===0 && !linkSearch" class="p-4 text-center text-sm text-slate-400">Digite para buscar nos produtos não pareados</div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-200 flex gap-2">
+        <button @click="linkModal=null" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
+        <button @click="confirmLink()" :disabled="!linkTarget || loading.link" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-medium rounded text-sm">
+          <span x-show="!loading.link">✓ Vincular</span>
+          <span x-show="loading.link">Salvando...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Set stock modal -->
   <div x-show="setStockModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40" @click.self="setStockModal = null">
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full" x-show="setStockModal">
@@ -446,7 +505,11 @@ function app() {
     runs: [],
     productSearch: '',
     productFilter: 'all',
-    loading: { sync: false, discover: false, setStock: false, pair: false },
+    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false },
+    linkModal: null,
+    linkSearch: '',
+    linkCatalog: [],
+    linkTarget: null,
     orders: [],
     orderPlatform: '',
     discoverResult: null,
@@ -612,6 +675,38 @@ function app() {
       this.pairModal = null;
       this.loading.pair = false;
       await this.loadAll();
+    },
+
+    openLinkModal(product, platform) {
+      this.linkModal = { sku: product.sku, platform };
+      this.linkSearch = '';
+      this.linkCatalog = [];
+      this.linkTarget = null;
+    },
+
+    async searchLinkCatalog() {
+      if (!this.linkModal) return;
+      const d = await this.api('/api/catalog?platform=' + this.linkModal.platform + '&q=' + encodeURIComponent(this.linkSearch));
+      this.linkCatalog = d?.items || [];
+    },
+
+    async confirmLink() {
+      if (!this.linkTarget || !this.linkModal) return;
+      this.loading.link = true;
+      await this.api('/api/mappings/' + encodeURIComponent(this.linkModal.sku) + '/link',
+        { method: 'POST', body: JSON.stringify({ unmapped_id: this.linkTarget.id }) });
+      this.linkModal = null;
+      this.linkTarget = null;
+      this.loading.link = false;
+      await this.loadAll();
+    },
+
+    async cleanupUnmapped() {
+      this.loading.cleanup = true;
+      const r = await this.api('/api/cleanup-unmapped', { method: 'POST' });
+      this.loading.cleanup = false;
+      await this.loadAll();
+      alert('Limpeza concluída: ' + (r?.meli_resolved||0) + ' ML + ' + (r?.shopee_resolved||0) + ' Shopee removidos dos não pareados.');
     },
 
     async resolveConflict(c) {

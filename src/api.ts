@@ -137,6 +137,68 @@ add('POST', '/api/mappings', async (req, env) => {
       notes = COALESCE(excluded.notes, mappings.notes),
       updated_at = excluded.updated_at
   `).bind(m.sku, m.meli_item_id ?? null, m.meli_variation_id ?? null, m.shopee_item_id ?? null, m.shopee_model_id ?? null, m.product_name ?? null, m.notes ?? null, now, now).run();
+
+  // Auto-resolve unmapped entries cujos item_id coincidem com o mapeamento criado
+  if (m.meli_item_id) {
+    const q = m.meli_variation_id
+      ? `UPDATE unmapped SET resolved=1 WHERE platform='meli' AND item_id=? AND (variation_id=? OR variation_id IS NULL)`
+      : `UPDATE unmapped SET resolved=1 WHERE platform='meli' AND item_id=?`;
+    const stmt = m.meli_variation_id
+      ? env.DB.prepare(q).bind(m.meli_item_id, m.meli_variation_id)
+      : env.DB.prepare(q).bind(m.meli_item_id);
+    await stmt.run();
+  }
+  if (m.shopee_item_id) {
+    const q = m.shopee_model_id
+      ? `UPDATE unmapped SET resolved=1 WHERE platform='shopee' AND item_id=? AND (variation_id=? OR variation_id IS NULL)`
+      : `UPDATE unmapped SET resolved=1 WHERE platform='shopee' AND item_id=?`;
+    const stmt = m.shopee_model_id
+      ? env.DB.prepare(q).bind(m.shopee_item_id, m.shopee_model_id)
+      : env.DB.prepare(q).bind(m.shopee_item_id);
+    await stmt.run();
+  }
+
+  return json({ ok: true });
+});
+
+// Limpa unmapped entries que já foram mapeadas (one-shot cleanup)
+add('POST', '/api/cleanup-unmapped', async (_req, env) => {
+  // Marca como resolvidos todos os unmapped cujo item_id+variation_id já está em mappings
+  const r1 = await env.DB.prepare(`
+    UPDATE unmapped SET resolved=1
+    WHERE platform='meli' AND EXISTS (
+      SELECT 1 FROM mappings WHERE meli_item_id=unmapped.item_id
+        AND (meli_variation_id=unmapped.variation_id OR (meli_variation_id IS NULL AND unmapped.variation_id IS NULL))
+    )
+  `).run();
+  const r2 = await env.DB.prepare(`
+    UPDATE unmapped SET resolved=1
+    WHERE platform='shopee' AND EXISTS (
+      SELECT 1 FROM mappings WHERE shopee_item_id=unmapped.item_id
+        AND (shopee_model_id=unmapped.variation_id OR (shopee_model_id IS NULL AND unmapped.variation_id IS NULL))
+    )
+  `).run();
+  return json({ ok: true, meli_resolved: r1.meta.changes, shopee_resolved: r2.meta.changes });
+});
+
+// Linka um item unmapped a um mapping existente (extend)
+add('POST', '/api/mappings/:sku/link', async (req, env, params) => {
+  const body = await req.json() as any;
+  const { unmapped_id } = body;
+  if (!unmapped_id) return json({ error: 'unmapped_id obrigatório' }, 400);
+
+  const row = await env.DB.prepare(`SELECT * FROM unmapped WHERE id=?`).bind(unmapped_id).first<any>();
+  if (!row) return json({ error: 'unmapped não encontrado' }, 404);
+
+  const now = Date.now();
+  if (row.platform === 'meli') {
+    await env.DB.prepare(`UPDATE mappings SET meli_item_id=?, meli_variation_id=?, updated_at=? WHERE sku=?`)
+      .bind(row.item_id, row.variation_id || null, now, params.sku).run();
+  } else {
+    await env.DB.prepare(`UPDATE mappings SET shopee_item_id=?, shopee_model_id=?, updated_at=? WHERE sku=?`)
+      .bind(row.item_id, row.variation_id || null, now, params.sku).run();
+  }
+  await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE id=?`).bind(unmapped_id).run();
   return json({ ok: true });
 });
 
