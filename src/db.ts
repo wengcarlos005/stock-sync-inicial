@@ -54,8 +54,16 @@ export async function upsertUnmapped(db: D1Database, sku: string, platform: 'mel
   `).bind(sku, platform, itemId, variationId, name, now, now).run();
 }
 
-export async function getActiveMappings(db: D1Database): Promise<Mapping[]> {
-  const r = await db.prepare(`SELECT * FROM mappings WHERE active = 1`).all<Mapping>();
+export async function getActiveMappings(db: D1Database, limit = 1000): Promise<Mapping[]> {
+  // ORDER BY last_poll_at ASC: polls least-recently-polled items first,
+  // so a capped batch rotates through all mappings across consecutive runs.
+  const r = await db.prepare(`
+    SELECT m.* FROM mappings m
+    LEFT JOIN state s ON s.sku = m.sku
+    WHERE m.active = 1
+    ORDER BY COALESCE(s.last_poll_at, 0) ASC
+    LIMIT ?
+  `).bind(limit).all<Mapping>();
   return r.results || [];
 }
 

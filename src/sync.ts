@@ -22,7 +22,10 @@ export async function runSync(env: SyncEnv, trigger: 'cron' | 'manual' = 'cron')
   const errs: string[] = [];
 
   try {
-    const mappings = await db.getActiveMappings(env.DB);
+    // Free plan: 50 subrequests/invocation. Each mapping = 2 fetch calls.
+    // Cap at 20 per run → 40 fetches (safe margin). Items rotate via ORDER BY last_poll_at ASC.
+    const batchSize = Math.min(20, Number((env as any).POLL_BATCH_SIZE || 20));
+    const mappings = await db.getActiveMappings(env.DB, batchSize);
 
     for (const map of mappings) {
       stats.polled++;

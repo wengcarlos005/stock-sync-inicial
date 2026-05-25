@@ -1,9 +1,9 @@
 name: Discovery — Parear ML ↔ Shopee
 
 on:
-  # Roda toda segunda-feira às 6h (BRT = UTC-3, então 9h UTC)
+  # Roda todo dia às 6h BRT (= 9h UTC)
   schedule:
-    - cron: '0 9 * * 1'
+    - cron: '0 9 * * *'
   # Ou dispara manualmente pelo GitHub (Actions → Run workflow)
   workflow_dispatch:
 

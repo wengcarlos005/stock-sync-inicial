@@ -17,7 +17,7 @@ database_id = "8e0638b5-b394-403e-9853-c7ce043a0919"
 [vars]
 SHADOW_MODE = "false"       # false = modo live, escreve estoque nas lojas.
 MAC_URL = "https://keymlnklhffwnleruvpy.supabase.co/functions/v1/marketplace-mcp"
-POLL_BATCH_SIZE = "50"
+POLL_BATCH_SIZE = "20"
 MAX_RATE_PER_MIN = "60"
 
 # Secrets (configurar via: wrangler secret put MAC_API_KEY)
