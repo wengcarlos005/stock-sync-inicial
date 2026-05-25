@@ -234,7 +234,7 @@ add('POST', '/api/discover', async (_req, env) => {
 
   // Dispara workflow_dispatch no GitHub Actions
   const res = await fetch(
-    `https://api.github.com/repos/${repo}/actions/workflows/discovery.yml/dispatches`,
+    `https://api.github.com/repos/${repo}/actions/workflows/282879355/dispatches`,
     {
       method: 'POST',
       headers: {
@@ -244,13 +244,13 @@ add('POST', '/api/discover', async (_req, env) => {
         'Content-Type': 'application/json',
         'User-Agent': 'stock-sync-worker',
       },
-      body: JSON.stringify({ ref: 'main' }),
+      body: JSON.stringify({ ref: 'main', inputs: {} }),
     }
   );
 
+  const responseText = await res.text();
   if (!res.ok) {
-    const txt = await res.text();
-    return json({ error: `GitHub API ${res.status}: ${txt.slice(0, 300)}` }, 500);
+    return json({ error: `GitHub API ${res.status}: ${responseText.slice(0, 500)}` }, 500);
   }
 
   return json({ ok: true, message: 'Discovery disparado no GitHub Actions! Aguarde ~5 minutos para concluir.' });
@@ -377,6 +377,33 @@ add('POST', '/api/mappings/manual', async (req, env) => {
   await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE id IN (?,?)`).bind(meli_unmapped_id, shopee_unmapped_id).run();
 
   return json({ ok: true, sku: canonicalSku });
+});
+
+// ============= Diagnóstico GitHub Actions =============
+add('GET', '/api/test-github', async (_req, env) => {
+  const token = (env as any).GITHUB_TOKEN;
+  const repo  = (env as any).GITHUB_REPO || 'wengcarlos005/stock-sync-inicial';
+  if (!token) return json({ error: 'GITHUB_TOKEN não configurado' }, 500);
+
+  // 1. Testa autenticação
+  const meRes = await fetch('https://api.github.com/user', {
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'User-Agent': 'stock-sync-worker' },
+  });
+  const meText = await meRes.text();
+
+  // 2. Testa acesso ao workflow específico
+  const wfRes = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/282879355`, {
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'User-Agent': 'stock-sync-worker' },
+  });
+  const wfText = await wfRes.text();
+
+  return json({
+    token_prefix: token.slice(0, 10) + '...',
+    me_status: meRes.status,
+    me_body: meText.slice(0, 200),
+    workflow_status: wfRes.status,
+    workflow_body: wfText.slice(0, 300),
+  });
 });
 
 // ============= Diagnóstico MAC API =============
