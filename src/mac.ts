@@ -15,6 +15,17 @@ export async function call(env: MacEnv, action: string, params: any = {}): Promi
     throw new Error(`MAC ${action} HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
   const json = await res.json() as any;
+  // MAC tem 2 envelopes possíveis para o action 'raw':
+  //  (a) Top-level: { status, data, _skill_update }      → body = json.data
+  //  (b) Outer wrap: { data: { status, data, _skill_update } } → body = json.data.data
+  if (action === 'raw') {
+    if (json && typeof json === 'object' && typeof json.status === 'number' && 'data' in json) {
+      return json.data; // formato (a)
+    }
+    if (json && json.data && typeof json.data === 'object' && typeof json.data.status === 'number' && 'data' in json.data) {
+      return json.data.data; // formato (b)
+    }
+  }
   return json.data;
 }
 

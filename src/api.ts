@@ -1163,6 +1163,48 @@ add('GET', '/api/debug/meli-variations/:id', async (_req, env, params) => {
   return json(result);
 });
 
+// ============= DEBUG: simular discover-local.js (raw call + pickSku) =============
+add('GET', '/api/debug/discover-sim/:id', async (_req, env, params) => {
+  // Pega item DUAS vezes via call() — mesma função que discover-local.js usa
+  const mac = await import('./mac');
+  const withAttrs: any = await mac.call(env, 'raw', { method: 'GET', path: `/items/${params.id}?include_attributes=all` });
+  const noAttrs: any  = await mac.call(env, 'raw', { method: 'GET', path: `/items/${params.id}` });
+
+  function pickV(v: any): { sku: string | null; candidates: any } {
+    const candidates = {
+      seller_custom_field: v?.seller_custom_field,
+      seller_sku: v?.seller_sku,
+      attr_value_name: (v?.attributes || []).find((a: any) => a.id === 'SELLER_SKU')?.value_name,
+      attr_values_0_name: (v?.attributes || []).find((a: any) => a.id === 'SELLER_SKU')?.values?.[0]?.name,
+    };
+    for (const c of Object.values(candidates)) if (c && String(c).trim()) return { sku: String(c).trim(), candidates };
+    return { sku: null, candidates };
+  }
+
+  function probe(item: any) {
+    if (!item) return { error: 'null' };
+    return {
+      has_variations: !!item.variations?.length,
+      variations_count: item.variations?.length || 0,
+      first_variation: item.variations?.[0] ? {
+        id: item.variations[0].id,
+        attributes_count: item.variations[0].attributes?.length || 0,
+        attribute_ids: (item.variations[0].attributes || []).map((a: any) => a.id),
+        picked: pickV(item.variations[0]),
+      } : null,
+    };
+  }
+
+  return json({
+    item_id: params.id,
+    with_include_attributes: probe(withAttrs),
+    without_include_attributes: probe(noAttrs),
+    raw_keys_with: withAttrs ? Object.keys(withAttrs) : null,
+    raw_keys_no: noAttrs ? Object.keys(noAttrs) : null,
+    raw_with_preview: typeof withAttrs === 'object' ? JSON.stringify(withAttrs).slice(0, 500) : null,
+  });
+});
+
 // ============= DEBUG: ver estrutura crua de um pedido ML =============
 add('GET', '/api/debug/meli-order/:id', async (_req, env, params) => {
   const search = await macRaw(env, 'raw', { method: 'GET', path: `/orders/${params.id}` });

@@ -43,6 +43,10 @@ async function macCall(action, params = {}) {
     throw new Error(`MAC ${action} HTTP ${res.status}: ${t.slice(0, 200)}`);
   }
   const j = await res.json();
+  if (action === 'raw') {
+    if (j && typeof j === 'object' && typeof j.status === 'number' && 'data' in j) return j.data;
+    if (j && j.data && typeof j.data === 'object' && typeof j.data.status === 'number' && 'data' in j.data) return j.data.data;
+  }
   return j.data;
 }
 
