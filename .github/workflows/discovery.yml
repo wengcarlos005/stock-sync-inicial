@@ -6,6 +6,11 @@ on:
     - cron: '0 9 * * *'
   # Ou dispara manualmente pelo GitHub (Actions → Run workflow)
   workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Modo debug (dumpa estrutura crua dos primeiros 3 itens)'
+        type: boolean
+        default: false
 
 jobs:
   discovery:
@@ -28,4 +33,5 @@ jobs:
           MELI_USER_ID:  ${{ secrets.MELI_USER_ID }}
           WORKER_URL:    ${{ secrets.WORKER_URL }}
           ADMIN_TOKEN:   ${{ secrets.ADMIN_TOKEN }}
+          DEBUG:         ${{ inputs.debug && '1' || '' }}
         run: node discover-local.js

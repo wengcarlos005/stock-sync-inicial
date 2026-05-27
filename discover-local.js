@@ -1,6 +1,13 @@
 /**
- * Discovery — varre ML + Shopee, pareia por SKU, envia para o Worker via API.
- * Inclui TODOS os produtos ML no unmapped (mesmo sem SELLER_SKU configurado).
+ * Discovery v3 — pareamento robusto ML × Shopee.
+ *
+ * Estratégias (em ordem):
+ *  1. SKU exato (extraído de TODOS campos possíveis dos dois lados)
+ *  2. SHOPEE_<item_id> no SELLER_SKU ML → casa pelo item_id Shopee + combo
+ *  3. Título do item (normalizado) + parte do combo de variação
+ *  4. Título do item (normalizado) puro (produtos sem variação dos dois lados)
+ *
+ * Suporte a DEBUG=1: dumpa estrutura crua dos primeiros 3 itens ML e Shopee.
  */
 
 const MAC_URL = process.env.MAC_URL   || 'https://keymlnklhffwnleruvpy.supabase.co/functions/v1/marketplace-mcp';
@@ -8,6 +15,7 @@ const MAC_KEY = process.env.MAC_API_KEY || 'mc_live_81ae21dc00069526c08cad3e564d
 const MELI_USER_ID = process.env.MELI_USER_ID || '1826916479';
 const WORKER_URL   = process.env.WORKER_URL   || 'https://stock-sync.wengcarlos005.workers.dev';
 const ADMIN_TOKEN  = process.env.ADMIN_TOKEN;
+const DEBUG = process.env.DEBUG === '1' || process.env.DEBUG === 'true';
 
 if (!ADMIN_TOKEN) {
   console.error('❌ ADMIN_TOKEN não definido.');
@@ -46,35 +54,57 @@ async function workerApi(path, method = 'GET', body = null) {
   return res.json();
 }
 
-function getMeliSku(item) {
-  const attr = (item.attributes || []).find(a => a.id === 'SELLER_SKU');
-  return attr?.value_name?.trim() || null;
+// ── Helpers de extração de SKU (cobre TODOS os campos possíveis) ──
+function pickSkuMeliItem(item) {
+  // Item-level ML: tenta seller_custom_field, depois attribute SELLER_SKU
+  const candidates = [
+    item.seller_custom_field,
+    item.seller_sku,
+    (item.attributes || []).find(a => a.id === 'SELLER_SKU')?.value_name,
+    (item.attributes || []).find(a => a.id === 'SELLER_SKU')?.values?.[0]?.name,
+  ];
+  for (const c of candidates) if (c && String(c).trim()) return String(c).trim();
+  return null;
 }
-function getMeliVariationSku(v) {
-  if (v.seller_custom_field?.trim()) return v.seller_custom_field.trim();
-  const attr = (v.attributes || []).find(a => a.id === 'SELLER_SKU');
-  return attr?.value_name?.trim() || null;
+function pickSkuMeliVariation(v) {
+  const candidates = [
+    v.seller_custom_field,
+    v.seller_sku,
+    (v.attributes || []).find(a => a.id === 'SELLER_SKU')?.value_name,
+    (v.attributes || []).find(a => a.id === 'SELLER_SKU')?.values?.[0]?.name,
+  ];
+  for (const c of candidates) if (c && String(c).trim()) return String(c).trim();
+  return null;
 }
-// Normaliza string para comparação: remove acentos, espaços/separadores → '-', lowercase
+
+// Combo: lista de value_names dos attribute_combinations
+function comboParts(v) {
+  return (v.attribute_combinations || [])
+    .map(c => c.value_name)
+    .filter(Boolean)
+    .map(s => String(s).trim());
+}
+
+// Normaliza pra comparação: minúsculo, sem acento, separadores → '-', remove não-alfanum
 function normalize(s) {
-  return (s || '').toLowerCase()
+  return (s || '').toString().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[\s\/\-_]+/g, '-')
     .replace(/[^a-z0-9\-]/g, '')
     .replace(/^-+|-+$/g, '');
 }
-function getMeliVariationCombo(v) {
-  const parts = (v.attribute_combinations || []).map(c => c.value_name).filter(Boolean);
-  return parts.length ? parts.join('-') : null;
-}
 
 async function main() {
-  console.log('=== Discovery ===\n');
+  console.log('=== Discovery v3 ===\n');
 
-  const skuToShopee = {};  // sku → {item_id, model_id, name, modelName}
-  const skuToMeli   = {};  // sku → {item_id, variation_id, name, combo}
-  const meliNoSku   = [];  // items ML sem SELLER_SKU → Estratégia 3 ou unmapped manual
-  const normTitleToShopee = {};  // normalize(shopee_item_name) → [{item_id, model_id, modelName, sku}]
+  const skuToShopee  = {};   // normalize(sku) → entry
+  const itemTitleToShopee = {};  // normalize(item_name) → array de entries
+  const shopeeByItemId = {}; // shopee item_id → array de entries
+
+  // MELI: indexação dupla — por SKU e por título+combo
+  const skuToMeli = {};      // normalize(sku) → entry
+  const meliItems = [];      // todos os ML items para parear depois
+  const meliNoSku = [];      // ML variations sem SKU
 
   // ── SHOPEE ──────────────────────────────────────────────────
   console.log('Varrendo Shopee...');
@@ -89,6 +119,7 @@ async function main() {
   }
   console.log(`  ${shopeeIds.length} items`);
 
+  let debugShopeeDumped = 0;
   for (let i = 0; i < shopeeIds.length; i++) {
     const id = shopeeIds[i];
     process.stdout.write(`  Shopee ${i + 1}/${shopeeIds.length}...\r`);
@@ -96,27 +127,60 @@ async function main() {
       const d = await macCall('shopee_get_item', { item_id: id });
       const item = d?.response?.item_list?.[0];
       if (!item) continue;
+
+      if (DEBUG && debugShopeeDumped < 3) {
+        console.log(`\n[DEBUG Shopee ${id}]`);
+        console.log('  item.item_name:', item.item_name);
+        console.log('  item.item_sku:', JSON.stringify(item.item_sku));
+        console.log('  item.has_model:', item.has_model);
+        console.log('  item.tier_variation:', JSON.stringify(item.tier_variation));
+        debugShopeeDumped++;
+      }
+
+      const normTitle = normalize(item.item_name || '');
+      if (!itemTitleToShopee[normTitle]) itemTitleToShopee[normTitle] = [];
+      if (!shopeeByItemId[String(id)]) shopeeByItemId[String(id)] = [];
+
       if (item.has_model) {
         const md = await macCall('shopee_get_models', { item_id: id });
-        for (const m of md?.response?.model || []) {
-          const sku = m.model_sku?.trim();
-          const normTitle = normalize(item.item_name || '');
-          if (!normTitleToShopee[normTitle]) normTitleToShopee[normTitle] = [];
-          normTitleToShopee[normTitle].push({ item_id: String(id), model_id: String(m.model_id), modelName: m.model_name || '', sku: sku || null });
-          if (!sku) continue;
-          skuToShopee[sku] = { item_id: String(id), model_id: String(m.model_id), name: `${item.item_name} - ${m.model_name || ''}`, modelName: m.model_name || '' };
+        const models = md?.response?.model || [];
+        if (DEBUG && debugShopeeDumped <= 3) {
+          for (const m of models.slice(0, 3)) {
+            console.log(`  model_id=${m.model_id} model_sku=${JSON.stringify(m.model_sku)} model_name=${JSON.stringify(m.model_name)}`);
+          }
+        }
+        for (const m of models) {
+          const sku = (m.model_sku || '').toString().trim();
+          const modelName = (m.model_name || '').toString().trim();
+          const entry = {
+            item_id: String(id),
+            model_id: String(m.model_id),
+            modelName,
+            sku: sku || null,
+            itemName: item.item_name || '',
+            normModelName: normalize(modelName),
+          };
+          itemTitleToShopee[normTitle].push(entry);
+          shopeeByItemId[String(id)].push(entry);
+          if (sku) skuToShopee[normalize(sku)] = entry;
         }
       } else {
-        const sku = item.item_sku?.trim();
-        const normTitle = normalize(item.item_name || '');
-        if (!normTitleToShopee[normTitle]) normTitleToShopee[normTitle] = [];
-        normTitleToShopee[normTitle].push({ item_id: String(id), model_id: null, modelName: '', sku: sku || null });
-        if (!sku) continue;
-        skuToShopee[sku] = { item_id: String(id), model_id: null, name: item.item_name || '', modelName: '' };
+        const sku = (item.item_sku || '').toString().trim();
+        const entry = {
+          item_id: String(id),
+          model_id: null,
+          modelName: '',
+          sku: sku || null,
+          itemName: item.item_name || '',
+          normModelName: '',
+        };
+        itemTitleToShopee[normTitle].push(entry);
+        shopeeByItemId[String(id)].push(entry);
+        if (sku) skuToShopee[normalize(sku)] = entry;
       }
     } catch (e) { console.error(`\n  ERRO shopee ${id}: ${e.message}`); }
   }
-  console.log(`\n  SKUs Shopee: ${Object.keys(skuToShopee).length}`);
+  console.log(`\n  Shopee SKUs indexados: ${Object.keys(skuToShopee).length} | títulos: ${Object.keys(itemTitleToShopee).length}`);
 
   // ── MERCADO LIVRE ────────────────────────────────────────────
   console.log('\nVarrendo Mercado Livre...');
@@ -131,6 +195,7 @@ async function main() {
   }
   console.log(`  ${meliIds.length} items`);
 
+  let debugMeliDumped = 0;
   for (let i = 0; i < meliIds.length; i++) {
     const id = meliIds[i];
     process.stdout.write(`  ML ${i + 1}/${meliIds.length}...\r`);
@@ -138,148 +203,197 @@ async function main() {
       const item = await macCall('raw', { method: 'GET', path: `/items/${id}` });
       if (!item) continue;
 
+      if (DEBUG && debugMeliDumped < 3) {
+        console.log(`\n[DEBUG ML ${id}]`);
+        console.log('  title:', item.title);
+        console.log('  item.seller_custom_field:', JSON.stringify(item.seller_custom_field));
+        console.log('  item.seller_sku:', JSON.stringify(item.seller_sku));
+        const itemSkuAttr = (item.attributes || []).find(a => a.id === 'SELLER_SKU');
+        console.log('  item SELLER_SKU attr:', JSON.stringify(itemSkuAttr?.value_name), 'values:', JSON.stringify(itemSkuAttr?.values));
+        console.log('  variations.length:', (item.variations || []).length);
+        for (const v of (item.variations || []).slice(0, 3)) {
+          console.log(`    v.id=${v.id}`);
+          console.log(`      seller_custom_field=${JSON.stringify(v.seller_custom_field)}`);
+          console.log(`      seller_sku=${JSON.stringify(v.seller_sku)}`);
+          const vAttr = (v.attributes || []).find(a => a.id === 'SELLER_SKU');
+          console.log(`      SELLER_SKU attr=${JSON.stringify(vAttr?.value_name)} values=${JSON.stringify(vAttr?.values)}`);
+          console.log(`      attr_combos=${JSON.stringify(comboParts(v))}`);
+          console.log(`      all_attr_ids=${JSON.stringify((v.attributes || []).map(a => a.id))}`);
+        }
+        debugMeliDumped++;
+      }
+
+      const itemTitle = item.title || '';
       if (item.variations?.length > 0) {
         for (const v of item.variations) {
-          const sku = getMeliVariationSku(v);
-          const combo = (v.attribute_combinations || []).map(c => c.value_name).filter(Boolean).join('/');
-          const name = (item.title || '') + (combo ? ' — ' + combo : '');
-          if (sku) {
-            skuToMeli[sku] = { item_id: id, variation_id: String(v.id), name, combo: getMeliVariationCombo(v) };
-          } else {
-            // Sem SKU: guarda para Estratégia 3 (combo) ou unmapped manual
-            meliNoSku.push({ item_id: id, variation_id: String(v.id), name, sku: '', itemTitle: item.title || '', combo: getMeliVariationCombo(v) });
-          }
+          const sku = pickSkuMeliVariation(v);
+          const parts = comboParts(v);
+          const fullCombo = parts.join('/');
+          const name = itemTitle + (fullCombo ? ' — ' + fullCombo : '');
+          const entry = {
+            item_id: id,
+            variation_id: String(v.id),
+            name,
+            itemTitle,
+            comboParts: parts,
+            sku,
+          };
+          if (sku) skuToMeli[normalize(sku)] = entry;
+          else meliNoSku.push(entry);
+          meliItems.push(entry);
         }
       } else {
-        const sku = getMeliSku(item);
-        const name = item.title || '';
-        if (sku) {
-          skuToMeli[sku] = { item_id: id, variation_id: null, name, combo: null };
-        } else {
-          meliNoSku.push({ item_id: id, variation_id: null, name, sku: '', itemTitle: item.title || '', combo: null });
-        }
+        const sku = pickSkuMeliItem(item);
+        const entry = {
+          item_id: id, variation_id: null,
+          name: itemTitle, itemTitle, comboParts: [], sku,
+        };
+        if (sku) skuToMeli[normalize(sku)] = entry;
+        else meliNoSku.push(entry);
+        meliItems.push(entry);
       }
     } catch (e) { console.error(`\n  ERRO meli ${id}: ${e.message}`); }
   }
-  console.log(`\n  SKUs ML: ${Object.keys(skuToMeli).length} | Sem SKU: ${meliNoSku.length}`);
+  console.log(`\n  ML: ${Object.keys(skuToMeli).length} com SKU | ${meliNoSku.length} sem SKU`);
 
-  // ── PAREAR ───────────────────────────────────────────────────
-  console.log('\nPareando...');
-  // shopeeByItemId: item_id → array de modelos (para Strategy 1 com SHOPEE_ prefix)
-  const shopeeByItemId = {};
-  for (const [sku, s] of Object.entries(skuToShopee)) {
-    if (!shopeeByItemId[s.item_id]) shopeeByItemId[s.item_id] = [];
-    shopeeByItemId[s.item_id].push({ ...s, sku });
-  }
-  // shopeeById: item_id → primeiro modelo (compatibilidade) — DEPRECATED, use shopeeByItemId
-  const shopeeById = {};
-  for (const [id, arr] of Object.entries(shopeeByItemId)) shopeeById[id] = arr[0];
-
-  const pairedShopeeIds = new Set();
-  const pairedMeliSkus  = new Set();
+  // ── PAREAMENTO ─────────────────────────────────────────────────
+  const pairedShopeeKeys = new Set(); // "item_id|model_id"
+  const pairedMeliKeys = new Set();   // "item_id|variation_id"
   let mapped = 0, mapErrors = 0;
+  const strategyStats = { s1: 0, s2: 0, s3: 0, s4: 0 };
 
-  for (const [meliSku, m] of Object.entries(skuToMeli)) {
-    let shopeeEntry = null, canonicalSku = meliSku;
+  async function createMapping(canonicalSku, meliE, shopeeE, strategyTag) {
+    if (!canonicalSku) canonicalSku = `ML${meliE.item_id}_SP${shopeeE.item_id}${shopeeE.model_id ? '_M' + shopeeE.model_id : ''}`;
+    try {
+      await workerApi('/api/mappings', 'POST', {
+        sku: canonicalSku,
+        meli_item_id: meliE.item_id,
+        meli_variation_id: meliE.variation_id,
+        shopee_item_id: shopeeE.item_id,
+        shopee_model_id: shopeeE.model_id,
+        product_name: meliE.name || shopeeE.itemName,
+      });
+      pairedShopeeKeys.add(`${shopeeE.item_id}|${shopeeE.model_id || ''}`);
+      pairedMeliKeys.add(`${meliE.item_id}|${meliE.variation_id || ''}`);
+      mapped++;
+      strategyStats[strategyTag]++;
+      return true;
+    } catch (e) { mapErrors++; return false; }
+  }
 
-    // Estratégia 1: SELLER_SKU = "SHOPEE_<item_id>" — casa pelo item_id Shopee
-    if (meliSku.startsWith('SHOPEE_')) {
-      const shopeeId = meliSku.replace(/^SHOPEE_/, '');
-      const allModels = shopeeByItemId[shopeeId] || [];
-      if (allModels.length === 1) {
-        shopeeEntry = allModels[0];
-      } else if (allModels.length > 1) {
-        // Múltiplos modelos Shopee: tenta casar pelo combo de atributos da variação ML
-        const meliCombo = normalize(m.combo || '');
-        shopeeEntry = (meliCombo && allModels.find(sm => normalize(sm.modelName || '') === meliCombo)) || allModels[0];
+  // ── ESTRATÉGIA 1: SKU exato (normalizado) dos dois lados ────
+  console.log('\nEstratégia 1: SKU exato normalizado...');
+  for (const meliE of meliItems) {
+    if (!meliE.sku) continue;
+    if (pairedMeliKeys.has(`${meliE.item_id}|${meliE.variation_id || ''}`)) continue;
+    const normSku = normalize(meliE.sku);
+    if (!normSku) continue;
+    // Pula SKU prefixado SHOPEE_ — estratégia 2 trata
+    if (meliE.sku.toUpperCase().startsWith('SHOPEE_')) continue;
+    const shopeeE = skuToShopee[normSku];
+    if (!shopeeE) continue;
+    await createMapping(shopeeE.sku || meliE.sku, meliE, shopeeE, 's1');
+  }
+  console.log(`  ✔ ${strategyStats.s1} pareados`);
+
+  // ── ESTRATÉGIA 2: SHOPEE_<item_id> ───────────────────────────
+  console.log('Estratégia 2: prefixo SHOPEE_<id>...');
+  for (const meliE of meliItems) {
+    if (pairedMeliKeys.has(`${meliE.item_id}|${meliE.variation_id || ''}`)) continue;
+    if (!meliE.sku || !meliE.sku.toUpperCase().startsWith('SHOPEE_')) continue;
+    const shopeeId = meliE.sku.replace(/^SHOPEE_/i, '');
+    const allModels = shopeeByItemId[shopeeId] || [];
+    if (!allModels.length) continue;
+    let shopeeE = null;
+    if (allModels.length === 1) shopeeE = allModels[0];
+    else {
+      // Múltiplos modelos: casa por combo parts
+      for (const part of meliE.comboParts) {
+        const np = normalize(part);
+        const found = allModels.find(sm => sm.normModelName === np || (sm.sku && normalize(sm.sku) === np));
+        if (found) { shopeeE = found; break; }
       }
-      if (shopeeEntry) canonicalSku = shopeeEntry.sku;
+      if (!shopeeE) shopeeE = allModels[0];
     }
-    // Estratégia 2: SKU idêntico nos dois lados
-    if (!shopeeEntry && meliSku in skuToShopee) {
-      shopeeEntry = { ...skuToShopee[meliSku], sku: meliSku };
-    }
-    if (!shopeeEntry) continue;
-
-    pairedShopeeIds.add(shopeeEntry.item_id);
-    pairedMeliSkus.add(meliSku);
-
-    try {
-      await workerApi('/api/mappings', 'POST', {
-        sku: canonicalSku,
-        meli_item_id: m.item_id,
-        meli_variation_id: m.variation_id,
-        shopee_item_id: shopeeEntry.item_id,
-        shopee_model_id: shopeeEntry.model_id,
-        product_name: m.name || shopeeEntry.name,
-      });
-      mapped++;
-    } catch (e) { mapErrors++; }
+    await createMapping(shopeeE.sku || `SHOPEE_${shopeeId}`, meliE, shopeeE, 's2');
   }
+  console.log(`  ✔ ${strategyStats.s2} pareados`);
 
-  // ── ESTRATÉGIA 3: ML sem SKU × Shopee por título + combo ────────
-  console.log('\nEstratégia 3: pareando ML sem SKU por título + combo...');
-  const pairedMeliItemVars = new Set();  // "item_id|variation_id" já pareados pela S3
-  let s3paired = 0;
-
-  for (const m of meliNoSku) {
-    const titleKey = normalize(m.itemTitle || '');
+  // ── ESTRATÉGIA 3: título ML normalizado + combo parts ────────
+  console.log('Estratégia 3: título ML + combo parts...');
+  for (const meliE of meliItems) {
+    if (pairedMeliKeys.has(`${meliE.item_id}|${meliE.variation_id || ''}`)) continue;
+    const titleKey = normalize(meliE.itemTitle);
     if (!titleKey) continue;
-    const shopeeModels = normTitleToShopee[titleKey] || [];
-    if (!shopeeModels.length) continue;
+    const candidates = itemTitleToShopee[titleKey] || [];
+    if (!candidates.length) continue;
 
-    let shopeeEntry = null;
-    if (m.combo) {
-      const normCombo = normalize(m.combo);
-      // Casa por nome do modelo ou pelo sku do modelo (normalizado)
-      shopeeEntry = shopeeModels.find(sm =>
-        normalize(sm.modelName || '') === normCombo ||
-        (sm.sku && normalize(sm.sku) === normCombo)
-      ) || null;
-    } else if (shopeeModels.length === 1) {
-      // Produto simples sem variações em ambos os lados
-      shopeeEntry = shopeeModels[0];
+    let shopeeE = null;
+    if (meliE.comboParts.length) {
+      // Tenta cada parte do combo individualmente (resolve "32/Truck" → "Truck")
+      for (const part of meliE.comboParts) {
+        const np = normalize(part);
+        if (!np) continue;
+        const found = candidates.find(c => c.normModelName === np || (c.sku && normalize(c.sku) === np));
+        if (found) { shopeeE = found; break; }
+      }
+      // Fallback: tenta o combo inteiro
+      if (!shopeeE) {
+        const npFull = normalize(meliE.comboParts.join('-'));
+        shopeeE = candidates.find(c => c.normModelName === npFull) || null;
+      }
+    } else if (candidates.length === 1) {
+      // ML sem variação, Shopee só 1 modelo: casa direto
+      shopeeE = candidates[0];
     }
-    if (!shopeeEntry) continue;
-
-    // SKU canônico: usa o do Shopee, senão gera por IDs
-    const canonicalSku = shopeeEntry.sku || `ML${m.item_id}_SP${shopeeEntry.item_id}`;
-
-    pairedShopeeIds.add(shopeeEntry.item_id);
-    pairedMeliItemVars.add(`${m.item_id}|${m.variation_id}`);
-
-    try {
-      await workerApi('/api/mappings', 'POST', {
-        sku: canonicalSku,
-        meli_item_id: m.item_id,
-        meli_variation_id: m.variation_id,
-        shopee_item_id: shopeeEntry.item_id,
-        shopee_model_id: shopeeEntry.model_id,
-        product_name: m.name || '',
-      });
-      s3paired++;
-      mapped++;
-    } catch (e) { mapErrors++; }
+    if (!shopeeE) continue;
+    const spKey = `${shopeeE.item_id}|${shopeeE.model_id || ''}`;
+    if (pairedShopeeKeys.has(spKey)) continue; // evita 2 ML pra mesmo modelo Shopee
+    await createMapping(shopeeE.sku || null, meliE, shopeeE, 's3');
   }
-  console.log(`  Estratégia 3: ${s3paired} pareados`);
+  console.log(`  ✔ ${strategyStats.s3} pareados`);
+
+  // ── ESTRATÉGIA 4: título ML normalizado puro (sem variação) ──
+  console.log('Estratégia 4: título ML normalizado puro...');
+  for (const meliE of meliItems) {
+    if (pairedMeliKeys.has(`${meliE.item_id}|${meliE.variation_id || ''}`)) continue;
+    if (meliE.comboParts.length > 0) continue; // só pra produtos sem variação
+    const titleKey = normalize(meliE.itemTitle);
+    if (!titleKey) continue;
+    const candidates = itemTitleToShopee[titleKey] || [];
+    if (candidates.length !== 1) continue; // só se Shopee também tem 1 só
+    const shopeeE = candidates[0];
+    const spKey = `${shopeeE.item_id}|${shopeeE.model_id || ''}`;
+    if (pairedShopeeKeys.has(spKey)) continue;
+    await createMapping(shopeeE.sku || null, meliE, shopeeE, 's4');
+  }
+  console.log(`  ✔ ${strategyStats.s4} pareados`);
 
   // ── UNMAPPED ─────────────────────────────────────────────────
   const unmappedItems = [];
-
-  // ML com SKU mas sem par Shopee
-  for (const [sku, m] of Object.entries(skuToMeli)) {
-    if (!pairedMeliSkus.has(sku))
-      unmappedItems.push({ platform: 'meli', sku, item_id: m.item_id, variation_id: m.variation_id, product_name: m.name });
+  for (const meliE of meliItems) {
+    if (pairedMeliKeys.has(`${meliE.item_id}|${meliE.variation_id || ''}`)) continue;
+    unmappedItems.push({
+      platform: 'meli',
+      sku: meliE.sku || '',
+      item_id: meliE.item_id,
+      variation_id: meliE.variation_id,
+      product_name: meliE.name,
+    });
   }
-  // ML sem SELLER_SKU — pula os já pareados pela Estratégia 3
-  for (const m of meliNoSku) {
-    if (pairedMeliItemVars.has(`${m.item_id}|${m.variation_id}`)) continue;
-    unmappedItems.push({ platform: 'meli', sku: '', item_id: m.item_id, variation_id: m.variation_id, product_name: m.name });
-  }
-  // Shopee sem par ML
-  for (const [sku, s] of Object.entries(skuToShopee)) {
-    if (!pairedShopeeIds.has(s.item_id))
-      unmappedItems.push({ platform: 'shopee', sku, item_id: s.item_id, variation_id: s.model_id, product_name: s.name });
+  // Shopee não pareados
+  for (const arr of Object.values(shopeeByItemId)) {
+    for (const s of arr) {
+      const key = `${s.item_id}|${s.model_id || ''}`;
+      if (pairedShopeeKeys.has(key)) continue;
+      unmappedItems.push({
+        platform: 'shopee',
+        sku: s.sku || '',
+        item_id: s.item_id,
+        variation_id: s.model_id,
+        product_name: s.itemName + (s.modelName ? ' — ' + s.modelName : ''),
+      });
+    }
   }
 
   let unmappedInserted = 0;
@@ -290,29 +404,14 @@ async function main() {
     } catch (e) { console.error(`  ERRO bulk ${i}: ${e.message}`); }
   }
 
-  // ── DIAGNÓSTICO DE PEDIDOS ───────────────────────────────────
-  console.log('\nTestando acesso a pedidos ML...');
-  try {
-    const orders = await macCall('raw', { method: 'GET', path: `/orders/search?seller=${MELI_USER_ID}&sort=date_desc&limit=5` });
-    const count = orders?.results?.length ?? 0;
-    console.log(`  ✅ ML orders API: ${count} pedidos recentes encontrados`);
-    if (count > 0) console.log(`  Primeiro: #${orders.results[0].id} status=${orders.results[0].status}`);
-  } catch (e) {
-    console.log(`  ❌ ML orders API indisponível via MAC: ${e.message}`);
-  }
-
-  try {
-    const shopeeOrders = await macCall('shopee_get_order_list', { time_range_field: 'create_time', time_from: Math.floor(Date.now()/1000) - 86400, time_to: Math.floor(Date.now()/1000), page_size: 5 });
-    const count = shopeeOrders?.response?.order_list?.length ?? 0;
-    console.log(`  ✅ Shopee orders API: ${count} pedidos recentes encontrados`);
-  } catch (e) {
-    console.log(`  ❌ Shopee orders API indisponível via MAC: ${e.message}`);
-  }
-
   console.log(`\n✅ Discovery concluído:`);
   console.log(`   Shopee: ${shopeeIds.length} items | ML: ${meliIds.length} items`);
-  console.log(`   ✔ Pareados: ${mapped} (${mapErrors} erros)`);
-  console.log(`   📋 Não pareados: ${unmappedInserted}/${unmappedItems.length} (${meliNoSku.length - s3paired} ML sem SKU restantes após Estratégia 3)`);
+  console.log(`   ✔ Total pareados: ${mapped}  (erros: ${mapErrors})`);
+  console.log(`     S1 SKU exato:     ${strategyStats.s1}`);
+  console.log(`     S2 SHOPEE_<id>:   ${strategyStats.s2}`);
+  console.log(`     S3 título+combo: ${strategyStats.s3}`);
+  console.log(`     S4 título puro:  ${strategyStats.s4}`);
+  console.log(`   📋 Não pareados:   ${unmappedInserted}/${unmappedItems.length}`);
 }
 
 main().catch(e => { console.error('FATAL:', e.message); process.exit(1); });

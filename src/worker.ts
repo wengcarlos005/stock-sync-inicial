@@ -28,6 +28,7 @@ export default {
       return new Response('OK', { status: 200 });
     }
 
+
     // API endpoints — todos precisam de admin token
     if (url.pathname.startsWith('/api/')) {
       const token = req.headers.get('x-admin-token') || url.searchParams.get('token');
