@@ -48,7 +48,7 @@ add('GET', '/api/products', async (req, env) => {
   const search = url.searchParams.get('q')?.toLowerCase().trim() || '';
   const filter = url.searchParams.get('filter') || 'all';   // all | mismatch | active | disabled
   const r = await env.DB.prepare(`
-    SELECT m.sku, m.product_name, m.active, m.notes,
+    SELECT m.sku, m.product_name, m.active, m.notes, m.image_url,
            m.meli_item_id, m.meli_variation_id, m.shopee_item_id, m.shopee_model_id,
            s.meli_stock, s.shopee_stock, s.master_stock, s.last_poll_at, s.last_change_at,
            m.updated_at
@@ -58,6 +58,34 @@ add('GET', '/api/products', async (req, env) => {
   `).all();
 
   let rows = r.results as any[];
+
+  // Enriquece com image+variation extraídos de orders recentes (busca por SKU)
+  // Usa os pedidos mais recentes — o último visto pra cada SKU "ganha".
+  const ordersR = await env.DB.prepare(
+    `SELECT items_json FROM orders ORDER BY created_at DESC LIMIT 2000`
+  ).all();
+  const skuMeta = new Map<string, { image: string | null; variation: string | null; name: string | null }>();
+  for (const o of ordersR.results as any[]) {
+    let items: any[] = [];
+    try { items = JSON.parse(o.items_json || '[]'); } catch {}
+    for (const it of items) {
+      const sku = (it.sku || '').trim();
+      if (!sku || skuMeta.has(sku)) continue; // primeiro visto = mais recente
+      skuMeta.set(sku, {
+        image: it.image || null,
+        variation: it.variation || null,
+        name: it.name || null,
+      });
+    }
+  }
+  for (const x of rows) {
+    const meta = skuMeta.get(x.sku);
+    // image_url da tabela mappings tem prioridade; fallback pra imagem do último pedido
+    x.image = x.image_url || meta?.image || null;
+    x.variation = meta?.variation || null;
+    if (!x.product_name && meta?.name) x.product_name = meta.name;
+  }
+
   if (search) {
     rows = rows.filter(x =>
       x.sku.toLowerCase().includes(search) ||
@@ -82,6 +110,92 @@ add('GET', '/api/products', async (req, env) => {
     });
   }
   return json({ total: rows.length, items: rows });
+});
+
+// ============= Produtos: Shopee como master (todos itens + status pareamento) =============
+// Junta `mappings` (paired) + `unmapped` (Shopee não pareados) — Shopee é fonte da verdade.
+// Para cada item Shopee, mostra: foto, nome, sku, variação, ML pareado (se houver).
+add('GET', '/api/products/shopee-master', async (req, env) => {
+  const url = new URL(req.url);
+  const search = url.searchParams.get('q')?.toLowerCase().trim() || '';
+  const filter = url.searchParams.get('filter') || 'all'; // all | paired | unpaired
+
+  // 1. Mappings com Shopee preenchido
+  const paired = await env.DB.prepare(`
+    SELECT m.sku, m.product_name, m.image_url, m.active,
+           m.meli_item_id, m.meli_variation_id, m.shopee_item_id, m.shopee_model_id,
+           s.master_stock, s.meli_stock, s.shopee_stock
+    FROM mappings m
+    LEFT JOIN state s ON s.sku = m.sku
+    WHERE m.shopee_item_id IS NOT NULL AND m.shopee_item_id != ''
+  `).all();
+
+  // 2. Unmapped Shopee (não pareados ainda)
+  const unpaired = await env.DB.prepare(`
+    SELECT sku, product_name, item_id AS shopee_item_id, variation_id AS shopee_model_id
+    FROM unmapped
+    WHERE platform = 'shopee' AND resolved = 0
+  `).all();
+
+  // 3. Enriquece com imagem/variation/name do último pedido (preenche faltas)
+  const ordersR = await env.DB.prepare(`SELECT items_json FROM orders ORDER BY created_at DESC LIMIT 2000`).all();
+  const meta = new Map<string, { image: string | null; variation: string | null; name: string | null }>();
+  for (const o of ordersR.results as any[]) {
+    let items: any[] = [];
+    try { items = JSON.parse(o.items_json || '[]'); } catch {}
+    for (const it of items) {
+      // Index by Shopee item_id+model_id (variations have unique model_id)
+      const k = `${it.item_id}|${it.variation_id || ''}`;
+      if (!meta.has(k)) meta.set(k, { image: it.image || null, variation: it.variation || null, name: it.name || null });
+      // Also by SKU as fallback
+      if (it.sku && !meta.has(it.sku)) meta.set(it.sku, { image: it.image || null, variation: it.variation || null, name: it.name || null });
+    }
+  }
+
+  const enrich = (row: any) => {
+    const k = `${row.shopee_item_id}|${row.shopee_model_id || ''}`;
+    const m = meta.get(k) || (row.sku ? meta.get(row.sku) : null);
+    return {
+      ...row,
+      image: row.image_url || m?.image || null,
+      variation: m?.variation || null,
+      product_name: row.product_name || m?.name || '',
+    };
+  };
+
+  const pairedRows = (paired.results as any[]).map(r => ({ ...enrich(r), paired: true }));
+  const unpairedRows = (unpaired.results as any[]).map(r => ({ ...enrich(r), paired: false, active: 0, master_stock: null, meli_stock: null, shopee_stock: null, meli_item_id: null, meli_variation_id: null }));
+
+  let rows = [...pairedRows, ...unpairedRows];
+
+  // Filtros
+  if (filter === 'paired')   rows = rows.filter(r => r.paired);
+  if (filter === 'unpaired') rows = rows.filter(r => !r.paired);
+  if (search) {
+    rows = rows.filter(r =>
+      (r.sku || '').toLowerCase().includes(search) ||
+      (r.product_name || '').toLowerCase().includes(search) ||
+      (r.variation || '').toLowerCase().includes(search)
+    );
+  }
+
+  // Agrupa por shopee_item_id pra mostrar como anúncio + variações
+  const grouped = new Map<string, any>();
+  for (const r of rows) {
+    const gId = r.shopee_item_id;
+    if (!grouped.has(gId)) {
+      grouped.set(gId, {
+        shopee_item_id: gId,
+        product_name: r.product_name,
+        image: r.image,
+        variations: [],
+      });
+    }
+    grouped.get(gId).variations.push(r);
+  }
+
+  const items = [...grouped.values()];
+  return json({ total: items.length, total_variations: rows.length, items });
 });
 
 // ============= Sales stats per SKU (a partir da tabela orders) =============
@@ -1202,6 +1316,68 @@ add('GET', '/api/debug/discover-sim/:id', async (_req, env, params) => {
     raw_keys_with: withAttrs ? Object.keys(withAttrs) : null,
     raw_keys_no: noAttrs ? Object.keys(noAttrs) : null,
     raw_with_preview: typeof withAttrs === 'object' ? JSON.stringify(withAttrs).slice(0, 500) : null,
+  });
+});
+
+// ============= Enriquecer imagens de produtos pareados (chamadas em lote) =============
+// Para cada mapping sem image_url, busca o item na plataforma (ML preferido, fallback Shopee)
+// e salva a thumbnail. Roda em chunks pra não estourar subrequests.
+add('POST', '/api/products/enrich-images', async (req, env) => {
+  const url = new URL(req.url);
+  const limit = Math.min(Number(url.searchParams.get('limit') || 30), 100);
+  const mac = await import('./mac');
+
+  const r = await env.DB.prepare(
+    `SELECT sku, meli_item_id, shopee_item_id FROM mappings WHERE image_url IS NULL OR image_url = '' LIMIT ?`
+  ).bind(limit).all();
+  const rows = r.results as any[];
+
+  let updated = 0, errors = 0;
+  for (const m of rows) {
+    let image: string | null = null;
+    try {
+      if (m.meli_item_id) {
+        const item: any = await mac.call(env, 'raw', { method: 'GET', path: `/items/${m.meli_item_id}?attributes=thumbnail,secure_thumbnail,pictures` });
+        image = item?.secure_thumbnail || item?.thumbnail || item?.pictures?.[0]?.secure_url || item?.pictures?.[0]?.url || null;
+      }
+      if (!image && m.shopee_item_id) {
+        const it: any = await mac.shopeeGetItem(env, Number(m.shopee_item_id));
+        image = (it as any)?.image?.image_url_list?.[0] || null;
+      }
+      if (image) {
+        await env.DB.prepare(`UPDATE mappings SET image_url = ? WHERE sku = ?`).bind(image, m.sku).run();
+        updated++;
+      }
+    } catch { errors++; }
+  }
+
+  // Quantos faltam ainda?
+  const left = await env.DB.prepare(`SELECT COUNT(*) c FROM mappings WHERE image_url IS NULL OR image_url = ''`).first<any>();
+  return json({ processed: rows.length, updated, errors, remaining: left?.c ?? 0 });
+});
+
+// ============= DEBUG: listar pedidos Shopee num período (pra achar gaps) =============
+add('GET', '/api/debug/shopee-orders-range', async (req, env) => {
+  const url = new URL(req.url);
+  const fromSec = Number(url.searchParams.get('from') || (Math.floor(Date.now()/1000) - 24*3600));
+  const toSec   = Number(url.searchParams.get('to')   || Math.floor(Date.now()/1000));
+  const mac = await import('./mac');
+  // Sem status (default)
+  const params: any = { time_range_field: 'create_time', time_from: fromSec, time_to: toSec, page_size: 50 };
+  let d: any;
+  try { d = await mac.call(env, 'shopee_list_orders', params); } catch (e: any) { return json({ error: e.message, fromSec, toSec }); }
+  // Também tenta variantes update_time
+  const params2: any = { time_range_field: 'update_time', time_from: fromSec, time_to: toSec, page_size: 50 };
+  let d2: any;
+  try { d2 = await mac.call(env, 'shopee_list_orders', params2); } catch {}
+  return json({
+    fromSec, toSec,
+    create_time_keys: d ? Object.keys(d) : null,
+    create_time_response_keys: d?.response ? Object.keys(d.response) : null,
+    create_time_orders_count: d?.response?.order_list?.length ?? null,
+    create_time_preview: JSON.stringify(d).slice(0, 800),
+    update_time_orders_count: d2?.response?.order_list?.length ?? null,
+    update_time_preview: d2 ? JSON.stringify(d2).slice(0, 400) : null,
   });
 });
 

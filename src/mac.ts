@@ -242,52 +242,56 @@ export async function shopeeGetRecentOrders(env: MacEnv, sinceMs: number): Promi
   const sinceUnix = Math.max(Math.floor(sinceMs / 1000), Math.floor(Date.now() / 1000) - 15 * 24 * 3600);
   const nowUnix = Math.floor(Date.now() / 1000);
 
-  // 1. Listar order_sn
-  let listData: any;
-  try {
-    listData = await call(env, 'shopee_list_orders', {
-      time_range_field: 'create_time',
-      time_from: sinceUnix,
-      time_to: nowUnix,
-      page_size: 50,
-    });
-  } catch { return []; } // se MAC não suporta, ignora silenciosamente
-
-  const orderSnList: string[] = (listData?.response?.order_list || []).map((o: any) => o.order_sn);
+  // 1. Listar order_sn — Shopee EXIGE order_status, então itera por todos os status relevantes
+  const statuses = ['UNPAID','READY_TO_SHIP','PROCESSED','SHIPPED','COMPLETED','IN_CANCEL','CANCELLED','INVOICE_PENDING'];
+  const orderSnSet = new Set<string>();
+  for (const st of statuses) {
+    let cursor = '';
+    for (let page = 0; page < 5; page++) {
+      const params: any = { time_range_field: 'create_time', time_from: sinceUnix, time_to: nowUnix, page_size: 50, order_status: st };
+      if (cursor) params.cursor = cursor;
+      let d: any;
+      try { d = await call(env, 'shopee_list_orders', params); } catch { break; }
+      for (const o of (d?.response?.order_list || [])) orderSnSet.add(o.order_sn);
+      if (!d?.response?.more) break;
+      cursor = d?.response?.next_cursor || '';
+      if (!cursor) break;
+    }
+  }
+  const orderSnList = [...orderSnSet];
   if (!orderSnList.length) return [];
 
-  // 2. Buscar detalhes em lote (inclui recipient_address pra nome completo)
-  let detailData: any;
-  try {
-    detailData = await call(env, 'shopee_get_order_detail', {
-      order_sn_list: orderSnList,
-      response_optional_fields: 'buyer_username,buyer_user_id,item_list,recipient_address',
-    });
-  } catch { return []; }
-
+  // 2. Buscar detalhes em lote — Shopee permite 50 por chamada
   const out: NormalizedOrder[] = [];
-  for (const o of detailData?.response?.order_list || []) {
-    const items = (o.item_list || []).map((it: any) => ({
-      item_id: String(it.item_id || ''),
-      variation_id: it.model_id ? String(it.model_id) : null,
-      qty: Number(it.model_quantity_purchased || 1),
-      name: it.item_name || '',
-      variation: it.model_name || null,
-      image: it.image_info?.image_url || null,
-      sku: it.model_sku || it.item_sku || '',
-    }));
-
-    // Prefere nome real, mas cai pro username se Shopee retornar "****" (sem PII)
-    const buyerName = deriveShopeeName(o);
-
-    out.push({
-      platform: 'shopee',
-      order_id: String(o.order_sn),
-      status: o.order_status || '',
-      buyer: buyerName,
-      created_at: (o.create_time || 0) * 1000,
-      items,
-    });
+  for (let i = 0; i < orderSnList.length; i += 50) {
+    const chunk = orderSnList.slice(i, i + 50);
+    let detailData: any;
+    try {
+      detailData = await call(env, 'shopee_get_order_detail', {
+        order_sn_list: chunk,
+        response_optional_fields: 'buyer_username,buyer_user_id,item_list,recipient_address',
+      });
+    } catch { continue; }
+    for (const o of detailData?.response?.order_list || []) {
+      const items = (o.item_list || []).map((it: any) => ({
+        item_id: String(it.item_id || ''),
+        variation_id: it.model_id ? String(it.model_id) : null,
+        qty: Number(it.model_quantity_purchased || 1),
+        name: it.item_name || '',
+        variation: it.model_name || null,
+        image: it.image_info?.image_url || null,
+        sku: it.model_sku || it.item_sku || '',
+      }));
+      const buyerName = deriveShopeeName(o);
+      out.push({
+        platform: 'shopee',
+        order_id: String(o.order_sn),
+        status: o.order_status || '',
+        buyer: buyerName,
+        created_at: (o.create_time || 0) * 1000,
+        items,
+      });
+    }
   }
   return out;
 }

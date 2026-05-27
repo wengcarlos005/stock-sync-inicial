@@ -28,6 +28,23 @@ export default {
       return new Response('OK', { status: 200 });
     }
 
+    // TEMP: diagnóstico pública pra MAC orders (remover depois)
+    if (url.pathname === '/_test-orders-x9k2') {
+      const r = await fetch(env.MAC_URL, {
+        method: 'POST',
+        headers: { 'x-api-key': env.MAC_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'raw', params: { method: 'GET', path: `/orders/search?seller=${env.MELI_USER_ID}&sort=date_desc&limit=2` } }),
+      });
+      const txt = await r.text();
+      return new Response(JSON.stringify({
+        worker_mac_url: env.MAC_URL,
+        worker_key_prefix: env.MAC_API_KEY?.slice(0, 14) + '...',
+        worker_meli_user: env.MELI_USER_ID,
+        mac_response_status: r.status,
+        mac_response_body: txt.slice(0, 400),
+      }, null, 2), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // TEMP: trigger único de discovery (remover depois)
     if (url.pathname === '/_kick-discovery-once-x9k2') {
       if (!env.GITHUB_TOKEN) return new Response(JSON.stringify({ error: 'GITHUB_TOKEN not configured' }), { status: 500 });
