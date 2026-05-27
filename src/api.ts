@@ -460,6 +460,91 @@ add('GET', '/api/test-mac', async (_req, env) => {
   }
 });
 
+// ============= DEBUG: inspeção crua de produtos via MAC =============
+async function macRaw(env: Env, action: string, params: any) {
+  const res = await fetch(env.MAC_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': env.MAC_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { _raw: text, _status: res.status }; }
+}
+
+// GET /api/debug/shopee/:id — devolve item + modelos crus
+add('GET', '/api/debug/shopee/:id', async (_req, env, params) => {
+  const id = Number(params.id);
+  const item = await macRaw(env, 'shopee_get_item', { item_id: id });
+  const models = await macRaw(env, 'shopee_get_models', { item_id: id });
+  return json({ item, models });
+});
+
+// GET /api/debug/meli/:id — devolve item ML cru
+add('GET', '/api/debug/meli/:id', async (_req, env, params) => {
+  const item = await macRaw(env, 'raw', { method: 'GET', path: `/items/${params.id}` });
+  return json({ item });
+});
+
+// GET /api/debug/meli-search?q=truck — busca anúncios ML por termo
+add('GET', '/api/debug/meli-search', async (req, env) => {
+  const url = new URL(req.url);
+  const q = encodeURIComponent(url.searchParams.get('q') || '');
+  const userId = env.MELI_USER_ID;
+  const r = await macRaw(env, 'raw', { method: 'GET', path: `/users/${userId}/items/search?q=${q}&limit=10` });
+  return json(r);
+});
+
+// GET /api/debug/sku-fields — para 5 ML + 5 Shopee aleatórios, lista de quais campos cada
+// SKU vem (para entender estrutura real dos dados)
+add('GET', '/api/debug/sku-fields', async (_req, env) => {
+  const userId = env.MELI_USER_ID;
+  const mlSearch: any = await macRaw(env, 'raw', { method: 'GET', path: `/users/${userId}/items/search?limit=5` });
+  const mlIds: string[] = mlSearch?.data?.results || mlSearch?.results || [];
+  const mlSamples = [];
+  for (const id of mlIds.slice(0, 5)) {
+    const r: any = await macRaw(env, 'raw', { method: 'GET', path: `/items/${id}` });
+    const it = r?.data || r;
+    const itemSkuAttr = (it.attributes || []).find((a: any) => a.id === 'SELLER_SKU');
+    const vars = (it.variations || []).slice(0, 3).map((v: any) => ({
+      id: v.id,
+      seller_custom_field: v.seller_custom_field,
+      seller_sku: v.seller_sku,
+      SELLER_SKU_attr: (v.attributes || []).find((a: any) => a.id === 'SELLER_SKU')?.value_name,
+      attr_combos: (v.attribute_combinations || []).map((c: any) => c.value_name),
+      all_attr_ids: (v.attributes || []).map((a: any) => a.id),
+    }));
+    mlSamples.push({
+      id, title: it.title,
+      item_seller_custom_field: it.seller_custom_field,
+      item_SELLER_SKU_attr: itemSkuAttr?.value_name,
+      variations_count: (it.variations || []).length,
+      variations_sample: vars,
+    });
+  }
+
+  const sp: any = await macRaw(env, 'shopee_list_items', { page_size: 5, offset: 0 });
+  const spIds: number[] = (sp?.data?.response?.item || sp?.response?.item || []).map((i: any) => i.item_id);
+  const spSamples = [];
+  for (const id of spIds.slice(0, 5)) {
+    const r: any = await macRaw(env, 'shopee_get_item', { item_id: id });
+    const it = (r?.data?.response?.item_list || r?.response?.item_list || [])[0];
+    if (!it) continue;
+    let models: any[] = [];
+    if (it.has_model) {
+      const md: any = await macRaw(env, 'shopee_get_models', { item_id: id });
+      models = (md?.data?.response?.model || md?.response?.model || []).slice(0, 4).map((m: any) => ({
+        model_id: m.model_id, model_sku: m.model_sku, model_name: m.model_name, tier_index: m.tier_index,
+      }));
+    }
+    spSamples.push({
+      item_id: id, item_name: it.item_name, item_sku: it.item_sku, has_model: it.has_model,
+      tier_variation: it.tier_variation, models,
+    });
+  }
+
+  return json({ ml: mlSamples, shopee: spSamples });
+});
+
 // ============= Orders =============
 add('GET', '/api/orders', async (req, env) => {
   const url = new URL(req.url);
