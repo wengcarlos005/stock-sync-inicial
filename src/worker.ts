@@ -29,6 +29,7 @@ export default {
     }
 
 
+
     // API endpoints — todos precisam de admin token
     if (url.pathname.startsWith('/api/')) {
       const token = req.headers.get('x-admin-token') || url.searchParams.get('token');
