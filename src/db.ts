@@ -70,12 +70,12 @@ export async function setConfig(db: D1Database, key: string, value: string): Pro
 // ============ Orders ============
 export async function saveOrderIfNew(db: D1Database, order: {
   platform: string; order_id: string; status: string; buyer: string;
-  created_at: number; items_json: string;
+  created_at: number; items_json: string; pack_id?: string | null;
 }): Promise<boolean> {
   const r = await db.prepare(`
-    INSERT OR IGNORE INTO orders (platform, order_id, status, buyer, created_at, items_json, processed_at)
-    VALUES (?,?,?,?,?,?,?)
-  `).bind(order.platform, order.order_id, order.status, order.buyer, order.created_at, order.items_json, Date.now()).run();
+    INSERT OR IGNORE INTO orders (platform, order_id, status, buyer, created_at, items_json, processed_at, pack_id)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).bind(order.platform, order.order_id, order.status, order.buyer, order.created_at, order.items_json, Date.now(), order.pack_id ?? null).run();
   return (r.meta.changes ?? 0) > 0; // true = novo, false = já existia
 }
 

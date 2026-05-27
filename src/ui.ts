@@ -37,8 +37,8 @@ export const html = `<!DOCTYPE html>
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div class="flex items-center gap-4">
           <h1 class="text-xl font-bold">📦 Stock Sync</h1>
-          <span x-show="status.shadow_mode" class="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded">SHADOW MODE</span>
-          <span x-show="!status.shadow_mode" class="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded">LIVE</span>
+          <span x-show="status.shadow_mode" class="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded">MODO SOMBRA</span>
+          <span x-show="!status.shadow_mode" class="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded">AO VIVO</span>
         </div>
         <div class="flex items-center gap-3 text-sm">
           <span class="text-slate-500" x-text="lastRunText"></span>
@@ -57,8 +57,8 @@ export const html = `<!DOCTYPE html>
           <div class="text-xs text-slate-500">Produtos sincronizados</div>
         </div>
         <div class="bg-slate-100 rounded-lg p-3">
-          <div class="text-2xl font-bold" :class="status.unresolved_conflicts ? 'text-red-600' : ''" x-text="status.unresolved_conflicts || 0"></div>
-          <div class="text-xs text-slate-500">Conflitos abertos</div>
+          <div class="text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : ''" x-text="lowStockCount"></div>
+          <div class="text-xs text-slate-500">Estoque baixo / zerado</div>
         </div>
         <div class="bg-slate-100 rounded-lg p-3">
           <div class="text-2xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : ''" x-text="status.unmapped_items || 0"></div>
@@ -87,14 +87,23 @@ export const html = `<!DOCTYPE html>
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
-        <div class="flex gap-3 mb-4 items-center">
-          <h2 class="text-sm font-semibold text-slate-700">Pedidos recentes detectados</h2>
-          <div class="flex gap-1">
-            <button @click="orderPlatform=''; loadOrders()" :class="orderPlatform==='' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'" class="text-xs px-3 py-1.5 rounded-lg">Todos</button>
-            <button @click="orderPlatform='meli'; loadOrders()" :class="orderPlatform==='meli' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'" class="text-xs px-3 py-1.5 rounded-lg">🟡 ML</button>
-            <button @click="orderPlatform='shopee'; loadOrders()" :class="orderPlatform==='shopee' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-600'" class="text-xs px-3 py-1.5 rounded-lg">🛒 Shopee</button>
+        <div class="flex gap-3 mb-3 items-center flex-wrap">
+          <h2 class="text-sm font-semibold text-slate-700">Pedidos</h2>
+          <div class="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
+            <button @click="orderPlatform=''; orderPage=1; loadOrders()" :class="orderPlatform==='' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Todas plataformas</button>
+            <button @click="orderPlatform='meli'; orderPage=1; loadOrders()" :class="orderPlatform==='meli' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">🟡 ML</button>
+            <button @click="orderPlatform='shopee'; orderPage=1; loadOrders()" :class="orderPlatform==='shopee' ? 'bg-orange-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">🛒 Shopee</button>
           </div>
-          <span class="text-xs text-slate-400 ml-auto">Atualizado a cada 5 min automaticamente</span>
+          <span class="text-xs text-slate-400 ml-auto">Atualizado a cada 5 min</span>
+        </div>
+        <div class="flex gap-3 mb-4 items-center flex-wrap">
+          <span class="text-xs text-slate-500">Status:</span>
+          <div class="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
+            <button @click="orderStatus=''; orderPage=1; loadOrders()" :class="orderStatus==='' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Todos</button>
+            <button @click="orderStatus='to_ship'; orderPage=1; loadOrders()" :class="orderStatus==='to_ship' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">📦 A enviar</button>
+            <button @click="orderStatus='completed'; orderPage=1; loadOrders()" :class="orderStatus==='completed' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">✅ Concluídos</button>
+            <button @click="orderStatus='cancelled'; orderPage=1; loadOrders()" :class="orderStatus==='cancelled' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">❌ Cancelados</button>
+          </div>
         </div>
         <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <table class="w-full text-sm">
@@ -115,18 +124,33 @@ export const html = `<!DOCTYPE html>
                     <span x-show="o.platform==='meli'" class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">🟡 ML</span>
                     <span x-show="o.platform==='shopee'" class="text-xs px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full font-medium">🛒 Shopee</span>
                   </td>
-                  <td class="px-4 py-3 font-mono text-xs text-slate-500" x-text="o.order_id"></td>
+                  <td class="px-4 py-3 font-mono text-xs text-slate-500">
+                    <div x-text="o.display_id || o.order_id"></div>
+                    <div x-show="o.grouped_count > 1" class="text-[10px] text-indigo-600 font-sans font-medium mt-0.5" x-text="o.grouped_count + ' itens no pacote'"></div>
+                  </td>
                   <td class="px-4 py-3 text-sm" x-text="o.buyer || '—'"></td>
                   <td class="px-4 py-3 text-xs">
                     <template x-for="(it, idx) in parseItems(o.items_json)" :key="idx">
-                      <div class="flex gap-1">
-                        <span class="font-semibold" x-text="'×' + it.qty"></span>
-                        <span class="text-slate-600 truncate max-w-[200px]" x-text="it.name || it.sku || it.item_id"></span>
+                      <div class="flex items-start gap-2 py-1">
+                        <template x-if="it.image">
+                          <img :src="it.image" class="w-10 h-10 rounded object-cover border border-slate-200 shrink-0" loading="lazy" />
+                        </template>
+                        <template x-if="!it.image">
+                          <div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">📦</div>
+                        </template>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-baseline gap-1">
+                            <span class="font-semibold text-slate-700" x-text="'×' + it.qty"></span>
+                            <span class="text-slate-800 text-xs leading-tight" x-text="it.name || it.sku || it.item_id"></span>
+                          </div>
+                          <div x-show="it.variation" class="text-[11px] text-indigo-600 font-medium mt-0.5" x-text="it.variation"></div>
+                          <div x-show="it.sku" class="text-[10px] text-slate-400 font-mono" x-text="'SKU: ' + it.sku"></div>
+                        </div>
                       </div>
                     </template>
                   </td>
                   <td class="px-4 py-3">
-                    <span class="text-xs px-2 py-0.5 rounded" :class="orderStatusClass(o.status)" x-text="o.status || '—'"></span>
+                    <span class="text-xs px-2 py-0.5 rounded" :class="orderStatusClass(o.status)" x-text="translateStatus(o.status)"></span>
                   </td>
                   <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(o.created_at)"></td>
                 </tr>
@@ -134,26 +158,39 @@ export const html = `<!DOCTYPE html>
               <tr x-show="orders.length === 0">
                 <td colspan="6" class="text-center py-10 text-slate-400">
                   <div class="text-2xl mb-2">🛒</div>
-                  <div>Nenhum pedido ainda. O sistema detecta pedidos novos a cada 5 minutos.</div>
-                  <div class="text-xs mt-1 text-slate-300">Pedidos anteriores aparecem após o próximo ciclo de sync.</div>
+                  <div>Nenhum pedido encontrado com esses filtros.</div>
                 </td>
               </tr>
             </tbody>
           </table>
+          <!-- Paginação -->
+          <div x-show="orderTotalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50 text-sm">
+            <div class="text-slate-500 text-xs">
+              <span x-text="'Mostrando '+ ((orderPage-1)*100+1) + '–' + Math.min(orderPage*100, orderTotal) + ' de ' + orderTotal + ' pedidos'"></span>
+            </div>
+            <div class="flex gap-1 items-center">
+              <button @click="orderPage=1; loadOrders()" :disabled="orderPage===1" class="px-2 py-1 text-xs rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">«</button>
+              <button @click="orderPage--; loadOrders()" :disabled="orderPage===1" class="px-2 py-1 text-xs rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">‹</button>
+              <span class="px-3 text-xs text-slate-600" x-text="'Página ' + orderPage + ' de ' + orderTotalPages"></span>
+              <button @click="orderPage++; loadOrders()" :disabled="orderPage>=orderTotalPages" class="px-2 py-1 text-xs rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">›</button>
+              <button @click="orderPage=orderTotalPages; loadOrders()" :disabled="orderPage>=orderTotalPages" class="px-2 py-1 text-xs rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">»</button>
+            </div>
+          </div>
         </div>
       </section>
 
-      <!-- Produtos -->
-      <section x-show="tab === 'products'" x-cloak>
-        <div class="flex gap-3 mb-4">
+      <!-- Estoque -->
+      <section x-show="tab === 'stock'" x-cloak>
+        <div class="flex gap-3 mb-4 flex-wrap">
           <input x-model="productSearch" @input.debounce.300ms="loadProducts()" placeholder="Buscar por SKU ou nome..."
-            class="flex-1 px-4 py-2 border border-slate-300 rounded-lg" />
-          <select x-model="productFilter" @change="loadProducts()" class="px-4 py-2 border border-slate-300 rounded-lg bg-white">
-            <option value="all">Todos</option>
-            <option value="mismatch">Estoques diferentes</option>
-            <option value="active">Ativos</option>
-            <option value="disabled">Desativados</option>
-          </select>
+            class="flex-1 min-w-[200px] px-4 py-2 border border-slate-300 rounded-lg" />
+          <div class="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
+            <button @click="productFilter='all'; loadProducts()" :class="productFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Todos</button>
+            <button @click="productFilter='out_of_stock'; loadProducts()" :class="productFilter==='out_of_stock' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">⚠ Sem estoque</button>
+            <button @click="productFilter='low_stock'; loadProducts()" :class="productFilter==='low_stock' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">⚡ Estoque baixo (&lt; 3)</button>
+            <button @click="productFilter='mismatch'; loadProducts()" :class="productFilter==='mismatch' ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Divergentes</button>
+            <button @click="productFilter='disabled'; loadProducts()" :class="productFilter==='disabled' ? 'bg-slate-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Pausados</button>
+          </div>
         </div>
         <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <table class="w-full text-sm">
@@ -161,9 +198,7 @@ export const html = `<!DOCTYPE html>
               <tr>
                 <th class="text-left px-4 py-3">SKU</th>
                 <th class="text-left px-4 py-3">Produto</th>
-                <th class="text-center px-4 py-3">🟡 ML</th>
-                <th class="text-center px-4 py-3">🛒 Shopee</th>
-                <th class="text-right px-4 py-3">Master</th>
+                <th class="text-right px-4 py-3">Unidades</th>
                 <th class="text-left px-4 py-3">Última mudança</th>
                 <th class="text-center px-4 py-3">Ações</th>
               </tr>
@@ -172,109 +207,175 @@ export const html = `<!DOCTYPE html>
               <template x-for="p in products" :key="p.sku">
                 <tr :class="p.active ? '' : 'opacity-50'">
                   <td class="px-4 py-3 font-mono text-xs" x-text="p.sku"></td>
-                  <td class="px-4 py-3" x-text="(p.product_name||'').slice(0,60)"></td>
-                  <td class="px-4 py-3 text-center">
-                    <template x-if="p.meli_item_id">
-                      <span class="font-mono text-xs" :class="stockClass(p.meli_stock, p.shopee_stock)" x-text="p.meli_stock ?? '—'"></span>
-                    </template>
-                    <template x-if="!p.meli_item_id">
-                      <button @click="openLinkModal(p, 'meli')" class="text-xs px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear ML</button>
-                    </template>
+                  <td class="px-4 py-3" x-text="(p.product_name||'').slice(0,70)"></td>
+                  <td class="px-4 py-3 text-right">
+                    <span class="text-lg font-bold font-mono" :class="unitsClass(unifiedStock(p))" x-text="unifiedStockDisplay(p)"></span>
                   </td>
-                  <td class="px-4 py-3 text-center">
-                    <template x-if="p.shopee_item_id">
-                      <span class="font-mono text-xs" :class="stockClass(p.shopee_stock, p.meli_stock)" x-text="p.shopee_stock ?? '—'"></span>
-                    </template>
-                    <template x-if="!p.shopee_item_id">
-                      <button @click="openLinkModal(p, 'shopee')" class="text-xs px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded">+ Parear Shopee</button>
-                    </template>
-                  </td>
-                  <td class="px-4 py-3 text-right font-mono font-semibold" x-text="p.master_stock ?? '—'"></td>
                   <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(p.last_change_at)"></td>
-                  <td class="px-4 py-3 text-center flex gap-1 justify-center">
-                    <button @click="openSetStock(p)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">setar</button>
-                    <button @click="openLinkModal(p, p.meli_item_id ? 'shopee' : 'meli')" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">parear</button>
-                    <button @click="toggleMapping(p.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="p.active ? 'pausar' : 'ativar'"></button>
+                  <td class="px-4 py-3 text-center">
+                    <div class="flex gap-1 justify-center flex-wrap">
+                      <button @click="openSetStock(p)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
+                      <template x-if="!p.meli_item_id">
+                        <button @click="openLinkModal(p, 'meli')" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ ML</button>
+                      </template>
+                      <template x-if="!p.shopee_item_id">
+                        <button @click="openLinkModal(p, 'shopee')" class="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded">+ Shopee</button>
+                      </template>
+                      <button @click="toggleMapping(p.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="p.active ? 'pausar' : 'ativar'"></button>
+                    </div>
                   </td>
                 </tr>
               </template>
               <tr x-show="products.length === 0">
-                <td colspan="7" class="text-center py-8 text-slate-400">Nenhum produto encontrado. Rode discovery na aba Config.</td>
+                <td colspan="5" class="text-center py-8 text-slate-400">Nenhum produto encontrado. Rode discovery na aba Config.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- Mudanças -->
+      <!-- Produtos (Stats de vendas) -->
+      <section x-show="tab === 'products'" x-cloak>
+        <div class="flex gap-3 mb-4">
+          <input x-model="salesSearch" @input.debounce.300ms="loadSales()" placeholder="Buscar por SKU ou nome..."
+            class="flex-1 px-4 py-2 border border-slate-300 rounded-lg" />
+          <button @click="loadSales()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="text-left px-4 py-3">Produto</th>
+                <th class="text-left px-4 py-3">SKU</th>
+                <th class="text-right px-4 py-3">Estoque</th>
+                <th class="text-right px-4 py-3">7 dias</th>
+                <th class="text-right px-4 py-3">Mês</th>
+                <th class="text-right px-4 py-3">Total</th>
+                <th class="text-left px-4 py-3">Última venda</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <template x-for="s in salesStats" :key="s.sku">
+                <tr class="hover:bg-slate-50">
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                      <template x-if="s.image">
+                        <img :src="s.image" class="w-10 h-10 rounded object-cover border border-slate-200 shrink-0" loading="lazy" />
+                      </template>
+                      <template x-if="!s.image">
+                        <div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-300 shrink-0">📦</div>
+                      </template>
+                      <div class="min-w-0">
+                        <div class="text-xs leading-tight font-medium" x-text="(s.name||'—').slice(0,55)"></div>
+                        <div x-show="s.variation" class="text-[11px] text-indigo-600 mt-0.5" x-text="s.variation"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-xs text-slate-500" x-text="s.sku"></td>
+                  <td class="px-4 py-3 text-right font-mono" :class="unitsClass(s.current_stock)" x-text="s.current_stock ?? '—'"></td>
+                  <td class="px-4 py-3 text-right font-mono text-emerald-700 font-semibold" x-text="s.last7"></td>
+                  <td class="px-4 py-3 text-right font-mono text-slate-700" x-text="s.month"></td>
+                  <td class="px-4 py-3 text-right font-mono font-bold" x-text="s.total"></td>
+                  <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(s.last_sale_at)"></td>
+                </tr>
+              </template>
+              <tr x-show="salesStats.length === 0">
+                <td colspan="7" class="text-center py-10 text-slate-400">
+                  <div class="text-2xl mb-2">📊</div>
+                  <div>Nenhum dado de venda ainda.</div>
+                  <div class="text-xs mt-1 text-slate-300">Pedidos detectados pelo sync vão aparecer aqui.</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Movimentações -->
       <section x-show="tab === 'changes'" x-cloak>
         <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th class="text-left px-4 py-3">Quando</th>
-                <th class="text-left px-4 py-3">SKU</th>
+                <th class="text-left px-4 py-3">Produto / SKU</th>
                 <th class="text-left px-4 py-3">Origem</th>
-                <th class="text-left px-4 py-3">Trigger</th>
-                <th class="text-left px-4 py-3">ML antes → depois</th>
-                <th class="text-left px-4 py-3">Shopee antes → depois</th>
-                <th class="text-right px-4 py-3">Δ</th>
-                <th class="text-left px-4 py-3">Propagou</th>
+                <th class="text-left px-4 py-3">Tipo</th>
+                <th class="text-right px-4 py-3">Δ unidades</th>
+                <th class="text-left px-4 py-3">Estoque antes → depois</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <template x-for="c in changes" :key="c.id">
                 <tr :class="c.shadow ? 'bg-amber-50/50' : ''">
                   <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(c.ts)"></td>
-                  <td class="px-4 py-3 font-mono text-xs" x-text="c.sku"></td>
-                  <td class="px-4 py-3" x-text="c.source"></td>
-                  <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded" :class="triggerClass(c.trigger)" x-text="c.trigger"></span></td>
-                  <td class="px-4 py-3 font-mono text-xs" x-text="(c.meli_stock_before ?? '—') + ' → ' + (c.meli_stock_after ?? '—')"></td>
-                  <td class="px-4 py-3 font-mono text-xs" x-text="(c.shopee_stock_before ?? '—') + ' → ' + (c.shopee_stock_after ?? '—')"></td>
-                  <td class="px-4 py-3 text-right font-mono" :class="c.delta < 0 ? 'text-red-600' : c.delta > 0 ? 'text-emerald-600' : ''" x-text="c.delta > 0 ? '+' + c.delta : c.delta"></td>
+                  <td class="px-4 py-3">
+                    <div class="text-xs leading-tight" x-text="(c.product_name||'').slice(0,55) || c.sku"></div>
+                    <div class="text-[10px] text-slate-400 font-mono" x-text="c.sku"></div>
+                  </td>
                   <td class="px-4 py-3 text-xs">
-                    <span x-show="c.shadow" class="text-amber-700">shadow</span>
-                    <span x-show="!c.shadow && c.propagated_to" x-text="'→ ' + c.propagated_to" class="text-emerald-700"></span>
-                    <span x-show="!c.shadow && c.error" x-text="'⚠ ' + c.error" class="text-red-600"></span>
+                    <span x-show="c.source==='meli'" class="text-amber-700">🟡 ML</span>
+                    <span x-show="c.source==='shopee'" class="text-orange-700">🛒 Shopee</span>
+                    <span x-show="c.source==='manual'" class="text-purple-700">✋ Manual</span>
+                  </td>
+                  <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded" :class="triggerClass(c.trigger)" x-text="triggerLabel(c.trigger)"></span></td>
+                  <td class="px-4 py-3 text-right font-mono font-bold" :class="c.delta < 0 ? 'text-red-600' : c.delta > 0 ? 'text-emerald-600' : ''" x-text="c.delta > 0 ? '+' + c.delta : c.delta"></td>
+                  <td class="px-4 py-3 text-xs font-mono text-slate-500">
+                    <template x-if="c.meli_stock_before !== null || c.shopee_stock_before !== null">
+                      <div>
+                        <div x-show="c.meli_stock_before !== null">ML: <span x-text="c.meli_stock_before + ' → ' + c.meli_stock_after"></span></div>
+                        <div x-show="c.shopee_stock_before !== null">Shopee: <span x-text="c.shopee_stock_before + ' → ' + c.shopee_stock_after"></span></div>
+                      </div>
+                    </template>
+                    <template x-if="c.meli_stock_before === null && c.shopee_stock_before === null">
+                      <span class="text-slate-300">—</span>
+                    </template>
                   </td>
                 </tr>
               </template>
               <tr x-show="changes.length === 0">
-                <td colspan="8" class="text-center py-8 text-slate-400">Nenhuma mudança detectada ainda.</td>
+                <td colspan="6" class="text-center py-8 text-slate-400">Nenhuma movimentação ainda. Use "Reconstruir Movimentações" na aba Config.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- Conflitos -->
-      <section x-show="tab === 'conflicts'" x-cloak>
-        <div class="bg-white border border-slate-200 rounded-lg p-4 mb-4 text-sm">
-          <p class="text-slate-600">Conflitos acontecem quando ambos os lados mudaram entre 2 polls. Resolução automática usa <code class="bg-slate-100 px-1 rounded">min(ML, Shopee)</code>. Você pode sobrepor manualmente abaixo.</p>
-        </div>
-        <div class="space-y-3">
-          <template x-for="c in conflicts" :key="c.id">
-            <div class="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-4">
-              <div class="flex-1">
-                <div class="font-mono text-xs text-slate-500" x-text="c.sku"></div>
-                <div class="text-sm mt-1">
-                  ML: <span class="font-mono" x-text="c.meli_before + ' → ' + c.meli_after"></span> |
-                  Shopee: <span class="font-mono" x-text="c.shopee_before + ' → ' + c.shopee_after"></span>
-                </div>
-                <div class="text-xs text-slate-500 mt-1" x-text="'Resolvido para ' + c.resolved_to + ' (' + c.resolution + ') — ' + fmtRelative(c.ts)"></div>
-              </div>
-              <input type="number" x-model="c._override" placeholder="novo valor" class="w-28 px-2 py-1 border border-slate-300 rounded text-sm" />
-              <button @click="resolveConflict(c)" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded">Aplicar</button>
-            </div>
-          </template>
-          <p x-show="conflicts.length === 0" class="text-center py-8 text-slate-400">Sem conflitos.</p>
-        </div>
-      </section>
 
       <!-- Não pareados -->
       <section x-show="tab === 'unmapped'" x-cloak>
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-          Produtos que existem em apenas um marketplace. Clique <strong>Parear</strong> para conectar manualmente com o equivalente do outro lado.
+          Produtos que existem em apenas um marketplace. Use <strong>Parear lote</strong> para casar todas variações de um anúncio Shopee com um anúncio ML automaticamente (por sufixo numérico do SKU).
+        </div>
+        <div class="mb-4 bg-white border border-slate-200 rounded-lg p-4">
+          <h3 class="text-sm font-semibold mb-2">⚡ Pareamento em lote por anúncio</h3>
+          <p class="text-xs text-slate-500 mb-3">Cole o <strong>item_id</strong> do Shopee e do ML que são o "mesmo anúncio" (mesmo produto). O sistema pareia as variações automaticamente.</p>
+          <div class="flex gap-2">
+            <input x-model="batchShopeeId" placeholder="Shopee item_id (ex: 29443482352)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
+            <input x-model="batchMeliId" placeholder="ML item_id (ex: MLB6139127802)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
+            <button @click="batchPairDry()" :disabled="loading.batchPair" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Pré-visualizar</button>
+            <button @click="batchPairApply()" :disabled="loading.batchPair" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Aplicar</button>
+          </div>
+          <div x-show="batchPairResult" class="mt-3 p-3 bg-slate-50 rounded text-xs">
+            <div x-show="batchPairResult?.dry_run" class="font-semibold mb-2">Pré-visualização:</div>
+            <div>
+              <span x-text="batchPairResult?.matched || batchPairResult?.created || 0"></span> pares formados
+              · <span x-text="batchPairResult?.unmatched_count || 0"></span> sem match
+            </div>
+            <template x-if="batchPairResult?.matches?.length">
+              <ul class="mt-2 space-y-1 max-h-60 overflow-y-auto">
+                <template x-for="m in batchPairResult.matches" :key="m.sku">
+                  <li class="text-slate-600 border-b border-slate-100 py-1">
+                    <div><span class="font-mono font-semibold" x-text="m.sku"></span> <span class="text-[10px] text-indigo-500" x-text="'· ' + m.reason"></span></div>
+                    <div class="text-[11px] text-slate-500">
+                      🛒 <span x-text="m.shopee_name || '(sem nome)'"></span>
+                      ↔ 🟡 <span x-text="m.meli_name || '(sem nome)'"></span>
+                    </div>
+                  </li>
+                </template>
+              </ul>
+            </template>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <!-- Coluna Shopee -->
@@ -293,6 +394,7 @@ export const html = `<!DOCTYPE html>
                   </div>
                   <div class="flex flex-col gap-1 shrink-0">
                     <button @click="openPairModal(u, 'shopee')" class="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded">Parear</button>
+                    <button @click="batchShopeeId=String(u.item_id)" class="text-[10px] px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded">usar lote</button>
                     <button @click="ignoreUnmapped(u.id)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Ignorar</button>
                   </div>
                 </div>
@@ -317,6 +419,7 @@ export const html = `<!DOCTYPE html>
                   </div>
                   <div class="flex flex-col gap-1 shrink-0">
                     <button @click="openPairModal(u, 'meli')" class="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded">Parear</button>
+                    <button @click="batchMeliId=String(u.item_id)" class="text-[10px] px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded">usar lote</button>
                     <button @click="ignoreUnmapped(u.id)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Ignorar</button>
                   </div>
                 </div>
@@ -342,6 +445,38 @@ export const html = `<!DOCTYPE html>
               <a href="https://github.com/wengcarlos005/stock-sync-inicial/actions" target="_blank" class="underline ml-2">Acompanhar progresso →</a>
             </div>
             <div x-show="discoverResult?.error" class="mt-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800" x-text="discoverResult?.error"></div>
+          </div>
+
+          <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Histórico de pedidos (backfill)</h3>
+            <p class="text-sm text-slate-500 mb-3">Importa pedidos antigos das duas plataformas pra alimentar as estatísticas de vendas na aba <strong>Produtos</strong>. Pode demorar alguns segundos.</p>
+            <div class="flex gap-2 items-center">
+              <select x-model="backfillDays" class="px-3 py-2 border border-slate-300 rounded text-sm bg-white">
+                <option value="30">Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+                <option value="180">Últimos 6 meses</option>
+                <option value="365">Último ano</option>
+                <option value="730">Últimos 2 anos</option>
+              </select>
+              <button @click="runBackfill()" :disabled="loading.backfill" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded text-sm">
+                <span x-show="!loading.backfill">⬇ Importar histórico</span>
+                <span x-show="loading.backfill">Importando...</span>
+              </button>
+            </div>
+            <div x-show="backfillResult" class="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-sm text-emerald-800">
+              ✅ Importado: <strong x-text="backfillResult?.ml?.inserted || 0"></strong> pedidos ML
+              + <strong x-text="backfillResult?.shopee?.inserted || 0"></strong> pedidos Shopee
+              <template x-if="(backfillResult?.errors?.length ?? 0) > 0">
+                <div class="mt-2 text-amber-700 text-xs">Avisos: <span x-text="backfillResult.errors.join(' | ')"></span></div>
+              </template>
+            </div>
+            <div class="mt-3">
+              <button @click="rebuildChanges()" :disabled="loading.rebuild" class="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white font-medium rounded text-sm">
+                <span x-show="!loading.rebuild">🔄 Reconstruir Movimentações</span>
+                <span x-show="loading.rebuild">Reconstruindo...</span>
+              </button>
+              <span class="text-xs text-slate-500 ml-2">Gera o histórico de saídas (vendas) a partir dos pedidos importados.</span>
+            </div>
           </div>
 
           <div class="border-t pt-6">
@@ -498,30 +633,40 @@ function app() {
     token: localStorage.getItem('stocksync_token') || '',
     loginInput: '',
     loginError: '',
-    tab: 'products',
+    tab: 'stock',
     tabs: [
       { id: 'orders', label: '🛒 Pedidos' },
-      { id: 'products', label: '📦 Produtos' },
-      { id: 'changes', label: '📜 Mudanças' },
-      { id: 'conflicts', label: '⚠️ Conflitos' },
+      { id: 'stock', label: '📦 Estoque' },
+      { id: 'products', label: '📊 Produtos' },
+      { id: 'changes', label: '📜 Movimentações' },
       { id: 'unmapped', label: '❓ Não pareados' },
       { id: 'config', label: '⚙️ Config' },
     ],
     status: {},
     products: [],
+    salesStats: [],
+    salesSearch: '',
     changes: [],
-    conflicts: [],
     unmapped: [],
     runs: [],
     productSearch: '',
     productFilter: 'all',
-    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false },
+    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false },
+    batchShopeeId: '',
+    batchMeliId: '',
+    batchPairResult: null,
+    backfillDays: '365',
+    backfillResult: null,
     linkModal: null,
     linkSearch: '',
     linkCatalog: [],
     linkTarget: null,
     orders: [],
     orderPlatform: '',
+    orderStatus: '',
+    orderPage: 1,
+    orderTotal: 0,
+    orderTotalPages: 1,
     discoverResult: null,
     setStockModal: null,
     newStockValue: 0,
@@ -564,8 +709,8 @@ function app() {
         this.loadStatus(),
         this.loadOrders(),
         this.loadProducts(),
+        this.loadSales(),
         this.loadChanges(),
-        this.loadConflicts(),
         this.loadUnmapped(),
         this.loadRuns(),
       ]);
@@ -582,33 +727,43 @@ function app() {
       const d = await this.api('/api/status');
       if (!d) return false;
       this.status = d;
-      this.tabs.find(t => t.id === 'conflicts').count = d.unresolved_conflicts;
-      this.tabs.find(t => t.id === 'unmapped').count = d.unmapped_items;
+      const um = this.tabs.find(t => t.id === 'unmapped');
+      if (um) um.count = d.unmapped_items;
       return true;
+    },
+
+    async loadSales() {
+      const d = await this.api('/api/products/sales?q=' + encodeURIComponent(this.salesSearch || ''));
+      this.salesStats = d?.items || [];
+      const t = this.tabs.find(x => x.id === 'products');
+      if (t) t.count = d?.total || 0;
     },
 
     async loadProducts() {
       const url = '/api/products?q=' + encodeURIComponent(this.productSearch) + '&filter=' + this.productFilter;
       const d = await this.api(url);
       this.products = d?.items || [];
-      this.tabs.find(t => t.id === 'products').count = d?.total || 0;
+      const t = this.tabs.find(x => x.id === 'stock');
+      if (t) t.count = d?.total || 0;
     },
 
     async loadOrders() {
-      const q = this.orderPlatform ? '&platform=' + this.orderPlatform : '';
-      const d = await this.api('/api/orders?limit=100' + q);
+      const params = new URLSearchParams();
+      params.set('page', String(this.orderPage));
+      params.set('page_size', '100');
+      if (this.orderPlatform) params.set('platform', this.orderPlatform);
+      if (this.orderStatus) params.set('status_group', this.orderStatus);
+      const d = await this.api('/api/orders?' + params.toString());
       this.orders = d?.items || [];
-      this.tabs.find(t => t.id === 'orders').count = this.orders.length;
+      this.orderTotal = d?.total || 0;
+      this.orderTotalPages = d?.total_pages || 1;
+      this.tabs.find(t => t.id === 'orders').count = this.orderTotal;
     },
 
     async loadChanges() {
-      const d = await this.api('/api/changes?limit=100');
+      const d = await this.api('/api/changes?limit=1000');
       this.changes = d?.items || [];
-    },
-
-    async loadConflicts() {
-      const d = await this.api('/api/conflicts');
-      this.conflicts = (d?.items || []).map(c => ({ ...c, _override: c.resolved_to }));
+      this.tabs.find(t => t.id === 'changes').count = this.changes.length;
     },
 
     async loadUnmapped() {
@@ -719,18 +874,76 @@ function app() {
       alert('Restaurados: ' + (r?.meli_restored||0) + ' ML + ' + (r?.shopee_restored||0) + ' Shopee voltaram para não pareados.');
     },
 
+    async batchPairDry() {
+      if (!this.batchShopeeId || !this.batchMeliId) return;
+      this.loading.batchPair = true;
+      this.batchPairResult = await this.api('/api/mappings/pair-products', {
+        method: 'POST',
+        body: JSON.stringify({ shopee_item_id: this.batchShopeeId, meli_item_id: this.batchMeliId, dry_run: true }),
+      });
+      this.loading.batchPair = false;
+    },
+
+    async batchPairApply() {
+      if (!this.batchShopeeId || !this.batchMeliId) return;
+      if (!confirm('Aplicar pareamento em lote? Vai criar mappings para todas variações que casarem.')) return;
+      this.loading.batchPair = true;
+      this.batchPairResult = await this.api('/api/mappings/pair-products', {
+        method: 'POST',
+        body: JSON.stringify({ shopee_item_id: this.batchShopeeId, meli_item_id: this.batchMeliId }),
+      });
+      this.loading.batchPair = false;
+      await this.loadAll();
+    },
+
+    async rebuildChanges() {
+      this.loading.rebuild = true;
+      try {
+        const r = await this.api('/api/changes/rebuild', { method: 'POST' });
+        await this.loadChanges();
+        alert((r?.inserted ?? 0) + ' movimentações geradas.');
+      } finally {
+        this.loading.rebuild = false;
+      }
+    },
+
+    async runBackfill() {
+      this.loading.backfill = true;
+      this.backfillResult = { ml: { inserted: 0 }, shopee: { inserted: 0 }, errors: [] };
+      const total = Number(this.backfillDays);
+      // Janelas de 30 dias pra não estourar timeout
+      const CHUNK = 30;
+      try {
+        for (let from = 0; from < total; from += CHUNK) {
+          const to = Math.min(total, from + CHUNK);
+          try {
+            const res = await fetch('/api/orders/backfill?days=' + to + '&from_days=' + from, {
+              method: 'POST',
+              headers: { 'x-admin-token': this.token },
+              signal: AbortSignal.timeout(280000),
+            });
+            const d = await res.json();
+            this.backfillResult.ml.inserted += (d.ml?.inserted || 0);
+            this.backfillResult.shopee.inserted += (d.shopee?.inserted || 0);
+            if (d.errors?.length) this.backfillResult.errors.push(...d.errors);
+          } catch (e) {
+            // timeout dessa janela — backfill segue rodando server-side, vamos pra próxima
+            this.backfillResult.errors.push('Janela ' + from + '-' + to + 'd: timeout (servidor continua processando)');
+          }
+        }
+        await Promise.all([this.loadSales(), this.loadOrders(), this.loadStatus()]);
+      } catch (e) {
+        this.backfillResult.errors.push(String(e.message || e));
+      }
+      this.loading.backfill = false;
+    },
+
     async cleanupUnmapped() {
       this.loading.cleanup = true;
       const r = await this.api('/api/cleanup-unmapped', { method: 'POST' });
       this.loading.cleanup = false;
       await this.loadAll();
       alert('Limpeza concluída: ' + (r?.meli_resolved||0) + ' ML + ' + (r?.shopee_resolved||0) + ' Shopee removidos dos não pareados.');
-    },
-
-    async resolveConflict(c) {
-      if (c._override == null || c._override < 0) return;
-      await this.api('/api/conflicts/' + c.id + '/resolve', { method: 'POST', body: JSON.stringify({ value: Number(c._override) }) });
-      await this.loadConflicts();
     },
 
     openSetStock(p) {
@@ -768,6 +981,40 @@ function app() {
       return a !== b ? 'text-red-600 font-semibold' : '';
     },
 
+    unifiedStock(p) {
+      // Estoque "unidades" canônico: master_stock se houver, senão min(meli,shopee)
+      if (p.master_stock != null) return p.master_stock;
+      const a = p.meli_stock, b = p.shopee_stock;
+      if (a == null && b == null) return null;
+      if (a == null) return b;
+      if (b == null) return a;
+      return Math.min(a, b);
+    },
+
+    unifiedStockDisplay(p) {
+      const s = this.unifiedStock(p);
+      if (s == null) return '—';
+      // Se ML e Shopee divergem, mostra alerta
+      if (p.meli_stock != null && p.shopee_stock != null && p.meli_stock !== p.shopee_stock) {
+        return s + ' ⚠';
+      }
+      return s;
+    },
+
+    unitsClass(n) {
+      if (n == null) return 'text-slate-400';
+      if (n === 0) return 'text-red-600';
+      if (n < 3) return 'text-amber-600';
+      return 'text-slate-800';
+    },
+
+    get lowStockCount() {
+      return (this.products || []).filter(p => {
+        const s = this.unifiedStock(p);
+        return s != null && s < 3;
+      }).length;
+    },
+
     parseItems(json) {
       try { return JSON.parse(json || '[]'); } catch { return []; }
     },
@@ -777,16 +1024,57 @@ function app() {
       s = s.toLowerCase();
       if (s.includes('paid') || s.includes('completed') || s.includes('shipped') || s.includes('ready')) return 'bg-emerald-100 text-emerald-700';
       if (s.includes('cancel')) return 'bg-red-100 text-red-700';
-      if (s.includes('pending') || s.includes('process')) return 'bg-amber-100 text-amber-700';
+      if (s.includes('pending') || s.includes('process') || s.includes('unpaid')) return 'bg-amber-100 text-amber-700';
       return 'bg-slate-100 text-slate-600';
     },
 
+    translateStatus(s) {
+      if (!s) return '—';
+      const map = {
+        // Mercado Livre
+        'paid': 'Pago',
+        'confirmed': 'Confirmado',
+        'payment_required': 'Aguardando pagamento',
+        'payment_in_process': 'Processando pagamento',
+        'partially_paid': 'Pago parcialmente',
+        'pending_shipment': 'Aguardando envio',
+        'shipped': 'Enviado',
+        'delivered': 'Entregue',
+        'cancelled': 'Cancelado',
+        'invalid': 'Inválido',
+        // Shopee
+        'unpaid': 'Não pago',
+        'ready_to_ship': 'Pronto para envio',
+        'processed': 'Processado',
+        'retry_ship': 'Reenvio',
+        'to_confirm_receive': 'Aguardando confirmação',
+        'in_cancel': 'Cancelando',
+        'to_return': 'A devolver',
+        'completed': 'Concluído',
+        // Genéricos
+        'pending': 'Pendente',
+      };
+      const k = String(s).toLowerCase();
+      return map[k] || s;
+    },
+
     triggerClass(t) {
-      if (t === 'sale') return 'bg-red-100 text-red-700';
+      if (t === 'sale' || t === 'sale_backfill') return 'bg-red-100 text-red-700';
       if (t === 'restock') return 'bg-emerald-100 text-emerald-700';
       if (t === 'conflict') return 'bg-amber-100 text-amber-700';
       if (t === 'manual_set') return 'bg-purple-100 text-purple-700';
       return 'bg-slate-100 text-slate-700';
+    },
+
+    triggerLabel(t) {
+      const map = {
+        'sale': 'Venda',
+        'sale_backfill': 'Venda (hist.)',
+        'restock': 'Reposição',
+        'conflict': 'Conflito',
+        'manual_set': 'Manual',
+      };
+      return map[t] || t;
     },
   };
 }

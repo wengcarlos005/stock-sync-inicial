@@ -100,7 +100,8 @@ export async function meliListItemIds(env: MacEnv, userId: string): Promise<stri
 }
 
 export async function meliGetItem(env: MacEnv, itemId: string): Promise<MeliItem | null> {
-  return meliRaw(env, 'GET', `/items/${itemId}`);
+  // include_attributes=all garante que variations[].attributes (com SELLER_SKU) venha preenchido
+  return meliRaw(env, 'GET', `/items/${itemId}?include_attributes=all`);
 }
 
 export async function meliUpdateStock(env: MacEnv, itemId: string, qty: number, variationId?: number): Promise<any> {
@@ -125,27 +126,99 @@ export function getMeliVariationSku(variation: any): string | null {
 
 // ============ Orders ============
 
+/** Deriva o status real do pedido ML a partir das tags (porque `status` fica "paid" mesmo após envio) */
+export function deriveMeliStatus(o: any): string {
+  const tags: string[] = (o.tags || []).map((t: string) => String(t).toLowerCase());
+  const base = String(o.status || '').toLowerCase();
+  if (base === 'cancelled' || tags.includes('cancelled')) return 'cancelled';
+  if (base === 'invalid') return 'invalid';
+  if (tags.includes('delivered')) return 'delivered';
+  if (tags.includes('shipped')) return 'shipped';
+  if (tags.includes('ready_to_ship')) return 'ready_to_ship';
+  if (tags.includes('pending_shipment') || tags.includes('not_delivered')) return base; // ainda paid
+  return base;
+}
+
+/** Para Shopee: usa name real se disponível, senão buyer_username */
+export function deriveShopeeName(o: any): string {
+  const recipName = o.recipient_address?.name;
+  if (recipName && recipName !== '****' && !String(recipName).includes('*')) return recipName;
+  return o.buyer_username || '';
+}
+
 /** Busca pedidos ML desde sinceMs. Retorna array normalizado. */
 export async function meliGetRecentOrders(env: MacEnv, userId: string, sinceMs: number): Promise<NormalizedOrder[]> {
-  // Pega últimos 50 pedidos ordenados por data (janela de 5min raramente passa disso)
+  // 1. Lista pedidos recentes (resumo) - 1 chamada
   const d = await meliRaw(env, 'GET', `/orders/search?seller=${userId}&sort=date_desc&limit=50`);
   const results: any[] = d?.results || [];
-  const out: NormalizedOrder[] = [];
-  for (const o of results) {
+
+  // Filtra antes de gastar chamadas
+  const fresh = results.filter(o => {
     const created = new Date(o.date_created || o.last_updated).getTime();
-    if (created <= sinceMs) continue; // já processado
-    const items = (o.order_items || []).map((oi: any) => ({
-      item_id: String(oi.item?.id || ''),
-      variation_id: oi.item?.variation_id ? String(oi.item.variation_id) : null,
-      qty: Number(oi.quantity || 1),
-      name: oi.item?.title || '',
-      sku: '',
+    return created > sinceMs;
+  });
+
+  // 2. Para cada pedido novo, busca detalhe completo + imagem do item
+  const itemImageCache = new Map<string, string | null>();
+
+  async function getItemImage(itemId: string): Promise<string | null> {
+    if (itemImageCache.has(itemId)) return itemImageCache.get(itemId)!;
+    try {
+      const r: any = await meliRaw(env, 'GET', `/items/${itemId}?attributes=thumbnail,secure_thumbnail,pictures`);
+      const img = r?.secure_thumbnail || r?.thumbnail || r?.pictures?.[0]?.secure_url || r?.pictures?.[0]?.url || null;
+      itemImageCache.set(itemId, img);
+      return img;
+    } catch {
+      itemImageCache.set(itemId, null);
+      return null;
+    }
+  }
+
+  const out: NormalizedOrder[] = [];
+  for (const summary of fresh) {
+    let full: any = summary;
+    try {
+      full = (await meliRaw(env, 'GET', `/orders/${summary.id}`)) || summary;
+    } catch { /* mantém summary */ }
+
+    const created = new Date(full.date_created || full.last_updated).getTime();
+
+    const items = await Promise.all((full.order_items || []).map(async (oi: any) => {
+      // Variação ML: "Nome: Valor | Nome: Valor"
+      const variationAttrs = (oi.item?.variation_attributes || [])
+        .map((a: any) => {
+          const v = a.value_name || a.value_id;
+          return a.name && v ? `${a.name}: ${v}` : v;
+        })
+        .filter(Boolean)
+        .join(' | ');
+
+      const itemId = String(oi.item?.id || '');
+      const image = itemId ? await getItemImage(itemId) : null;
+
+      return {
+        item_id: itemId,
+        variation_id: oi.item?.variation_id ? String(oi.item.variation_id) : null,
+        qty: Number(oi.quantity || 1),
+        name: oi.item?.title || '',
+        variation: variationAttrs || null,
+        image,
+        sku: oi.item?.seller_sku || oi.item?.seller_custom_field || '',
+      };
     }));
+
+    // Nome completo do comprador (com fallback pro nickname)
+    const buyerName = [full.buyer?.first_name, full.buyer?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || full.buyer?.nickname || '';
+
     out.push({
       platform: 'meli',
-      order_id: String(o.id),
-      status: o.status || '',
-      buyer: o.buyer?.nickname || '',
+      order_id: String(full.id),
+      pack_id: full.pack_id ? String(full.pack_id) : null,
+      status: deriveMeliStatus(full),
+      buyer: buyerName,
       created_at: created,
       items,
     });
@@ -161,7 +234,7 @@ export async function shopeeGetRecentOrders(env: MacEnv, sinceMs: number): Promi
   // 1. Listar order_sn
   let listData: any;
   try {
-    listData = await call(env, 'shopee_get_order_list', {
+    listData = await call(env, 'shopee_list_orders', {
       time_range_field: 'create_time',
       time_from: sinceUnix,
       time_to: nowUnix,
@@ -172,12 +245,12 @@ export async function shopeeGetRecentOrders(env: MacEnv, sinceMs: number): Promi
   const orderSnList: string[] = (listData?.response?.order_list || []).map((o: any) => o.order_sn);
   if (!orderSnList.length) return [];
 
-  // 2. Buscar detalhes em lote
+  // 2. Buscar detalhes em lote (inclui recipient_address pra nome completo)
   let detailData: any;
   try {
     detailData = await call(env, 'shopee_get_order_detail', {
       order_sn_list: orderSnList,
-      response_optional_fields: 'buyer_username,item_list',
+      response_optional_fields: 'buyer_username,buyer_user_id,item_list,recipient_address',
     });
   } catch { return []; }
 
@@ -188,13 +261,19 @@ export async function shopeeGetRecentOrders(env: MacEnv, sinceMs: number): Promi
       variation_id: it.model_id ? String(it.model_id) : null,
       qty: Number(it.model_quantity_purchased || 1),
       name: it.item_name || '',
+      variation: it.model_name || null,
+      image: it.image_info?.image_url || null,
       sku: it.model_sku || it.item_sku || '',
     }));
+
+    // Prefere nome real, mas cai pro username se Shopee retornar "****" (sem PII)
+    const buyerName = deriveShopeeName(o);
+
     out.push({
       platform: 'shopee',
       order_id: String(o.order_sn),
       status: o.order_status || '',
-      buyer: o.buyer_username || '',
+      buyer: buyerName,
       created_at: (o.create_time || 0) * 1000,
       items,
     });
@@ -205,8 +284,17 @@ export async function shopeeGetRecentOrders(env: MacEnv, sinceMs: number): Promi
 export interface NormalizedOrder {
   platform: 'meli' | 'shopee';
   order_id: string;
+  pack_id?: string | null;
   status: string;
   buyer: string;
   created_at: number;
-  items: Array<{ item_id: string; variation_id: string | null; qty: number; name: string; sku: string }>;
+  items: Array<{
+    item_id: string;
+    variation_id: string | null;
+    qty: number;
+    name: string;
+    variation?: string | null;
+    image?: string | null;
+    sku: string;
+  }>;
 }

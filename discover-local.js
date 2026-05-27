@@ -227,7 +227,7 @@ async function main() {
     const id = meliIds[i];
     process.stdout.write(`  ML ${i + 1}/${meliIds.length}...\r`);
     try {
-      const item = await macCall('raw', { method: 'GET', path: `/items/${id}` });
+      const item = await macCall('raw', { method: 'GET', path: `/items/${id}?include_attributes=all` });
       if (!item) continue;
 
       if (DEBUG && debugMeliDumped < 3) {

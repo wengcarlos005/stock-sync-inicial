@@ -72,6 +72,7 @@ async function syncOrders(env: SyncEnv, stats: SyncStats, errs: string[], shadow
         buyer: order.buyer,
         created_at: order.created_at,
         items_json: JSON.stringify(order.items),
+        pack_id: order.pack_id ?? null,
       });
       if (!isNew) continue; // já processado antes
 
