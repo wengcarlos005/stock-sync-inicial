@@ -111,8 +111,12 @@ add('POST', '/api/conflicts/:id/resolve', async (req, env, params) => {
 
 // ============= Unmapped =============
 add('GET', '/api/unmapped', async (_req, env) => {
-  const r = await env.DB.prepare(`SELECT * FROM unmapped WHERE resolved=0 ORDER BY last_seen_at DESC LIMIT 200`).all();
-  return json({ items: r.results });
+  // Top 250 de cada plataforma (não 200 misturado, que pode dar 200% Shopee)
+  const [meli, shopee] = await Promise.all([
+    env.DB.prepare(`SELECT * FROM unmapped WHERE resolved=0 AND platform='meli'   ORDER BY last_seen_at DESC LIMIT 250`).all(),
+    env.DB.prepare(`SELECT * FROM unmapped WHERE resolved=0 AND platform='shopee' ORDER BY last_seen_at DESC LIMIT 250`).all(),
+  ]);
+  return json({ items: [...(meli.results || []), ...(shopee.results || [])] });
 });
 
 add('POST', '/api/unmapped/:id/ignore', async (_req, env, params) => {

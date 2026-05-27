@@ -287,7 +287,7 @@ async function main() {
   const pairedShopeeKeys = new Set(); // "item_id|model_id"
   const pairedMeliKeys = new Set();   // "item_id|variation_id"
   let mapped = 0, mapErrors = 0;
-  const strategyStats = { s1: 0, s2: 0, s3: 0, s4: 0 };
+  const strategyStats = { s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
 
   async function createMapping(canonicalSku, meliE, shopeeE, strategyTag) {
     if (!canonicalSku) canonicalSku = `ML${meliE.item_id}_SP${shopeeE.item_id}${shopeeE.model_id ? '_M' + shopeeE.model_id : ''}`;
@@ -307,6 +307,26 @@ async function main() {
       return true;
     } catch (e) { mapErrors++; return false; }
   }
+
+  // ── ESTRATÉGIA 5: Shopee model_sku é o variation_id (ou item_id) do ML ──
+  // Padrão comum: seller cadastra o ID da variação ML como SKU do modelo Shopee.
+  console.log('\nEstratégia 5: Shopee SKU é o ID da variação ML...');
+  for (const meliE of meliItems) {
+    const mlKey = `${meliE.item_id}|${meliE.variation_id || ''}`;
+    if (pairedMeliKeys.has(mlKey)) continue;
+    // Tenta variation_id primeiro (mais comum), depois item_id
+    const candidates = [meliE.variation_id, meliE.item_id].filter(Boolean);
+    for (const c of candidates) {
+      const norm = normalize(String(c));
+      const shopeeE = skuToShopee[norm];
+      if (!shopeeE) continue;
+      const spKey = `${shopeeE.item_id}|${shopeeE.model_id || ''}`;
+      if (pairedShopeeKeys.has(spKey)) continue;
+      await createMapping(shopeeE.sku || String(c), meliE, shopeeE, 's5');
+      break;
+    }
+  }
+  console.log(`  ✔ ${strategyStats.s5} pareados`);
 
   // ── ESTRATÉGIA 1: SKU exato (normalizado) dos dois lados ────
   console.log('\nEstratégia 1: SKU exato normalizado...');
@@ -466,10 +486,11 @@ async function main() {
   console.log(`\n✅ Discovery concluído:`);
   console.log(`   Shopee: ${shopeeIds.length} items | ML: ${meliIds.length} items`);
   console.log(`   ✔ Total pareados: ${mapped}  (erros: ${mapErrors})`);
-  console.log(`     S1 SKU exato:     ${strategyStats.s1}`);
-  console.log(`     S2 SHOPEE_<id>:   ${strategyStats.s2}`);
-  console.log(`     S3 título+combo: ${strategyStats.s3}`);
-  console.log(`     S4 título puro:  ${strategyStats.s4}`);
+  console.log(`     S5 SKU=ML var/item ID: ${strategyStats.s5}`);
+  console.log(`     S1 SKU exato:          ${strategyStats.s1}`);
+  console.log(`     S2 SHOPEE_<id>:        ${strategyStats.s2}`);
+  console.log(`     S3 fuzzy título+combo: ${strategyStats.s3}`);
+  console.log(`     S4 título puro:        ${strategyStats.s4}`);
   console.log(`   📋 Não pareados:   ${unmappedInserted}/${unmappedItems.length}`);
 }
 
