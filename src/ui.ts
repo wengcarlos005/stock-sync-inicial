@@ -339,12 +339,10 @@ export const html = `<!DOCTYPE html>
                         </template>
                       </td>
                       <td class="px-3 py-2 text-center">
-                        <template x-if="v.paired">
-                          <button @click="openSetStock(v)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
-                        </template>
-                        <template x-if="!v.paired">
-                          <button @click="openPairFromMaster(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear</button>
-                        </template>
+                        <button @click="openPairFromMaster(v, anuncio)"
+                          :class="v.paired ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' : 'bg-amber-100 hover:bg-amber-200 text-amber-800'"
+                          class="text-xs px-2 py-1 rounded"
+                          x-text="v.paired ? 'Re-parear' : '+ Parear'"></button>
                       </td>
                     </tr>
                   </template>
@@ -689,6 +687,94 @@ export const html = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Pair Variation Modal (usado na aba Produtos/Estoque) -->
+  <div x-show="pairVarModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="pairVarModal=null">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]" x-show="pairVarModal">
+      <div class="px-6 py-4 border-b border-slate-200">
+        <h3 class="font-semibold">Parear variação</h3>
+        <p class="text-xs text-slate-500 mt-1" x-text="pairVarModal?.anuncio_name?.slice(0,90)"></p>
+      </div>
+
+      <!-- Estado atual: 2 cards lado a lado -->
+      <div class="px-6 py-3 grid grid-cols-2 gap-3 border-b border-slate-200">
+        <div class="p-3 rounded border" :class="pairVarModal?.shopee_item_id ? 'border-orange-300 bg-orange-50' : 'border-dashed border-slate-300 bg-slate-50'">
+          <div class="text-xs uppercase font-semibold text-orange-600 mb-1">🟠 Shopee</div>
+          <template x-if="pairVarModal?.shopee_item_id">
+            <div class="text-xs space-y-0.5">
+              <div>Item: <span class="font-mono" x-text="pairVarModal.shopee_item_id"></span></div>
+              <div x-show="pairVarModal.shopee_model_id">Variação: <span class="font-mono" x-text="pairVarModal.shopee_model_id"></span></div>
+              <div x-show="pairVarModal.shopee_label"><span class="px-2 py-0.5 bg-orange-100 rounded" x-text="pairVarModal.shopee_label"></span></div>
+            </div>
+          </template>
+          <template x-if="!pairVarModal?.shopee_item_id">
+            <button @click="pairVarSearchSide='shopee'; searchPairVarCatalog()" class="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded">+ Buscar Shopee</button>
+          </template>
+        </div>
+        <div class="p-3 rounded border" :class="pairVarModal?.meli_item_id ? 'border-blue-300 bg-blue-50' : 'border-dashed border-slate-300 bg-slate-50'">
+          <div class="text-xs uppercase font-semibold text-blue-600 mb-1">🔵 Mercado Livre</div>
+          <template x-if="pairVarModal?.meli_item_id">
+            <div class="text-xs space-y-0.5">
+              <div>Item: <span class="font-mono" x-text="pairVarModal.meli_item_id"></span></div>
+              <div x-show="pairVarModal.meli_variation_id">Variação: <span class="font-mono" x-text="pairVarModal.meli_variation_id"></span></div>
+              <div x-show="pairVarModal.meli_label"><span class="px-2 py-0.5 bg-blue-100 rounded" x-text="pairVarModal.meli_label"></span></div>
+            </div>
+          </template>
+          <template x-if="!pairVarModal?.meli_item_id">
+            <button @click="pairVarSearchSide='meli'; searchPairVarCatalog()" class="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded">+ Buscar ML</button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Toggle pra trocar lado mesmo quando já tem -->
+      <div class="px-6 py-2 text-xs text-slate-500 flex gap-3 items-center border-b border-slate-200">
+        <span>Buscar em:</span>
+        <button @click="pairVarSearchSide='shopee'; searchPairVarCatalog()" :class="pairVarSearchSide==='shopee' ? 'bg-orange-200 text-orange-800' : 'bg-slate-100 hover:bg-slate-200'" class="px-2 py-1 rounded">🟠 Shopee</button>
+        <button @click="pairVarSearchSide='meli'; searchPairVarCatalog()" :class="pairVarSearchSide==='meli' ? 'bg-blue-200 text-blue-800' : 'bg-slate-100 hover:bg-slate-200'" class="px-2 py-1 rounded">🔵 ML</button>
+        <label class="ml-auto flex items-center gap-1"><input type="checkbox" x-model="pairVarIncludePaired" @change="searchPairVarCatalog()" /> incluir já pareados</label>
+      </div>
+
+      <div class="px-6 py-3 border-b border-slate-200">
+        <input x-model="pairVarSearch" @input.debounce.300ms="searchPairVarCatalog()" placeholder="Buscar por nome, SKU ou ID..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" autofocus />
+      </div>
+      <div class="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-[150px]">
+        <template x-for="item in pairVarCatalog" :key="item.key">
+          <div class="px-4 py-2 hover:bg-indigo-50 cursor-pointer flex items-center gap-3"
+               @click="selectPairVarTarget(item)"
+               :class="pairVarTarget?.key === item.key ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''">
+            <template x-if="item.image"><img :src="item.image" class="w-10 h-10 object-cover rounded border border-slate-200 shrink-0" loading="lazy" /></template>
+            <template x-if="!item.image"><div class="w-10 h-10 bg-slate-100 rounded flex items-center justify-center text-slate-300">📦</div></template>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs truncate" x-text="(item.product_name||'—').slice(0,80)"></div>
+              <div class="text-[10px] text-slate-400 font-mono">
+                <span x-text="item.item_id"></span><span x-show="item.variation_id"> / <span x-text="item.variation_id"></span></span>
+                · <span x-text="item.sku || '(sem SKU)'"></span>
+                <span x-show="item.variation" class="ml-1 px-1 bg-slate-100 rounded" x-text="item.variation"></span>
+                <span x-show="item.paired" class="ml-1 text-emerald-600">✓ já pareado</span>
+              </div>
+            </div>
+            <span x-show="pairVarTarget?.key === item.key" class="text-indigo-600">✓</span>
+          </div>
+        </template>
+        <div x-show="pairVarCatalog.length===0" class="p-4 text-center text-sm text-slate-400" x-text="pairVarSearch ? 'Nenhum resultado.' : 'Digite pra buscar.'"></div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-slate-200">
+        <div class="flex items-center gap-2 mb-3 text-xs">
+          <span class="text-slate-500">SKU final:</span>
+          <input x-model="pairVarSku" placeholder="auto" class="flex-1 px-3 py-1.5 border border-slate-300 rounded text-sm font-mono" />
+        </div>
+        <div class="flex gap-2">
+          <button @click="pairVarModal=null" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
+          <button @click="confirmPairVariation()" :disabled="!canConfirmPairVar() || loading.pair"
+            class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-medium rounded text-sm">
+            <span x-show="!loading.pair">✓ Confirmar pareamento</span>
+            <span x-show="loading.pair">Salvando...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Set stock modal -->
   <div x-show="setStockModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40" @click.self="setStockModal = null">
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full" x-show="setStockModal">
@@ -768,6 +854,13 @@ function app() {
     pairCatalog: [],
     pairTarget: null,
     pairSku: '',
+    pairVarModal: null,
+    pairVarSearch: '',
+    pairVarCatalog: [],
+    pairVarTarget: null,
+    pairVarSku: '',
+    pairVarSearchSide: 'meli',
+    pairVarIncludePaired: false,
 
     async init() {
       if (!this.token) return;
@@ -836,14 +929,76 @@ function app() {
       if (t2) t2.count = d?.total || 0;
     },
     openPairFromMaster(v, anuncio) {
-      // Pré-preenche batch pair com IDs do anúncio (lado faltante vazio)
-      this.batchShopeeId = String(v.shopee_item_id || anuncio.shopee_item_id || '');
-      this.batchMeliId   = String(v.meli_item_id   || anuncio.meli_item_id   || '');
-      this.tab = 'unmapped';
-      setTimeout(() => {
-        const el = document.getElementById(this.batchShopeeId ? 'batch-meli-input' : 'batch-shopee-input');
-        if (el) el.focus();
-      }, 200);
+      // Abre modal de pareamento por variação (mesmo se já pareado, permite re-parear)
+      this.pairVarModal = {
+        anuncio_name: anuncio.product_name || '',
+        shopee_item_id: v.shopee_item_id || null,
+        shopee_model_id: v.shopee_model_id || null,
+        shopee_label: v.shopee_item_id ? (v.variation || v.sku || '') : null,
+        meli_item_id: v.meli_item_id || null,
+        meli_variation_id: v.meli_variation_id || null,
+        meli_label: v.meli_item_id ? (v.variation || v.sku || '') : null,
+        original_sku: v.sku,
+      };
+      // Lado que falta = lado a buscar; se já tem os 2, default Shopee (re-pareamento)
+      this.pairVarSearchSide = !v.shopee_item_id ? 'shopee' : (!v.meli_item_id ? 'meli' : 'meli');
+      this.pairVarSearch = '';
+      this.pairVarCatalog = [];
+      this.pairVarTarget = null;
+      this.pairVarSku = v.sku || '';
+      this.pairVarIncludePaired = false;
+    },
+    async searchPairVarCatalog() {
+      if (!this.pairVarModal) return;
+      const params = new URLSearchParams({
+        platform: this.pairVarSearchSide,
+        q: this.pairVarSearch || '',
+      });
+      if (this.pairVarIncludePaired) params.set('include_paired', '1');
+      const d = await this.api('/api/catalog?' + params.toString());
+      const items = (d?.items || []).map(x => ({
+        ...x,
+        key: x.platform + '|' + x.item_id + '|' + (x.variation_id || ''),
+      }));
+      this.pairVarCatalog = items;
+    },
+    selectPairVarTarget(item) {
+      this.pairVarTarget = item;
+      // Se SKU final vazio, sugere o do target
+      if (!this.pairVarSku && item.sku) this.pairVarSku = item.sku;
+    },
+    canConfirmPairVar() {
+      if (!this.pairVarModal || !this.pairVarTarget) return false;
+      const m = this.pairVarModal;
+      const t = this.pairVarTarget;
+      // Tem que ter ML e Shopee nos finais
+      const finalShopee = t.platform === 'shopee' ? t.item_id : m.shopee_item_id;
+      const finalMeli   = t.platform === 'meli'   ? t.item_id : m.meli_item_id;
+      return !!(finalShopee && finalMeli);
+    },
+    async confirmPairVariation() {
+      if (!this.canConfirmPairVar()) return;
+      this.loading.pair = true;
+      const m = this.pairVarModal;
+      const t = this.pairVarTarget;
+      const body = {
+        shopee_item_id: t.platform === 'shopee' ? t.item_id : m.shopee_item_id,
+        shopee_model_id: t.platform === 'shopee' ? (t.variation_id || null) : m.shopee_model_id,
+        meli_item_id:   t.platform === 'meli'   ? t.item_id : m.meli_item_id,
+        meli_variation_id: t.platform === 'meli' ? (t.variation_id || null) : m.meli_variation_id,
+        sku: this.pairVarSku || undefined,
+        product_name: t.product_name || m.anuncio_name || undefined,
+      };
+      try {
+        await this.api('/api/mappings/pair-variation', { method: 'POST', body: JSON.stringify(body) });
+        this.pairVarModal = null;
+        await this.loadMaster();
+        await this.loadStatus();
+      } catch (e) {
+        alert('Erro ao parear: ' + e.message);
+      } finally {
+        this.loading.pair = false;
+      }
     },
 
     async loadProducts() {

@@ -235,10 +235,15 @@ add('GET', '/api/products/master', async (req, env) => {
     const a = ensureAnuncio(m.shopee_item_id || null, m.meli_item_id || null, m.product_name || '', m.image_url);
     if (!a) continue;
     const sales = lookupSales(m.sku, `${m.meli_item_id}|${m.meli_variation_id||''}`, `${m.shopee_item_id}|${m.shopee_model_id||''}`);
-    const meta = salesBySku.get(m.sku) || sales;
+    // Preferência de nome de variação: Shopee > SKU > ML (ML costuma ser verboso "Quantidade: X | Versão: Y")
+    const shopeeSales = salesByShopeeVar.get(`${m.shopee_item_id}|${m.shopee_model_id||''}`);
+    const skuSales = salesBySku.get(m.sku);
+    const meliSales = salesByMeliVar.get(`${m.meli_item_id}|${m.meli_variation_id||''}`);
+    const preferredVariation = shopeeSales?.variation || skuSales?.variation || meliSales?.variation || null;
+    const meta = skuSales || sales;
     a.variations.push({
       sku: m.sku,
-      variation: meta?.variation || null,
+      variation: preferredVariation,
       image: m.image_url || meta?.image || null,
       meli_item_id: m.meli_item_id || null,
       meli_variation_id: m.meli_variation_id || null,
@@ -813,12 +818,56 @@ add('GET', '/api/catalog', async (req, env) => {
   const url = new URL(req.url);
   const platform = url.searchParams.get('platform') || '';
   const q = url.searchParams.get('q')?.toLowerCase().trim() || '';
-  let query = `SELECT id, platform, sku, item_id, variation_id, product_name FROM unmapped WHERE resolved=0`;
+  const includePaired = url.searchParams.get('include_paired') === '1';
+
+  // Sempre busca não pareados
+  let query = `SELECT id, platform, sku, item_id, variation_id, product_name, 0 AS paired FROM unmapped WHERE resolved=0`;
   if (platform) query += ` AND platform='${platform === 'meli' ? 'meli' : 'shopee'}'`;
-  const r = await env.DB.prepare(query + ` ORDER BY product_name ASC LIMIT 300`).all();
-  let items = r.results as any[];
-  if (q) items = items.filter(x => (x.product_name || '').toLowerCase().includes(q) || (x.sku || '').toLowerCase().includes(q));
-  return json({ items });
+  let items = (await env.DB.prepare(query + ` ORDER BY product_name ASC LIMIT 600`).all()).results as any[];
+
+  // Opcionalmente inclui já pareados (pra re-pareamento manual)
+  if (includePaired) {
+    const sql = platform === 'meli'
+      ? `SELECT NULL AS id, 'meli' AS platform, sku, meli_item_id AS item_id, meli_variation_id AS variation_id, product_name, 1 AS paired FROM mappings WHERE meli_item_id IS NOT NULL AND meli_item_id!='' LIMIT 600`
+      : platform === 'shopee'
+        ? `SELECT NULL AS id, 'shopee' AS platform, sku, shopee_item_id AS item_id, shopee_model_id AS variation_id, product_name, 1 AS paired FROM mappings WHERE shopee_item_id IS NOT NULL AND shopee_item_id!='' LIMIT 600`
+        : '';
+    if (sql) {
+      const more = (await env.DB.prepare(sql).all()).results as any[];
+      items = items.concat(more);
+    }
+  }
+
+  // Enriquece com imagem e variation pelos pedidos recentes (best-effort)
+  const ordersR = (await env.DB.prepare(`SELECT items_json FROM orders ORDER BY created_at DESC LIMIT 1500`).all()).results as any[];
+  const meta = new Map<string, { image: string | null; variation: string | null }>();
+  for (const o of ordersR) {
+    let oi: any[] = [];
+    try { oi = JSON.parse(o.items_json || '[]'); } catch {}
+    for (const it of oi) {
+      const k = `${it.item_id}|${it.variation_id||''}`;
+      if (!meta.has(k) && (it.image || it.variation)) meta.set(k, { image: it.image || null, variation: it.variation || null });
+    }
+  }
+  for (const x of items) {
+    const m = meta.get(`${x.item_id}|${x.variation_id||''}`);
+    if (m) { x.image = m.image; x.variation = m.variation; }
+  }
+
+  // Busca por nome/SKU/ID (com normalização de acento/mojibake)
+  if (q) {
+    const fixMojibake = (s: string) => { if (!s) return ''; try { const f = decodeURIComponent(escape(s)); return f.includes(String.fromCharCode(0xFFFD)) ? s : f; } catch { return s; } };
+    const norm = (s: string) => fixMojibake(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const nq = norm(q);
+    items = items.filter(x =>
+      norm(x.product_name).includes(nq) ||
+      norm(x.sku).includes(nq) ||
+      String(x.item_id || '').toLowerCase().includes(nq) ||
+      String(x.variation_id || '').includes(nq) ||
+      norm(x.variation || '').includes(nq)
+    );
+  }
+  return json({ items: items.slice(0, 300) });
 });
 
 // ============= Pareamento em lote por anúncio (variações por nome) =============
@@ -959,6 +1008,37 @@ add('POST', '/api/mappings/pair-products', async (req, env) => {
 });
 
 // ============= Pareamento manual =============
+// ============= Parear variação direto via item_id (não exige unmapped.id) =============
+// Body: { shopee_item_id, shopee_model_id?, meli_item_id, meli_variation_id?, sku?, product_name? }
+add('POST', '/api/mappings/pair-variation', async (req, env) => {
+  const body = await req.json() as any;
+  const sp_item = String(body.shopee_item_id || '').trim();
+  const sp_model = body.shopee_model_id ? String(body.shopee_model_id) : null;
+  const ml_item = String(body.meli_item_id || '').trim();
+  const ml_var = body.meli_variation_id ? String(body.meli_variation_id) : null;
+  if (!sp_item || !ml_item) return json({ error: 'shopee_item_id e meli_item_id obrigatórios' }, 400);
+
+  const sku = (body.sku || '').trim() || `MANUAL_${sp_item}_${ml_item}${sp_model ? '_' + sp_model : ''}`;
+  const name = (body.product_name || '').trim() || null;
+  const now = Date.now();
+
+  await env.DB.prepare(`
+    INSERT INTO mappings (sku, meli_item_id, meli_variation_id, shopee_item_id, shopee_model_id, product_name, active, notes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 1, 'pareamento manual', ?, ?)
+    ON CONFLICT(sku) DO UPDATE SET
+      meli_item_id=excluded.meli_item_id, meli_variation_id=excluded.meli_variation_id,
+      shopee_item_id=excluded.shopee_item_id, shopee_model_id=excluded.shopee_model_id,
+      product_name=COALESCE(excluded.product_name, mappings.product_name),
+      updated_at=excluded.updated_at
+  `).bind(sku, ml_item, ml_var, sp_item, sp_model, name, now, now).run();
+
+  // Marca como resolvido nos unmapped relacionados (se existirem)
+  await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE (platform='shopee' AND item_id=? AND (variation_id=? OR (? IS NULL AND variation_id IS NULL))) OR (platform='meli' AND item_id=? AND (variation_id=? OR (? IS NULL AND variation_id IS NULL)))`)
+    .bind(sp_item, sp_model, sp_model, ml_item, ml_var, ml_var).run();
+
+  return json({ ok: true, sku });
+});
+
 add('POST', '/api/mappings/manual', async (req, env) => {
   const body = await req.json() as any;
   const { meli_unmapped_id, shopee_unmapped_id, sku, product_name } = body;
