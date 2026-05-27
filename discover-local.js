@@ -10,7 +10,9 @@
  * Suporte a DEBUG=1: dumpa estrutura crua dos primeiros 3 itens ML e Shopee.
  */
 
-const MAC_URL = process.env.MAC_URL   || 'https://keymlnklhffwnleruvpy.supabase.co/functions/v1/marketplace-mcp';
+// URL nova do MAC (antiga keymlnklhffwnleruvpy.supabase.co foi descontinuada em 2026-05)
+const MAC_URL_DEFAULT = 'https://ucxjnhqjegqkoevsdjwa.supabase.co/functions/v1/marketplace-mcp';
+const MAC_URL = (process.env.MAC_URL && !process.env.MAC_URL.includes('keymlnklhffwnleruvpy')) ? process.env.MAC_URL : MAC_URL_DEFAULT;
 const MAC_KEY = process.env.MAC_API_KEY || 'mc_live_81ae21dc00069526c08cad3e564d17eb10d056c4ba6cf92a8d523d5b0b0bf65a';
 const MELI_USER_ID = process.env.MELI_USER_ID || '1826916479';
 const WORKER_URL   = process.env.WORKER_URL   || 'https://stock-sync.wengcarlos005.workers.dev';
@@ -92,6 +94,31 @@ function normalize(s) {
     .replace(/[\s\/\-_]+/g, '-')
     .replace(/[^a-z0-9\-]/g, '')
     .replace(/^-+|-+$/g, '');
+}
+
+// Stopwords pra remover dos tokens de título (palavras genéricas)
+const STOPWORDS = new Set([
+  'de','do','da','dos','das','para','com','em','no','na','nos','nas','e','o','a','os','as',
+  '2','em','1','3','4','5','6','7','8','9','10','un','und','unidade','unidades','pcs','pç','pçs',
+  'brinquedo','brinquedos','infantil','crianca','criancas','menino','menina','educativo','educatil',
+  'kit','novo','original','promocao','importado','pronto','entrega','frete','gratis',
+]);
+
+// Tokeniza título: normaliza, split por '-', remove stopwords e tokens curtos
+function titleTokens(s) {
+  const norm = normalize(s);
+  if (!norm) return [];
+  return norm.split('-').filter(t => t.length >= 3 && !STOPWORDS.has(t));
+}
+
+// Similaridade Jaccard entre dois sets de tokens
+function jaccard(a, b) {
+  if (!a.length || !b.length) return 0;
+  const sa = new Set(a), sb = new Set(b);
+  let inter = 0;
+  for (const t of sa) if (sb.has(t)) inter++;
+  const union = sa.size + sb.size - inter;
+  return union ? inter / union : 0;
 }
 
 async function main() {
@@ -319,37 +346,69 @@ async function main() {
   }
   console.log(`  ✔ ${strategyStats.s2} pareados`);
 
-  // ── ESTRATÉGIA 3: título ML normalizado + combo parts ────────
-  console.log('Estratégia 3: título ML + combo parts...');
-  for (const meliE of meliItems) {
-    if (pairedMeliKeys.has(`${meliE.item_id}|${meliE.variation_id || ''}`)) continue;
-    const titleKey = normalize(meliE.itemTitle);
-    if (!titleKey) continue;
-    const candidates = itemTitleToShopee[titleKey] || [];
-    if (!candidates.length) continue;
+  // ── ESTRATÉGIA 3: pareamento fuzzy de título + combo parts ──
+  // Para cada item ML, acha o item Shopee mais similar (Jaccard de tokens
+  // do título ≥ 0.5). Dentro desse par, pareia variação pelo combo.
+  console.log('Estratégia 3: fuzzy título (Jaccard) + combo...');
 
-    let shopeeE = null;
-    if (meliE.comboParts.length) {
-      // Tenta cada parte do combo individualmente (resolve "32/Truck" → "Truck")
-      for (const part of meliE.comboParts) {
-        const np = normalize(part);
-        if (!np) continue;
-        const found = candidates.find(c => c.normModelName === np || (c.sku && normalize(c.sku) === np));
-        if (found) { shopeeE = found; break; }
-      }
-      // Fallback: tenta o combo inteiro
-      if (!shopeeE) {
-        const npFull = normalize(meliE.comboParts.join('-'));
-        shopeeE = candidates.find(c => c.normModelName === npFull) || null;
-      }
-    } else if (candidates.length === 1) {
-      // ML sem variação, Shopee só 1 modelo: casa direto
-      shopeeE = candidates[0];
+  // Pré-computa tokens dos títulos Shopee, agrupados por item_id
+  const shopeeItemMap = {}; // item_id → { itemName, tokens, models[] }
+  for (const [itemId, arr] of Object.entries(shopeeByItemId)) {
+    if (!arr.length) continue;
+    const itemName = arr[0].itemName;
+    shopeeItemMap[itemId] = { itemId, itemName, tokens: titleTokens(itemName), models: arr };
+  }
+  const shopeeItemEntries = Object.values(shopeeItemMap);
+
+  // Agrupa items ML por meli_item_id pra processar 1 vez por anúncio ML
+  const mlByItemId = {};
+  for (const e of meliItems) {
+    if (pairedMeliKeys.has(`${e.item_id}|${e.variation_id || ''}`)) continue;
+    if (!mlByItemId[e.item_id]) mlByItemId[e.item_id] = { itemTitle: e.itemTitle, variants: [] };
+    mlByItemId[e.item_id].variants.push(e);
+  }
+
+  for (const [mlItemId, ml] of Object.entries(mlByItemId)) {
+    const mlTokens = titleTokens(ml.itemTitle);
+    if (mlTokens.length < 2) continue;
+
+    // Acha melhor Shopee item por Jaccard
+    let bestSp = null, bestScore = 0;
+    for (const sp of shopeeItemEntries) {
+      if (!sp.tokens.length) continue;
+      const score = jaccard(mlTokens, sp.tokens);
+      if (score > bestScore) { bestScore = score; bestSp = sp; }
     }
-    if (!shopeeE) continue;
-    const spKey = `${shopeeE.item_id}|${shopeeE.model_id || ''}`;
-    if (pairedShopeeKeys.has(spKey)) continue; // evita 2 ML pra mesmo modelo Shopee
-    await createMapping(shopeeE.sku || null, meliE, shopeeE, 's3');
+    if (!bestSp || bestScore < 0.4) continue;
+
+    // Pareia cada variação ML com modelo Shopee correspondente
+    for (const meliE of ml.variants) {
+      const mlKey = `${meliE.item_id}|${meliE.variation_id || ''}`;
+      if (pairedMeliKeys.has(mlKey)) continue;
+
+      let shopeeE = null;
+      const availableModels = bestSp.models.filter(m => !pairedShopeeKeys.has(`${m.item_id}|${m.model_id || ''}`));
+      if (!availableModels.length) continue;
+
+      if (meliE.comboParts.length) {
+        // Tenta casar cada parte do combo individualmente (resolve "32/Truck" → "Truck")
+        for (const part of meliE.comboParts) {
+          const np = normalize(part);
+          if (!np) continue;
+          const found = availableModels.find(c =>
+            c.normModelName === np ||
+            (c.sku && normalize(c.sku) === np) ||
+            (c.sku && normalize(c.sku).endsWith('-' + np)) ||
+            (c.sku && normalize(c.sku).startsWith(np + '-'))
+          );
+          if (found) { shopeeE = found; break; }
+        }
+      } else if (availableModels.length === 1) {
+        shopeeE = availableModels[0];
+      }
+      if (!shopeeE) continue;
+      await createMapping(shopeeE.sku || null, meliE, shopeeE, 's3');
+    }
   }
   console.log(`  ✔ ${strategyStats.s3} pareados`);
 
