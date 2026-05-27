@@ -179,74 +179,95 @@ export const html = `<!DOCTYPE html>
         </div>
       </section>
 
-      <!-- Estoque -->
+      <!-- Estoque (mesma estrutura agrupada da aba Produtos, mas focado em estoque) -->
       <section x-show="tab === 'stock'" x-cloak>
-        <div class="flex gap-3 mb-4 flex-wrap">
-          <input x-model="productSearch" @input.debounce.300ms="loadProducts()" placeholder="Buscar por SKU ou nome..."
-            class="flex-1 min-w-[200px] px-4 py-2 border border-slate-300 rounded-lg" />
-          <div class="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
-            <button @click="productFilter='all'; loadProducts()" :class="productFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Todos</button>
-            <button @click="productFilter='out_of_stock'; loadProducts()" :class="productFilter==='out_of_stock' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">⚠ Sem estoque</button>
-            <button @click="productFilter='low_stock'; loadProducts()" :class="productFilter==='low_stock' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">⚡ Estoque baixo (&lt; 3)</button>
-            <button @click="productFilter='mismatch'; loadProducts()" :class="productFilter==='mismatch' ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Divergentes</button>
-            <button @click="productFilter='disabled'; loadProducts()" :class="productFilter==='disabled' ? 'bg-slate-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Pausados</button>
+        <div class="flex flex-wrap gap-3 mb-4 items-center">
+          <input x-model="masterSearch" @input.debounce.300ms="loadMaster()" placeholder="Buscar por nome, SKU ou variação..."
+            class="flex-1 min-w-[260px] px-4 py-2 border border-slate-300 rounded-lg" />
+          <div class="flex bg-slate-100 p-1 rounded-lg gap-1">
+            <button @click="masterFilter='all'; loadMaster()" :class="masterFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">Todos</button>
+            <button @click="masterFilter='paired'; loadMaster()" :class="masterFilter==='paired' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">✓ Pareados</button>
+            <button @click="masterFilter='unpaired'; loadMaster()" :class="masterFilter==='unpaired' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">⚠ Faltando</button>
+          </div>
+          <button @click="loadMaster()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
+        </div>
+        <div class="text-xs text-slate-500 mb-3"><span x-text="masterItems.length"></span> anúncios · <span x-text="masterTotalVars"></span> variações</div>
+
+        <div class="space-y-3">
+          <template x-for="anuncio in masterItems" :key="anuncio.key">
+            <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div class="flex items-start gap-3 p-3 bg-slate-50 border-b border-slate-200">
+                <template x-if="anuncio.image">
+                  <img :src="anuncio.image" class="w-14 h-14 rounded object-cover border border-slate-200 shrink-0" loading="lazy" />
+                </template>
+                <template x-if="!anuncio.image">
+                  <div class="w-14 h-14 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300 text-xl shrink-0">📦</div>
+                </template>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
+                  <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                    <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
+                    <span x-show="anuncio.meli_item_id">🔵 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
+                    <span>· <span x-text="anuncio.variations.length"></span> variações</span>
+                    <span x-show="anuncio.fully_paired" class="text-emerald-600">✓ pareado</span>
+                  </div>
+                </div>
+              </div>
+              <table class="w-full text-sm">
+                <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
+                  <tr>
+                    <th class="text-left px-3 py-2 w-36">Variação</th>
+                    <th class="text-left px-3 py-2">SKU</th>
+                    <th class="text-right px-3 py-2 w-20">ML</th>
+                    <th class="text-right px-3 py-2 w-20">SP</th>
+                    <th class="text-right px-3 py-2 w-24">Unidades</th>
+                    <th class="text-center px-3 py-2 w-32">Ação</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <template x-for="v in anuncio.variations" :key="(v.shopee_model_id||'')+'|'+(v.meli_variation_id||'')+'|'+v.sku">
+                    <tr :class="v.paired ? (v.active ? '' : 'opacity-50') : 'bg-amber-50/40'">
+                      <td class="px-3 py-2">
+                        <span x-show="v.variation" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="v.variation"></span>
+                        <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
+                      </td>
+                      <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
+                      <td class="px-3 py-2 text-right font-mono text-xs" :class="unitsClass(v.meli_stock)" x-text="v.meli_stock ?? '—'"></td>
+                      <td class="px-3 py-2 text-right font-mono text-xs" :class="unitsClass(v.shopee_stock)" x-text="v.shopee_stock ?? '—'"></td>
+                      <td class="px-3 py-2 text-right">
+                        <template x-if="v.paired">
+                          <span class="text-lg font-bold font-mono" :class="unitsClass(unifiedStock(v))" x-text="unifiedStockDisplay(v)"></span>
+                        </template>
+                        <template x-if="!v.paired">
+                          <span class="text-xs text-slate-300">—</span>
+                        </template>
+                      </td>
+                      <td class="px-3 py-2 text-center">
+                        <template x-if="v.paired">
+                          <div class="flex gap-1 justify-center">
+                            <button @click="openSetStock(v)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
+                            <button @click="toggleMapping(v.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="v.active ? 'pausar' : 'ativar'"></button>
+                          </div>
+                        </template>
+                        <template x-if="!v.paired">
+                          <button @click="openPairFromMaster(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear</button>
+                        </template>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+          <div x-show="masterItems.length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
+            <div class="text-2xl mb-2">📦</div>
+            <div>Nenhum produto encontrado.</div>
           </div>
         </div>
-        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th class="text-left px-4 py-3">SKU</th>
-                <th class="text-left px-4 py-3">Produto</th>
-                <th class="text-right px-4 py-3">Unidades</th>
-                <th class="text-left px-4 py-3">Última mudança</th>
-                <th class="text-center px-4 py-3">Ações</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <template x-for="p in products" :key="p.sku">
-                <tr :class="p.active ? '' : 'opacity-50'">
-                  <td class="px-4 py-3 font-mono text-xs whitespace-nowrap" x-text="p.sku"></td>
-                  <td class="px-4 py-3">
-                    <div class="flex items-start gap-3">
-                      <template x-if="p.image">
-                        <img :src="p.image" class="w-12 h-12 object-cover rounded border border-slate-200 flex-shrink-0" loading="lazy" />
-                      </template>
-                      <template x-if="!p.image">
-                        <div class="w-12 h-12 bg-slate-100 rounded border border-slate-200 flex-shrink-0 flex items-center justify-center text-slate-300 text-xl">📦</div>
-                      </template>
-                      <div class="min-w-0 flex-1">
-                        <div class="text-sm leading-snug" x-text="(p.product_name||'').slice(0,90)"></div>
-                        <template x-if="p.variation">
-                          <div class="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="p.variation"></div>
-                        </template>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 text-right">
-                    <span class="text-lg font-bold font-mono" :class="unitsClass(unifiedStock(p))" x-text="unifiedStockDisplay(p)"></span>
-                  </td>
-                  <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(p.last_change_at)"></td>
-                  <td class="px-4 py-3 text-center">
-                    <div class="flex gap-1 justify-center flex-wrap">
-                      <button @click="openSetStock(p)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
-                      <template x-if="!p.meli_item_id">
-                        <button @click="openLinkModal(p, 'meli')" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ ML</button>
-                      </template>
-                      <template x-if="!p.shopee_item_id">
-                        <button @click="openLinkModal(p, 'shopee')" class="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded">+ Shopee</button>
-                      </template>
-                      <button @click="toggleMapping(p.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="p.active ? 'pausar' : 'ativar'"></button>
-                    </div>
-                  </td>
-                </tr>
-              </template>
-              <tr x-show="products.length === 0">
-                <td colspan="5" class="text-center py-8 text-slate-400">Nenhum produto encontrado. Rode discovery na aba Config.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <!-- placeholder mantém estado legado de products[] -->
+        <table class="hidden"><tbody>
+          <template x-for="p in products" :key="p.sku"><tr></tr></template>
+        </tbody></table>
       </section>
 
       <!-- Produtos (Stats de vendas) -->
@@ -275,44 +296,54 @@ export const html = `<!DOCTYPE html>
                 </template>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
-                  <div class="text-xs text-slate-500 mt-1">Shopee ID: <span class="font-mono" x-text="anuncio.shopee_item_id"></span> · <span x-text="anuncio.variations.length"></span> variações</div>
+                  <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                    <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
+                    <span x-show="anuncio.meli_item_id">🔵 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
+                    <span>· <span x-text="anuncio.variations.length"></span> variações</span>
+                    <span x-show="anuncio.fully_paired" class="text-emerald-600">✓ pareado</span>
+                  </div>
                 </div>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
                   <tr>
-                    <th class="text-left px-3 py-2 w-40">Variação</th>
+                    <th class="text-left px-3 py-2 w-36">Variação</th>
                     <th class="text-left px-3 py-2">SKU</th>
-                    <th class="text-right px-3 py-2 w-24">Estoque</th>
-                    <th class="text-left px-3 py-2 w-32">ML pareado</th>
+                    <th class="text-center px-3 py-2 w-20">7d</th>
+                    <th class="text-center px-3 py-2 w-20">30d</th>
+                    <th class="text-center px-3 py-2 w-20">Total</th>
+                    <th class="text-center px-3 py-2 w-28">Status</th>
                     <th class="text-center px-3 py-2 w-32">Ação</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                  <template x-for="v in anuncio.variations" :key="v.shopee_model_id || v.sku">
+                  <template x-for="v in anuncio.variations" :key="(v.shopee_model_id||'')+'|'+(v.meli_variation_id||'')+'|'+v.sku">
                     <tr :class="v.paired ? '' : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
                         <span x-show="v.variation" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="v.variation"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
-                      <td class="px-3 py-2 text-right">
-                        <span x-show="v.paired" class="font-mono font-bold" :class="unitsClass(unifiedStock(v))" x-text="unifiedStockDisplay(v)"></span>
-                        <span x-show="!v.paired" class="text-xs text-slate-300">—</span>
-                      </td>
-                      <td class="px-3 py-2">
-                        <span x-show="v.meli_item_id" class="text-xs">
-                          <span class="text-emerald-600">✓</span>
-                          <span class="font-mono text-slate-500" x-text="v.meli_item_id"></span>
-                        </span>
-                        <span x-show="!v.meli_item_id" class="text-xs text-amber-600">⚠ Sem ML</span>
+                      <td class="px-3 py-2 text-center font-mono text-emerald-700 font-semibold" x-text="v.sales_7d || '—'"></td>
+                      <td class="px-3 py-2 text-center font-mono text-slate-700" x-text="v.sales_30d || '—'"></td>
+                      <td class="px-3 py-2 text-center font-mono font-bold" x-text="v.sales_total || '—'"></td>
+                      <td class="px-3 py-2 text-center text-xs">
+                        <template x-if="v.paired">
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">✓ ML+SP</span>
+                        </template>
+                        <template x-if="!v.paired && v.shopee_item_id">
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded">⚠ Só SP</span>
+                        </template>
+                        <template x-if="!v.paired && v.meli_item_id">
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded">⚠ Só ML</span>
+                        </template>
                       </td>
                       <td class="px-3 py-2 text-center">
                         <template x-if="v.paired">
                           <button @click="openSetStock(v)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
                         </template>
                         <template x-if="!v.paired">
-                          <button @click="openPairFromShopee(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear ML</button>
+                          <button @click="openPairFromMaster(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear</button>
                         </template>
                       </td>
                     </tr>
@@ -404,7 +435,7 @@ export const html = `<!DOCTYPE html>
           <h3 class="text-sm font-semibold mb-2">⚡ Pareamento em lote por anúncio</h3>
           <p class="text-xs text-slate-500 mb-3">Cole o <strong>item_id</strong> do Shopee e do ML que são o "mesmo anúncio" (mesmo produto). O sistema pareia as variações automaticamente.</p>
           <div class="flex gap-2">
-            <input x-model="batchShopeeId" placeholder="Shopee item_id (ex: 29443482352)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
+            <input id="batch-shopee-input" x-model="batchShopeeId" placeholder="Shopee item_id (ex: 29443482352)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
             <input id="batch-meli-input" x-model="batchMeliId" placeholder="ML item_id (ex: MLB6139127802)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
             <button @click="batchPairDry()" :disabled="loading.batchPair" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Pré-visualizar</button>
             <button @click="batchPairApply()" :disabled="loading.batchPair" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Aplicar</button>
@@ -795,20 +826,22 @@ function app() {
     },
     async loadMaster() {
       const q = new URLSearchParams({ q: this.masterSearch || '', filter: this.masterFilter || 'all' });
-      const d = await this.api('/api/products/shopee-master?' + q.toString());
+      const d = await this.api('/api/products/master?' + q.toString());
       this.masterItems = d?.items || [];
       this.masterTotalVars = d?.total_variations || 0;
       const t = this.tabs.find(x => x.id === 'products');
       if (t) t.count = d?.total || 0;
+      // Aba Estoque também usa esse dado
+      const t2 = this.tabs.find(x => x.id === 'stock');
+      if (t2) t2.count = d?.total || 0;
     },
-    openPairFromShopee(v, anuncio) {
-      // Abre o modal de pareamento usando os dados do anúncio Shopee
-      this.batchShopeeId = String(v.shopee_item_id || anuncio.shopee_item_id);
-      this.batchMeliId = '';
+    openPairFromMaster(v, anuncio) {
+      // Pré-preenche batch pair com IDs do anúncio (lado faltante vazio)
+      this.batchShopeeId = String(v.shopee_item_id || anuncio.shopee_item_id || '');
+      this.batchMeliId   = String(v.meli_item_id   || anuncio.meli_item_id   || '');
       this.tab = 'unmapped';
-      // foco no input do batch pair
       setTimeout(() => {
-        const el = document.getElementById('batch-meli-input');
+        const el = document.getElementById(this.batchShopeeId ? 'batch-meli-input' : 'batch-shopee-input');
         if (el) el.focus();
       }, 200);
     },
