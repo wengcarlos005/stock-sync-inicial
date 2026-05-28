@@ -97,17 +97,21 @@ export async function meliRaw(env: MacEnv, method: string, path: string, body?: 
 
 export async function meliListItemIds(env: MacEnv, userId: string): Promise<string[]> {
   const ids: string[] = [];
-  let offset = 0;
   const limit = 50;
-  while (true) {
-    const d = await meliRaw(env, 'GET', `/users/${userId}/items/search?limit=${limit}&offset=${offset}`);
-    const results = d?.results || [];
-    ids.push(...results);
-    if (results.length < limit) break;
-    offset += limit;
+  // ML só retorna 'active' por padrão. Itera por status pra pegar pausados/inativos também.
+  for (const status of ['active', 'paused', 'closed', 'under_review']) {
+    let offset = 0;
+    while (true) {
+      const d = await meliRaw(env, 'GET', `/users/${userId}/items/search?status=${status}&limit=${limit}&offset=${offset}`);
+      const results = d?.results || [];
+      ids.push(...results);
+      if (results.length < limit) break;
+      offset += limit;
+      if (ids.length > 5000) break;
+    }
     if (ids.length > 5000) break;
   }
-  return ids;
+  return Array.from(new Set(ids));
 }
 
 export async function meliGetItem(env: MacEnv, itemId: string): Promise<MeliItem | null> {

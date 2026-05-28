@@ -20,7 +20,7 @@ export default {
 
     // Serve UI at root (sem auth — auth na UI por modal)
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } });
     }
 
     // Health check

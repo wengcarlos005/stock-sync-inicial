@@ -349,81 +349,220 @@ add('GET', '/api/products/shopee-master', async (req, env) => {
   const search = url.searchParams.get('q')?.toLowerCase().trim() || '';
   const filter = url.searchParams.get('filter') || 'all'; // all | paired | unpaired
 
-  // 1. Mappings com Shopee preenchido
-  const paired = await env.DB.prepare(`
+  // 1. Mappings (pareados — Shopee + ML, ou só um dos lados)
+  const mappingsR = await env.DB.prepare(`
     SELECT m.sku, m.product_name, m.image_url, m.active,
            m.meli_item_id, m.meli_variation_id, m.shopee_item_id, m.shopee_model_id,
            s.master_stock, s.meli_stock, s.shopee_stock
     FROM mappings m
     LEFT JOIN state s ON s.sku = m.sku
-    WHERE m.shopee_item_id IS NOT NULL AND m.shopee_item_id != ''
   `).all();
 
-  // 2. Unmapped Shopee (não pareados ainda)
-  const unpaired = await env.DB.prepare(`
+  // 2. Unmapped Shopee
+  const unmappedShopeeR = await env.DB.prepare(`
     SELECT sku, product_name, item_id AS shopee_item_id, variation_id AS shopee_model_id
-    FROM unmapped
-    WHERE platform = 'shopee' AND resolved = 0
+    FROM unmapped WHERE platform='shopee' AND resolved=0
   `).all();
 
-  // 3. Enriquece com imagem/variation/name do último pedido (preenche faltas)
-  const ordersR = await env.DB.prepare(`SELECT items_json FROM orders ORDER BY created_at DESC LIMIT 2000`).all();
+  // 3. Unmapped ML
+  const unmappedMeliR = await env.DB.prepare(`
+    SELECT sku, product_name, item_id AS meli_item_id, variation_id AS meli_variation_id
+    FROM unmapped WHERE platform='meli' AND resolved=0
+  `).all();
+
+  // 4. Enriquecimento via orders (imagem, variation, vendas)
+  const nowTs = Date.now();
+  const cutoff7d = nowTs - 7 * 24 * 60 * 60 * 1000;
+  const cutoff30d = nowTs - 30 * 24 * 60 * 60 * 1000;
+  const ordersR = await env.DB.prepare(`SELECT items_json, created_at FROM orders ORDER BY created_at DESC LIMIT 5000`).all();
   const meta = new Map<string, { image: string | null; variation: string | null; name: string | null }>();
+  const salesBySku = new Map<string, { d7: number; d30: number; total: number }>();
+  const addSale = (key: string, qty: number, ts: number) => {
+    if (!key) return;
+    let s = salesBySku.get(key);
+    if (!s) { s = { d7: 0, d30: 0, total: 0 }; salesBySku.set(key, s); }
+    s.total += qty;
+    if (ts >= cutoff30d) s.d30 += qty;
+    if (ts >= cutoff7d) s.d7 += qty;
+  };
   for (const o of ordersR.results as any[]) {
     let items: any[] = [];
     try { items = JSON.parse(o.items_json || '[]'); } catch {}
     for (const it of items) {
-      // Index by Shopee item_id+model_id (variations have unique model_id)
       const k = `${it.item_id}|${it.variation_id || ''}`;
       if (!meta.has(k)) meta.set(k, { image: it.image || null, variation: it.variation || null, name: it.name || null });
-      // Also by SKU as fallback
       if (it.sku && !meta.has(it.sku)) meta.set(it.sku, { image: it.image || null, variation: it.variation || null, name: it.name || null });
+      const qty = Number(it.qty || 1);
+      const ts = Number(o.created_at || 0);
+      if (it.sku) addSale(String(it.sku).trim(), qty, ts);
     }
   }
 
   const enrich = (row: any) => {
-    const k = `${row.shopee_item_id}|${row.shopee_model_id || ''}`;
-    const m = meta.get(k) || (row.sku ? meta.get(row.sku) : null);
+    const kSp = row.shopee_item_id ? `${row.shopee_item_id}|${row.shopee_model_id || ''}` : null;
+    const kMl = row.meli_item_id ? `${row.meli_item_id}|${row.meli_variation_id || ''}` : null;
+    const m = (kSp && meta.get(kSp)) || (kMl && meta.get(kMl)) || (row.sku && meta.get(row.sku)) || null;
+    const s = row.sku ? salesBySku.get(String(row.sku).trim()) : null;
     return {
       ...row,
       image: row.image_url || m?.image || null,
       variation: m?.variation || null,
       product_name: row.product_name || m?.name || '',
+      sales_7d: s?.d7 || 0,
+      sales_30d: s?.d30 || 0,
+      sales_total: s?.total || 0,
+      paired: !!(row.shopee_item_id && row.meli_item_id),
     };
   };
 
-  const pairedRows = (paired.results as any[]).map(r => ({ ...enrich(r), paired: true }));
-  const unpairedRows = (unpaired.results as any[]).map(r => ({ ...enrich(r), paired: false, active: 0, master_stock: null, meli_stock: null, shopee_stock: null, meli_item_id: null, meli_variation_id: null }));
+  // Constrói lista combinada de variações com DEDUP
+  // Chave única por (shopee_item_id, shopee_model_id) OU (meli_item_id, meli_variation_id) OU sku
+  const dedupMap = new Map<string, any>();
+  const addOrMerge = (row: any) => {
+    // Chaves possíveis de identificação
+    const keys: string[] = [];
+    if (row.shopee_item_id) keys.push(`sp:${row.shopee_item_id}|${row.shopee_model_id || ''}`);
+    if (row.meli_item_id) keys.push(`ml:${row.meli_item_id}|${row.meli_variation_id || ''}`);
+    if (row.sku) keys.push(`sku:${row.sku}`);
+    if (keys.length === 0) return;
 
-  let rows = [...pairedRows, ...unpairedRows];
+    // Procura entrada existente por qualquer chave
+    let existing: any = null;
+    for (const k of keys) { if (dedupMap.has(k)) { existing = dedupMap.get(k); break; } }
 
-  // Filtros
+    if (existing) {
+      // Merge: preserva campos preenchidos do existente, completa com row
+      if (row.shopee_item_id && !existing.shopee_item_id) existing.shopee_item_id = row.shopee_item_id;
+      if (row.shopee_model_id && !existing.shopee_model_id) existing.shopee_model_id = row.shopee_model_id;
+      if (row.meli_item_id && !existing.meli_item_id) existing.meli_item_id = row.meli_item_id;
+      if (row.meli_variation_id && !existing.meli_variation_id) existing.meli_variation_id = row.meli_variation_id;
+      if (row.sku && !existing.sku) existing.sku = row.sku;
+      if (row.product_name && !existing.product_name) existing.product_name = row.product_name;
+      if (row.image && !existing.image) existing.image = row.image;
+      if (row.variation && !existing.variation) existing.variation = row.variation;
+      if (row.sales_total > (existing.sales_total || 0)) {
+        existing.sales_7d = row.sales_7d; existing.sales_30d = row.sales_30d; existing.sales_total = row.sales_total;
+      }
+      existing.paired = !!(existing.shopee_item_id && existing.meli_item_id);
+      if (row.mapped) existing.mapped = true; // qualquer fonte mappings vence
+      // Atualiza todas as chaves para apontar pra esta entrada
+      for (const k of keys) dedupMap.set(k, existing);
+    } else {
+      for (const k of keys) dedupMap.set(k, row);
+    }
+  };
+
+  // mapped=true marca rows que existem na tabela mappings (permite Atualizar mesmo se 1 lado só)
+  for (const r of (mappingsR.results as any[])) addOrMerge(enrich({ ...r, mapped: true }));
+  for (const r of (unmappedShopeeR.results as any[])) addOrMerge(enrich({ ...r, active: 0, mapped: false }));
+  for (const r of (unmappedMeliR.results as any[])) addOrMerge(enrich({ ...r, active: 0, mapped: false }));
+
+  // Pega entradas únicas (Set por identidade do objeto)
+  const uniqueRows = Array.from(new Set(dedupMap.values()));
+  let rows = uniqueRows;
   if (filter === 'paired')   rows = rows.filter(r => r.paired);
   if (filter === 'unpaired') rows = rows.filter(r => !r.paired);
   if (search) {
     rows = rows.filter(r =>
       (r.sku || '').toLowerCase().includes(search) ||
       (r.product_name || '').toLowerCase().includes(search) ||
-      (r.variation || '').toLowerCase().includes(search)
+      (r.variation || '').toLowerCase().includes(search) ||
+      String(r.shopee_item_id || '').includes(search) ||
+      String(r.meli_item_id || '').includes(search)
     );
   }
 
-  // Agrupa por shopee_item_id pra mostrar como anúncio + variações
+  // ===== Agrupamento por "anúncio" =====
+  // Shopee é mestre quando disponível. Rows ML-only são absorvidas pelo grupo SP
+  // que já contém o mesmo meli_item_id — evita duplicação.
+  // Trim em IDs garante consistência (espaço extra acidental no DB).
+  const norm = (v: any) => v == null ? null : String(v).trim() || null;
   const grouped = new Map<string, any>();
-  for (const r of rows) {
-    const gId = r.shopee_item_id;
-    if (!grouped.has(gId)) {
-      grouped.set(gId, {
-        shopee_item_id: gId,
-        product_name: r.product_name,
-        image: r.image,
-        variations: [],
+  const meliToGKey = new Map<string, string>();
+
+  const ensureGroup = (gKey: string, sId: string | null, mId: string | null, img: string | null) => {
+    if (!grouped.has(gKey)) {
+      grouped.set(gKey, {
+        key: gKey,
+        shopee_item_id: sId,
+        meli_item_id: mId,
+        product_name: '',
+        image: img,
+        platforms: new Set<string>(),
+        variations: [] as any[],
       });
     }
-    grouped.get(gId).variations.push(r);
+    return grouped.get(gKey)!;
+  };
+
+  // 1ª passada: rows com shopee_item_id → grupo sp:
+  for (const r of rows) {
+    const sId = norm(r.shopee_item_id);
+    if (!sId) continue;
+    const mId = norm(r.meli_item_id);
+    const gKey = `sp:${sId}`;
+    const g = ensureGroup(gKey, sId, mId, r.image || null);
+    g.platforms.add('shopee');
+    if (mId) {
+      g.platforms.add('meli');
+      if (!g.meli_item_id) g.meli_item_id = mId;
+      meliToGKey.set(mId, gKey);
+    }
+    if (!g.image && r.image) g.image = r.image;
+    g.variations.push(r);
   }
 
-  const items = [...grouped.values()];
+  // 2ª passada: rows sem shopee_item_id (só ML)
+  for (const r of rows) {
+    if (norm(r.shopee_item_id)) continue;
+    const mId = norm(r.meli_item_id);
+    if (!mId) continue;
+    const existingGKey = meliToGKey.get(mId);
+    if (existingGKey) {
+      const g = grouped.get(existingGKey)!;
+      g.platforms.add('meli');
+      if (!g.image && r.image) g.image = r.image;
+      g.variations.push(r);
+    } else {
+      const gKey = `ml:${mId}`;
+      const g = ensureGroup(gKey, null, mId, r.image || null);
+      g.platforms.add('meli');
+      if (!g.product_name && r.product_name) g.product_name = r.product_name;
+      g.variations.push(r);
+      meliToGKey.set(mId, gKey);
+    }
+  }
+
+  // Para cada grupo: define nome (Shopee dominante) + extrai variação dos product_names
+  for (const [, g] of grouped) {
+    // Nome do grupo: pega o item_name puro de uma variação Shopee
+    // (product_name é "ItemName - VariationName"; usa lastIndexOf pra preservar item_name com hifens)
+    const spVarsWithName = (g.variations as any[]).filter((v: any) =>
+      norm(v.shopee_item_id) && v.product_name
+    );
+    if (spVarsWithName.length > 0) {
+      const raw = String(spVarsWithName[0].product_name);
+      const dashIdx = raw.lastIndexOf(' - ');
+      g.product_name = (dashIdx > 0 ? raw.slice(0, dashIdx) : raw).trim();
+    } else if (!g.product_name) {
+      const anyVar = (g.variations as any[]).find((v: any) => v.product_name);
+      if (anyVar) g.product_name = anyVar.product_name;
+    }
+    // Para cada variação, preenche variation se faltar (extrai do product_name)
+    for (const v of g.variations as any[]) {
+      if (!v.variation && v.product_name) {
+        const raw = String(v.product_name);
+        const dashIdx = raw.lastIndexOf(' - ');
+        if (dashIdx > 0) {
+          const suffix = raw.slice(dashIdx + 3).trim();
+          if (suffix) v.variation = suffix;
+        }
+      }
+    }
+  }
+
+  // Serializa Set → array
+  const items = [...grouped.values()].map(g => ({ ...g, platforms: [...g.platforms] }));
   return json({ total: items.length, total_variations: rows.length, items });
 });
 
@@ -433,6 +572,7 @@ add('GET', '/api/products/sales', async (req, env) => {
   const search = url.searchParams.get('q')?.toLowerCase().trim() || '';
   const now = Date.now();
   const cutoff7d = now - 7 * 24 * 60 * 60 * 1000;
+  const cutoff30d = now - 30 * 24 * 60 * 60 * 1000;
 
   // Mês corrente
   const monthStart = (() => {
@@ -464,6 +604,7 @@ add('GET', '/api/products/sales', async (req, env) => {
           image: it.image || null,
           total: 0,
           month: 0,
+          last30: 0,
           last7: 0,
           last_sale_at: null as number | null,
         };
@@ -471,6 +612,7 @@ add('GET', '/api/products/sales', async (req, env) => {
       }
       s.total += qty;
       if (o.created_at >= monthStart) s.month += qty;
+      if (o.created_at >= cutoff30d) s.last30 += qty;
       if (o.created_at >= cutoff7d) s.last7 += qty;
       if (!s.last_sale_at || o.created_at > s.last_sale_at) s.last_sale_at = o.created_at;
       // Atualiza name/image se vazio
@@ -733,6 +875,32 @@ add('POST', '/api/discover', async (_req, env) => {
 
 add('POST', '/api/sync', async (_req, env) => json(await runSync(env, 'manual')));
 
+// Extrai mensagem legível de erros HTTP brutos do MAC/ML/Shopee
+function cleanApiError(msg: string, platform: string): string {
+  if (!msg) return 'erro desconhecido';
+  // Tenta extrair JSON da string "MAC raw HTTP XXX: {json}"
+  const jsonStart = msg.indexOf('{');
+  if (jsonStart < 0) return msg.slice(0, 300);
+  try {
+    const parsed = JSON.parse(msg.slice(jsonStart));
+    // ML: { status, data: { cause: [{ message, code, ... }] } }
+    const cause = parsed?.data?.cause?.[0] || parsed?.cause?.[0];
+    if (cause?.message) {
+      const code = cause.code ? ` [${cause.code}]` : '';
+      return `${cause.message}${code}`;
+    }
+    // ML alternativo: { message, error, ... }
+    if (parsed?.message) return parsed.message + (parsed.error ? ` (${parsed.error})` : '');
+    // Shopee: { error, message }
+    if (parsed?.error || parsed?.message) {
+      return [parsed.error, parsed.message].filter(Boolean).join(': ');
+    }
+    return JSON.stringify(parsed).slice(0, 300);
+  } catch {
+    return msg.slice(0, 300);
+  }
+}
+
 // ============= Manual stock override =============
 add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
   const body = await req.json() as { stock: number };
@@ -749,19 +917,51 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
 
   // Apply to both (if not shadow)
   let propagated: string[] = [];
+  const errors: any[] = [];
   if (!shadow) {
-    try {
-      const mac = await import('./mac');
-      if (map.meli_item_id) {
-        await mac.meliUpdateStock(env, map.meli_item_id, body.stock, map.meli_variation_id ? Number(map.meli_variation_id) : undefined);
-        propagated.push('meli');
+    const mac = await import('./mac');
+    // ML
+    if (map.meli_item_id) {
+      try {
+        let meliVarId = map.meli_variation_id ? Number(map.meli_variation_id) : undefined;
+        // FALLBACK: se variation_id está faltando, busca live no ML e tenta achar a variação pelo SKU
+        if (!meliVarId) {
+          try {
+            const item = await mac.meliGetItem(env, map.meli_item_id);
+            const vars = item?.variations || [];
+            if (vars.length > 0) {
+              const matchBySku = vars.find((v: any) => mac.getMeliVariationSku(v)?.trim() === params.sku);
+              if (matchBySku) {
+                meliVarId = Number(matchBySku.id);
+                // Persiste no mapping pra evitar lookup futuro
+                await env.DB.prepare(`UPDATE mappings SET meli_variation_id=? WHERE sku=?`).bind(String(meliVarId), params.sku).run();
+              } else {
+                errors.push({ platform: 'meli', error: `Item ${map.meli_item_id} tem ${vars.length} variações mas nenhuma com SKU=${params.sku}. Re-pareie manualmente.` });
+              }
+            }
+          } catch (e: any) {
+            errors.push({ platform: 'meli', error: 'lookup falhou: ' + String(e.message) });
+          }
+        }
+        if (meliVarId || !map.meli_variation_id) {
+          await mac.meliUpdateStock(env, map.meli_item_id, body.stock, meliVarId);
+          propagated.push('meli');
+        }
+      } catch (e: any) {
+        errors.push({ platform: 'meli', error: cleanApiError(e.message, 'meli') });
       }
-      if (map.shopee_item_id) {
+    }
+    // Shopee
+    if (map.shopee_item_id) {
+      try {
         await mac.shopeeUpdateStock(env, Number(map.shopee_item_id), body.stock, map.shopee_model_id ? Number(map.shopee_model_id) : undefined);
         propagated.push('shopee');
+      } catch (e: any) {
+        errors.push({ platform: 'shopee', error: cleanApiError(e.message, 'shopee') });
       }
-    } catch (e: any) {
-      return json({ error: String(e.message) }, 500);
+    }
+    if (propagated.length === 0 && errors.length > 0) {
+      return json({ error: 'Falhou em todas as plataformas', details: errors }, 500);
     }
   }
 
@@ -793,7 +993,7 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
     body.stock, Date.now(), Date.now()
   ).run();
 
-  return json({ ok: true, shadow, propagated });
+  return json({ ok: true, shadow, propagated, errors: errors.length ? errors : undefined });
 });
 
 // ============= Catalog bulk upsert (usado pelo discovery remoto) =============
@@ -819,55 +1019,123 @@ add('GET', '/api/catalog', async (req, env) => {
   const platform = url.searchParams.get('platform') || '';
   const q = url.searchParams.get('q')?.toLowerCase().trim() || '';
   const includePaired = url.searchParams.get('include_paired') === '1';
+  const live = url.searchParams.get('live') === '1';
+  const plat = platform === 'meli' ? 'meli' : 'shopee';
+  const like = q ? `%${q}%` : null;
 
-  // Sempre busca não pareados
-  let query = `SELECT id, platform, sku, item_id, variation_id, product_name, 0 AS paired FROM unmapped WHERE resolved=0`;
-  if (platform) query += ` AND platform='${platform === 'meli' ? 'meli' : 'shopee'}'`;
-  let items = (await env.DB.prepare(query + ` ORDER BY product_name ASC LIMIT 600`).all()).results as any[];
+  // 1. Unmapped items — filtro em SQL (não em memória!) pra varrer DB inteiro, não só primeiros 300
+  let unmQuery = `SELECT id, platform, sku, item_id, variation_id, product_name FROM unmapped WHERE resolved=0`;
+  const unmParams: any[] = [];
+  if (platform) { unmQuery += ` AND platform=?`; unmParams.push(plat); }
+  if (like) {
+    unmQuery += ` AND (LOWER(product_name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(CAST(item_id AS TEXT)) LIKE ?)`;
+    unmParams.push(like, like, like);
+  }
+  unmQuery += ` ORDER BY product_name ASC LIMIT 300`;
+  const r = await env.DB.prepare(unmQuery).bind(...unmParams).all();
+  let items = (r.results as any[]).map(x => ({ ...x, paired: false }));
 
-  // Opcionalmente inclui já pareados (pra re-pareamento manual)
-  if (includePaired) {
-    const sql = platform === 'meli'
-      ? `SELECT NULL AS id, 'meli' AS platform, sku, meli_item_id AS item_id, meli_variation_id AS variation_id, product_name, 1 AS paired FROM mappings WHERE meli_item_id IS NOT NULL AND meli_item_id!='' LIMIT 600`
-      : platform === 'shopee'
-        ? `SELECT NULL AS id, 'shopee' AS platform, sku, shopee_item_id AS item_id, shopee_model_id AS variation_id, product_name, 1 AS paired FROM mappings WHERE shopee_item_id IS NOT NULL AND shopee_item_id!='' LIMIT 600`
-        : '';
-    if (sql) {
-      const more = (await env.DB.prepare(sql).all()).results as any[];
-      items = items.concat(more);
+  // 2. Mapped items — também com filtro em SQL
+  if (includePaired && platform) {
+    const col = plat === 'meli' ? 'meli_item_id' : 'shopee_item_id';
+    const varCol = plat === 'meli' ? 'meli_variation_id' : 'shopee_model_id';
+    let mapQuery = `SELECT sku, ${col} as item_id, ${varCol} as variation_id, product_name FROM mappings WHERE ${col} IS NOT NULL`;
+    const mapParams: any[] = [];
+    if (like) {
+      mapQuery += ` AND (LOWER(product_name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(CAST(${col} AS TEXT)) LIKE ?)`;
+      mapParams.push(like, like, like);
     }
+    mapQuery += ` ORDER BY product_name ASC LIMIT 300`;
+    const m = await env.DB.prepare(mapQuery).bind(...mapParams).all();
+    const mapped = (m.results as any[]).map(x => ({
+      id: 'paired:' + plat + ':' + x.item_id + ':' + (x.variation_id || ''),
+      platform: plat,
+      sku: x.sku,
+      item_id: x.item_id,
+      variation_id: x.variation_id,
+      product_name: x.product_name,
+      paired: true,
+    }));
+    items = items.concat(mapped);
   }
 
-  // Enriquece com imagem e variation pelos pedidos recentes (best-effort)
-  const ordersR = (await env.DB.prepare(`SELECT items_json FROM orders ORDER BY created_at DESC LIMIT 1500`).all()).results as any[];
-  const meta = new Map<string, { image: string | null; variation: string | null }>();
-  for (const o of ordersR) {
-    let oi: any[] = [];
-    try { oi = JSON.parse(o.items_json || '[]'); } catch {}
-    for (const it of oi) {
-      const k = `${it.item_id}|${it.variation_id||''}`;
-      if (!meta.has(k) && (it.image || it.variation)) meta.set(k, { image: it.image || null, variation: it.variation || null });
-    }
-  }
-  for (const x of items) {
-    const m = meta.get(`${x.item_id}|${x.variation_id||''}`);
-    if (m) { x.image = m.image; x.variation = m.variation; }
+  // 3. Live lookup — se nenhum resultado E query parece um item_id, busca direto na API
+  // (cobre anúncios inativos/sem estoque que não vieram via discovery)
+  if (live && items.length === 0 && q && platform) {
+    try {
+      const mac = await import('./mac');
+      let mlItemId: string | null = null;
+      if (plat === 'meli') {
+        if (/^mlb\d+$/i.test(q)) mlItemId = q.toUpperCase();
+        else if (/^\d{8,}$/.test(q)) mlItemId = 'MLB' + q; // só número → assume prefixo BR
+      }
+      if (plat === 'meli' && mlItemId) {
+        const itemId = mlItemId;
+        const item: any = await mac.meliGetItem(env, itemId);
+        if (item) {
+          if (item.variations && item.variations.length > 0) {
+            for (const v of item.variations) {
+              const combo = (v.attribute_combinations || []).map((c: any) => c.value_name).filter(Boolean).join('/');
+              items.push({
+                id: 'live:meli:' + item.id + ':' + v.id,
+                platform: 'meli',
+                sku: mac.getMeliVariationSku(v) || '',
+                item_id: item.id,
+                variation_id: String(v.id),
+                product_name: (item.title || '') + (combo ? ' - ' + combo : ''),
+                paired: false,
+                live: true,
+              });
+            }
+          } else {
+            items.push({
+              id: 'live:meli:' + item.id,
+              platform: 'meli',
+              sku: mac.getMeliSku(item) || '',
+              item_id: item.id,
+              variation_id: null,
+              product_name: item.title || '',
+              paired: false,
+              live: true,
+            });
+          }
+        }
+      } else if (plat === 'shopee' && /^\d{8,}$/.test(q)) {
+        const itemId = Number(q);
+        const item: any = await mac.shopeeGetItem(env, itemId);
+        if (item) {
+          if (item.has_model) {
+            const models = await mac.shopeeGetModels(env, itemId);
+            for (const m2 of models) {
+              items.push({
+                id: 'live:shopee:' + itemId + ':' + m2.model_id,
+                platform: 'shopee',
+                sku: m2.model_sku || '',
+                item_id: String(itemId),
+                variation_id: String(m2.model_id),
+                product_name: (item.item_name || '') + ' - ' + (m2.model_name || ''),
+                paired: false,
+                live: true,
+              });
+            }
+          } else {
+            items.push({
+              id: 'live:shopee:' + itemId,
+              platform: 'shopee',
+              sku: item.item_sku || '',
+              item_id: String(itemId),
+              variation_id: null,
+              product_name: item.item_name || '',
+              paired: false,
+              live: true,
+            });
+          }
+        }
+      }
+    } catch (e) { /* falha silenciosa de live lookup */ }
   }
 
-  // Busca por nome/SKU/ID (com normalização de acento/mojibake)
-  if (q) {
-    const fixMojibake = (s: string) => { if (!s) return ''; try { const f = decodeURIComponent(escape(s)); return f.includes(String.fromCharCode(0xFFFD)) ? s : f; } catch { return s; } };
-    const norm = (s: string) => fixMojibake(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    const nq = norm(q);
-    items = items.filter(x =>
-      norm(x.product_name).includes(nq) ||
-      norm(x.sku).includes(nq) ||
-      String(x.item_id || '').toLowerCase().includes(nq) ||
-      String(x.variation_id || '').includes(nq) ||
-      norm(x.variation || '').includes(nq)
-    );
-  }
-  return json({ items: items.slice(0, 300) });
+  return json({ items });
 });
 
 // ============= Pareamento em lote por anúncio (variações por nome) =============
@@ -1116,6 +1384,54 @@ add('GET', '/api/test-mac', async (_req, env) => {
   } catch (e: any) {
     return json({ error: String(e.message), key_prefix: key ? key.slice(0, 12) + '...' : 'MISSING' }, 500);
   }
+});
+
+// ============= DEBUG: compara variações LIVE Shopee vs banco (unmapped + mappings) =============
+add('GET', '/api/debug/variations/:item_id', async (_req, env, params) => {
+  const itemId = Number(params.item_id);
+  if (!itemId) return json({ error: 'item_id inválido' }, 400);
+
+  // 1. Live Shopee
+  const r = await fetch(env.MAC_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': env.MAC_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'shopee_get_models', params: { item_id: itemId } }),
+  });
+  const text = await r.text();
+  let parsed: any = null;
+  try { parsed = JSON.parse(text); } catch {}
+  const liveModels = parsed?.response?.model || parsed?.data?.response?.model || [];
+
+  // 2. Unmapped no banco
+  const unmappedR = await env.DB.prepare(
+    `SELECT sku, variation_id, product_name, resolved FROM unmapped WHERE platform='shopee' AND item_id=? ORDER BY id`
+  ).bind(String(itemId)).all();
+
+  // 3. Mappings no banco
+  const mappingsR = await env.DB.prepare(
+    `SELECT sku, shopee_model_id, meli_item_id, product_name FROM mappings WHERE shopee_item_id=?`
+  ).bind(String(itemId)).all();
+
+  // Live models simplificados
+  const liveSimple = liveModels.map((m: any) => ({
+    model_id: m.model_id,
+    model_sku: m.model_sku || null,
+    model_name: m.model_name || null,
+    stock: m.stock_info?.[0]?.current_stock ?? null,
+  }));
+
+  return json({
+    item_id: itemId,
+    mac_response_status: r.status,
+    mac_response_size_bytes: text.length,
+    live_count: liveModels.length,
+    unmapped_count: unmappedR.results?.length || 0,
+    unmapped_resolved_count: (unmappedR.results as any[])?.filter(x => x.resolved === 1).length || 0,
+    mappings_count: mappingsR.results?.length || 0,
+    live_models: liveSimple,
+    db_unmapped: unmappedR.results,
+    db_mappings: mappingsR.results,
+  });
 });
 
 // ============= DEBUG: inspeção crua de produtos via MAC =============

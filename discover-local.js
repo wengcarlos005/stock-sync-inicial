@@ -214,17 +214,27 @@ async function main() {
   console.log(`\n  Shopee SKUs indexados: ${Object.keys(skuToShopee).length} | títulos: ${Object.keys(itemTitleToShopee).length}`);
 
   // ── MERCADO LIVRE ────────────────────────────────────────────
-  console.log('\nVarrendo Mercado Livre...');
-  let meliIds = [], meliOffset = 0;
-  while (true) {
-    const d = await macCall('raw', { method: 'GET', path: `/users/${MELI_USER_ID}/items/search?limit=50&offset=${meliOffset}` });
-    const results = d?.results || [];
-    meliIds.push(...results);
-    if (results.length < 50) break;
-    meliOffset += 50;
+  console.log('\nVarrendo Mercado Livre (todos os status: active/paused/closed)...');
+  let meliIds = [];
+  // ML retorna só ativos por padrão. Itera por status pra pegar também pausados/inativos.
+  for (const status of ['active', 'paused', 'closed', 'under_review']) {
+    let meliOffset = 0;
+    let countForStatus = 0;
+    while (true) {
+      const d = await macCall('raw', { method: 'GET', path: `/users/${MELI_USER_ID}/items/search?status=${status}&limit=50&offset=${meliOffset}` });
+      const results = d?.results || [];
+      meliIds.push(...results);
+      countForStatus += results.length;
+      if (results.length < 50) break;
+      meliOffset += 50;
+      if (meliIds.length > 5000) break;
+    }
+    console.log(`  status=${status}: ${countForStatus} items`);
     if (meliIds.length > 5000) break;
   }
-  console.log(`  ${meliIds.length} items`);
+  // Dedup (mesmo item não deveria aparecer em 2 status, mas garante)
+  meliIds = Array.from(new Set(meliIds));
+  console.log(`  total único: ${meliIds.length} items`);
 
   let debugMeliDumped = 0;
   for (let i = 0; i < meliIds.length; i++) {

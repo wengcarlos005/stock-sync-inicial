@@ -6,7 +6,7 @@ export const html = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stock Sync — ML ↔ Shopee</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
   <style>
     [x-cloak] { display: none !important; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
@@ -72,7 +72,7 @@ export const html = `<!DOCTYPE html>
 
       <!-- Tabs -->
       <nav class="max-w-7xl mx-auto px-6 border-b border-slate-200 flex gap-1">
-        <template x-for="t in tabs">
+        <template x-for="t in tabs" :key="t.id">
           <button @click="tab = t.id" :class="tab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
             class="px-4 py-3 border-b-2 text-sm font-medium transition">
             <span x-text="t.label"></span>
@@ -187,7 +187,7 @@ export const html = `<!DOCTYPE html>
           <div class="flex bg-slate-100 p-1 rounded-lg gap-1">
             <button @click="masterFilter='all'; loadMaster()" :class="masterFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">Todos</button>
             <button @click="masterFilter='paired'; loadMaster()" :class="masterFilter==='paired' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">✓ Pareados</button>
-            <button @click="masterFilter='unpaired'; loadMaster()" :class="masterFilter==='unpaired' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">⚠ Faltando</button>
+            <button @click="masterFilter='unpaired'; loadMaster()" :class="masterFilter==='unpaired' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">⚠ Sem par</button>
           </div>
           <button @click="loadMaster()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
         </div>
@@ -205,53 +205,58 @@ export const html = `<!DOCTYPE html>
                 </template>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
-                  <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                  <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
-                    <span x-show="anuncio.meli_item_id">🔵 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
+                    <span x-show="anuncio.meli_item_id">🟡 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
-                    <span x-show="anuncio.fully_paired" class="text-emerald-600">✓ pareado</span>
                   </div>
                 </div>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
                   <tr>
-                    <th class="text-left px-3 py-2 w-36">Variação</th>
-                    <th class="text-left px-3 py-2">SKU</th>
-                    <th class="text-right px-3 py-2 w-20">ML</th>
-                    <th class="text-right px-3 py-2 w-20">SP</th>
-                    <th class="text-right px-3 py-2 w-24">Unidades</th>
+                    <th class="text-left px-3 py-2 w-28">Variação</th>
+                    <th class="text-left px-3 py-2 w-44">SKU</th>
+                    <th class="text-center px-3 py-2 w-20">ML</th>
+                    <th class="text-center px-3 py-2 w-20">SP</th>
+                    <th class="text-center px-3 py-2 w-24">Unidades</th>
                     <th class="text-center px-3 py-2 w-32">Ação</th>
+                    <th class="text-center px-3 py-2 w-32">Plataformas</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                  <template x-for="v in anuncio.variations" :key="(v.shopee_model_id||'')+'|'+(v.meli_variation_id||'')+'|'+v.sku">
-                    <tr :class="v.paired ? (v.active ? '' : 'opacity-50') : 'bg-amber-50/40'">
+                  <template x-for="(v, vi) in (anuncio.variations || [])" :key="vi">
+                    <tr :class="v.mapped ? (v.active === 0 ? 'opacity-50' : '') : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
                         <span x-show="v.variation" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="v.variation"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
-                      <td class="px-3 py-2 text-right font-mono text-xs" :class="unitsClass(v.meli_stock)" x-text="v.meli_stock ?? '—'"></td>
-                      <td class="px-3 py-2 text-right font-mono text-xs" :class="unitsClass(v.shopee_stock)" x-text="v.shopee_stock ?? '—'"></td>
-                      <td class="px-3 py-2 text-right">
-                        <template x-if="v.paired">
-                          <span class="text-lg font-bold font-mono" :class="unitsClass(unifiedStock(v))" x-text="unifiedStockDisplay(v)"></span>
-                        </template>
-                        <template x-if="!v.paired">
-                          <span class="text-xs text-slate-300">—</span>
-                        </template>
+                      <td class="px-3 py-2 text-center font-mono text-xs" :class="unitsClass(v.meli_stock)" x-text="v.meli_stock ?? '—'"></td>
+                      <td class="px-3 py-2 text-center font-mono text-xs" :class="unitsClass(v.shopee_stock)" x-text="v.shopee_stock ?? '—'"></td>
+                      <td class="px-3 py-2 text-center">
+                        <span x-show="v.mapped" class="text-base font-bold font-mono" :class="unitsClass(unifiedStock(v))" x-text="unifiedStockDisplay(v)"></span>
+                        <span x-show="!v.mapped" class="text-xs text-slate-300">—</span>
                       </td>
                       <td class="px-3 py-2 text-center">
-                        <template x-if="v.paired">
-                          <div class="flex gap-1 justify-center">
+                        <div class="flex gap-1 justify-center flex-wrap">
+                          <template x-if="v.mapped">
                             <button @click="openSetStock(v)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
+                          </template>
+                          <template x-if="v.mapped">
                             <button @click="toggleMapping(v.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="v.active ? 'pausar' : 'ativar'"></button>
-                          </div>
-                        </template>
-                        <template x-if="!v.paired">
-                          <button @click="openPairFromMaster(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">+ Parear</button>
-                        </template>
+                          </template>
+                          <template x-if="!v.mapped">
+                            <button @click="openPairFromProduct(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">Mapear</button>
+                          </template>
+                        </div>
+                      </td>
+                      <td class="px-3 py-2">
+                        <div class="flex items-center justify-center gap-1.5 flex-nowrap">
+                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap">🟠 SP</span>
+                          <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap">🟡 ML</span>
+                          <span x-show="!v.shopee_item_id && !v.meli_item_id" class="text-[10px] text-slate-300">—</span>
+                        </div>
                       </td>
                     </tr>
                   </template>
@@ -262,12 +267,9 @@ export const html = `<!DOCTYPE html>
           <div x-show="masterItems.length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
             <div class="text-2xl mb-2">📦</div>
             <div>Nenhum produto encontrado.</div>
+            <div class="text-xs mt-1 text-slate-300">Rode o Discovery em Config pra varrer suas lojas.</div>
           </div>
         </div>
-        <!-- placeholder mantém estado legado de products[] -->
-        <table class="hidden"><tbody>
-          <template x-for="p in products" :key="p.sku"><tr></tr></template>
-        </tbody></table>
       </section>
 
       <!-- Produtos (Stats de vendas) -->
@@ -282,10 +284,10 @@ export const html = `<!DOCTYPE html>
           </div>
           <button @click="loadMaster()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
         </div>
-        <div class="text-xs text-slate-500 mb-3"><span x-text="masterItems.length"></span> anúncios Shopee · <span x-text="masterTotalVars"></span> variações</div>
+        <div class="text-xs text-slate-500 mb-3"><span x-text="masterItems.length"></span> anúncios · <span x-text="masterTotalVars"></span> variações</div>
 
         <div class="space-y-3">
-          <template x-for="anuncio in masterItems" :key="anuncio.shopee_item_id">
+          <template x-for="anuncio in masterItems" :key="anuncio.key">
             <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div class="flex items-start gap-3 p-3 bg-slate-50 border-b border-slate-200">
                 <template x-if="anuncio.image">
@@ -296,53 +298,48 @@ export const html = `<!DOCTYPE html>
                 </template>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
-                  <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                  <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
-                    <span x-show="anuncio.meli_item_id">🔵 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
+                    <span x-show="anuncio.meli_item_id">🟡 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
-                    <span x-show="anuncio.fully_paired" class="text-emerald-600">✓ pareado</span>
                   </div>
                 </div>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
                   <tr>
-                    <th class="text-left px-3 py-2 w-36">Variação</th>
-                    <th class="text-left px-3 py-2">SKU</th>
-                    <th class="text-center px-3 py-2 w-20">7d</th>
-                    <th class="text-center px-3 py-2 w-20">30d</th>
-                    <th class="text-center px-3 py-2 w-20">Total</th>
-                    <th class="text-center px-3 py-2 w-28">Status</th>
-                    <th class="text-center px-3 py-2 w-32">Ação</th>
+                    <th rowspan="2" class="text-left px-3 py-2 w-28 align-bottom">Variação</th>
+                    <th rowspan="2" class="text-left px-3 py-2 w-44 align-bottom">SKU</th>
+                    <th colspan="3" class="text-center px-3 pt-2 pb-0 text-[10px] text-slate-500 font-semibold border-b border-slate-100">Histórico de Vendas</th>
+                    <th rowspan="2" class="text-center px-3 py-2 w-20 align-bottom">Ação</th>
+                    <th rowspan="2" class="text-center px-3 py-2 w-32 align-bottom">Plataformas</th>
+                  </tr>
+                  <tr>
+                    <th class="text-center px-3 py-2 w-16">7D</th>
+                    <th class="text-center px-3 py-2 w-16">30D</th>
+                    <th class="text-center px-3 py-2 w-16">Total</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                  <template x-for="v in anuncio.variations" :key="(v.shopee_model_id||'')+'|'+(v.meli_variation_id||'')+'|'+v.sku">
+                  <template x-for="(v, vi) in (anuncio.variations || [])" :key="vi">
                     <tr :class="v.paired ? '' : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
                         <span x-show="v.variation" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="v.variation"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
-                      <td class="px-3 py-2 text-center font-mono text-emerald-700 font-semibold" x-text="v.sales_7d || '—'"></td>
-                      <td class="px-3 py-2 text-center font-mono text-slate-700" x-text="v.sales_30d || '—'"></td>
-                      <td class="px-3 py-2 text-center font-mono font-bold" x-text="v.sales_total || '—'"></td>
-                      <td class="px-3 py-2 text-center text-xs">
-                        <template x-if="v.paired">
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">✓ ML+SP</span>
-                        </template>
-                        <template x-if="!v.paired && v.shopee_item_id">
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded">⚠ Só SP</span>
-                        </template>
-                        <template x-if="!v.paired && v.meli_item_id">
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded">⚠ Só ML</span>
-                        </template>
-                      </td>
+                      <td class="px-3 py-2 text-center font-mono text-xs text-emerald-700 font-semibold" x-text="v.sales_7d || '—'"></td>
+                      <td class="px-3 py-2 text-center font-mono text-xs text-slate-700" x-text="v.sales_30d || '—'"></td>
+                      <td class="px-3 py-2 text-center font-mono text-xs font-bold" x-text="v.sales_total || '—'"></td>
                       <td class="px-3 py-2 text-center">
-                        <button @click="openPairFromMaster(v, anuncio)"
-                          :class="v.paired ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' : 'bg-amber-100 hover:bg-amber-200 text-amber-800'"
-                          class="text-xs px-2 py-1 rounded"
-                          x-text="v.paired ? 'Re-parear' : '+ Parear'"></button>
+                        <button @click="openPairFromProduct(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">Mapear</button>
+                      </td>
+                      <td class="px-3 py-2">
+                        <div class="flex items-center justify-center gap-1.5 flex-nowrap">
+                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap">🟠 SP</span>
+                          <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap">🟡 ML</span>
+                          <span x-show="!v.shopee_item_id && !v.meli_item_id" class="text-[10px] text-slate-300">—</span>
+                        </div>
                       </td>
                     </tr>
                   </template>
@@ -513,7 +510,7 @@ export const html = `<!DOCTYPE html>
       </section>
 
       <!-- Config -->
-      <section x-show="tab === 'config'" x-cloak class="max-w-2xl">
+      <section x-show="tab === 'config'" x-cloak class="max-w-3xl mx-auto">
         <div class="bg-white border border-slate-200 rounded-lg p-6 space-y-6">
           <div>
             <h3 class="font-semibold mb-2">Discovery</h3>
@@ -591,7 +588,7 @@ export const html = `<!DOCTYPE html>
               <table class="w-full">
                 <thead><tr class="border-b border-slate-200"><th class="text-left p-2">Início</th><th class="text-left p-2">Trigger</th><th class="text-right p-2">Itens</th><th class="text-right p-2">Mudanças</th><th class="text-right p-2">Erros</th></tr></thead>
                 <tbody>
-                  <template x-for="r in runs">
+                  <template x-for="(r, ri) in runs" :key="r.id || ri">
                     <tr class="border-b border-slate-100">
                       <td class="p-2" x-text="fmtRelative(r.started_at)"></td>
                       <td class="p-2" x-text="r.trigger"></td>
@@ -610,51 +607,41 @@ export const html = `<!DOCTYPE html>
     </main>
   </div>
 
-  <!-- Pair modal -->
-  <div x-show="pairModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="pairModal = null">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]" x-show="pairModal">
+  <!-- Pair modal (vanilla DOM, sem dependencia Alpine reativo) -->
+  <div id="pair-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" onclick="if(event.target===this)window.__closePair()" style="display:none">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
       <div class="px-6 py-4 border-b border-slate-200">
         <h3 class="font-semibold">Pareamento manual</h3>
-        <p class="text-sm text-slate-500 mt-1">Selecionado: <span class="font-mono text-xs" x-text="pairModal?.source?.product_name?.slice(0,60)"></span></p>
-        <p class="text-xs text-slate-400 font-mono" x-text="pairModal?.source?.platform + ' → ' + pairModal?.source?.item_id"></p>
+        <p class="text-sm text-slate-500 mt-1">Selecionado: <span id="pm-source-name" class="font-mono text-xs"></span></p>
+        <p id="pm-source-meta" class="text-xs text-slate-400 font-mono"></p>
       </div>
       <div class="px-6 py-3 border-b border-slate-200">
-        <p class="text-sm font-medium mb-2" x-text="'Buscar no ' + (pairModal?.targetPlatform === 'meli' ? 'Mercado Livre' : 'Shopee') + ':'"></p>
-        <input x-model="pairSearch" @input.debounce.300ms="searchPairCatalog()" placeholder="Digite nome ou SKU..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" autofocus />
+        <p id="pm-target-label" class="text-sm font-medium mb-2"></p>
+        <div id="pm-platform-toggle" class="flex gap-1 mb-2 bg-slate-100 p-1 rounded-lg" style="display:none">
+          <button id="pm-tab-meli" onclick="window.__setPairPlatform('meli')" type="button" class="flex-1 text-xs px-3 py-1.5 rounded transition">🟡 Mercado Livre</button>
+          <button id="pm-tab-shopee" onclick="window.__setPairPlatform('shopee')" type="button" class="flex-1 text-xs px-3 py-1.5 rounded transition">🛒 Shopee</button>
+        </div>
+        <input id="pm-search" oninput="window.__searchPair()" placeholder="Digite nome ou SKU..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" autofocus />
       </div>
-      <div class="flex-1 overflow-y-auto divide-y divide-slate-100">
-        <template x-for="item in pairCatalog" :key="item.id">
-          <div class="px-4 py-3 hover:bg-indigo-50 cursor-pointer flex items-center gap-3" @click="selectPairTarget(item)"
-               :class="pairTarget?.id === item.id ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''">
-            <div class="flex-1 min-w-0">
-              <div class="text-sm truncate" x-text="(item.product_name||'—').slice(0,65)"></div>
-              <div class="text-xs text-slate-400 font-mono" x-text="item.sku + ' | ID: ' + item.item_id + (item.variation_id ? '/' + item.variation_id : '')"></div>
-            </div>
-            <span x-show="pairTarget?.id === item.id" class="text-indigo-600 text-sm">✓</span>
-          </div>
-        </template>
-        <div x-show="pairCatalog.length === 0 && pairSearch" class="p-4 text-center text-sm text-slate-400">Nenhum resultado</div>
-        <div x-show="pairCatalog.length === 0 && !pairSearch" class="p-4 text-center text-sm text-slate-400">Digite para buscar</div>
+      <div id="pm-results" class="flex-1 overflow-y-auto divide-y divide-slate-100">
+        <div class="p-4 text-center text-sm text-slate-400">Digite para buscar</div>
       </div>
       <div class="px-6 py-4 border-t border-slate-200 space-y-3">
         <div class="flex gap-2 items-center">
           <label class="text-sm text-slate-600 shrink-0">SKU final:</label>
-          <input x-model="pairSku" placeholder="auto (usa SKU da Shopee)" class="flex-1 px-3 py-1.5 border border-slate-300 rounded text-sm font-mono" />
+          <input id="pm-sku" placeholder="auto (usa SKU da Shopee)" class="flex-1 px-3 py-1.5 border border-slate-300 rounded text-sm font-mono" />
         </div>
         <div class="flex gap-2">
-          <button @click="pairModal = null" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
-          <button @click="confirmPair()" :disabled="!pairTarget || loading.pair" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-medium rounded text-sm">
-            <span x-show="!loading.pair">✓ Confirmar pareamento</span>
-            <span x-show="loading.pair">Salvando...</span>
-          </button>
+          <button onclick="window.__closePair()" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
+          <button id="pm-confirm" onclick="window.__confirmPair()" disabled class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-medium rounded text-sm">✓ Confirmar pareamento</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Link modal (parear produto já mapeado com item não pareado) -->
-  <div x-show="linkModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="linkModal=null">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]" x-show="linkModal">
+  <div x-show="linkModal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="linkModal=null" style="display:none">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
       <div class="px-6 py-4 border-b border-slate-200">
         <h3 class="font-semibold">Parear com produto existente</h3>
         <p class="text-sm text-slate-500 mt-1">SKU: <span class="font-mono" x-text="linkModal?.sku"></span></p>
@@ -687,110 +674,19 @@ export const html = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Pair Variation Modal (usado na aba Produtos/Estoque) -->
-  <div x-show="pairVarModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="pairVarModal=null">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]" x-show="pairVarModal">
-      <div class="px-6 py-4 border-b border-slate-200">
-        <h3 class="font-semibold">Parear variação</h3>
-        <p class="text-xs text-slate-500 mt-1" x-text="pairVarModal?.anuncio_name?.slice(0,90)"></p>
-      </div>
-
-      <!-- Estado atual: 2 cards lado a lado -->
-      <div class="px-6 py-3 grid grid-cols-2 gap-3 border-b border-slate-200">
-        <div class="p-3 rounded border" :class="pairVarModal?.shopee_item_id ? 'border-orange-300 bg-orange-50' : 'border-dashed border-slate-300 bg-slate-50'">
-          <div class="text-xs uppercase font-semibold text-orange-600 mb-1">🟠 Shopee</div>
-          <template x-if="pairVarModal?.shopee_item_id">
-            <div class="text-xs space-y-0.5">
-              <div>Item: <span class="font-mono" x-text="pairVarModal.shopee_item_id"></span></div>
-              <div x-show="pairVarModal.shopee_model_id">Variação: <span class="font-mono" x-text="pairVarModal.shopee_model_id"></span></div>
-              <div x-show="pairVarModal.shopee_label"><span class="px-2 py-0.5 bg-orange-100 rounded" x-text="pairVarModal.shopee_label"></span></div>
-            </div>
-          </template>
-          <template x-if="!pairVarModal?.shopee_item_id">
-            <button @click="pairVarSearchSide='shopee'; searchPairVarCatalog()" class="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded">+ Buscar Shopee</button>
-          </template>
-        </div>
-        <div class="p-3 rounded border" :class="pairVarModal?.meli_item_id ? 'border-blue-300 bg-blue-50' : 'border-dashed border-slate-300 bg-slate-50'">
-          <div class="text-xs uppercase font-semibold text-blue-600 mb-1">🔵 Mercado Livre</div>
-          <template x-if="pairVarModal?.meli_item_id">
-            <div class="text-xs space-y-0.5">
-              <div>Item: <span class="font-mono" x-text="pairVarModal.meli_item_id"></span></div>
-              <div x-show="pairVarModal.meli_variation_id">Variação: <span class="font-mono" x-text="pairVarModal.meli_variation_id"></span></div>
-              <div x-show="pairVarModal.meli_label"><span class="px-2 py-0.5 bg-blue-100 rounded" x-text="pairVarModal.meli_label"></span></div>
-            </div>
-          </template>
-          <template x-if="!pairVarModal?.meli_item_id">
-            <button @click="pairVarSearchSide='meli'; searchPairVarCatalog()" class="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded">+ Buscar ML</button>
-          </template>
-        </div>
-      </div>
-
-      <!-- Toggle pra trocar lado mesmo quando já tem -->
-      <div class="px-6 py-2 text-xs text-slate-500 flex gap-3 items-center border-b border-slate-200">
-        <span>Buscar em:</span>
-        <button @click="pairVarSearchSide='shopee'; searchPairVarCatalog()" :class="pairVarSearchSide==='shopee' ? 'bg-orange-200 text-orange-800' : 'bg-slate-100 hover:bg-slate-200'" class="px-2 py-1 rounded">🟠 Shopee</button>
-        <button @click="pairVarSearchSide='meli'; searchPairVarCatalog()" :class="pairVarSearchSide==='meli' ? 'bg-blue-200 text-blue-800' : 'bg-slate-100 hover:bg-slate-200'" class="px-2 py-1 rounded">🔵 ML</button>
-        <label class="ml-auto flex items-center gap-1"><input type="checkbox" x-model="pairVarIncludePaired" @change="searchPairVarCatalog()" /> incluir já pareados</label>
-      </div>
-
-      <div class="px-6 py-3 border-b border-slate-200">
-        <input x-model="pairVarSearch" @input.debounce.300ms="searchPairVarCatalog()" placeholder="Buscar por nome, SKU ou ID..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" autofocus />
-      </div>
-      <div class="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-[150px]">
-        <template x-for="item in pairVarCatalog" :key="item.key">
-          <div class="px-4 py-2 hover:bg-indigo-50 cursor-pointer flex items-center gap-3"
-               @click="selectPairVarTarget(item)"
-               :class="pairVarTarget?.key === item.key ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''">
-            <template x-if="item.image"><img :src="item.image" class="w-10 h-10 object-cover rounded border border-slate-200 shrink-0" loading="lazy" /></template>
-            <template x-if="!item.image"><div class="w-10 h-10 bg-slate-100 rounded flex items-center justify-center text-slate-300">📦</div></template>
-            <div class="flex-1 min-w-0">
-              <div class="text-xs truncate" x-text="(item.product_name||'—').slice(0,80)"></div>
-              <div class="text-[10px] text-slate-400 font-mono">
-                <span x-text="item.item_id"></span><span x-show="item.variation_id"> / <span x-text="item.variation_id"></span></span>
-                · <span x-text="item.sku || '(sem SKU)'"></span>
-                <span x-show="item.variation" class="ml-1 px-1 bg-slate-100 rounded" x-text="item.variation"></span>
-                <span x-show="item.paired" class="ml-1 text-emerald-600">✓ já pareado</span>
-              </div>
-            </div>
-            <span x-show="pairVarTarget?.key === item.key" class="text-indigo-600">✓</span>
-          </div>
-        </template>
-        <div x-show="pairVarCatalog.length===0" class="p-4 text-center text-sm text-slate-400" x-text="pairVarSearch ? 'Nenhum resultado.' : 'Digite pra buscar.'"></div>
-      </div>
-
-      <div class="px-6 py-4 border-t border-slate-200">
-        <div class="flex items-center gap-2 mb-3 text-xs">
-          <span class="text-slate-500">SKU final:</span>
-          <input x-model="pairVarSku" placeholder="auto" class="flex-1 px-3 py-1.5 border border-slate-300 rounded text-sm font-mono" />
-        </div>
-        <div class="flex gap-2">
-          <button @click="pairVarModal=null" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
-          <button @click="confirmPairVariation()" :disabled="!canConfirmPairVar() || loading.pair"
-            class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-medium rounded text-sm">
-            <span x-show="!loading.pair">✓ Confirmar pareamento</span>
-            <span x-show="loading.pair">Salvando...</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Set stock modal -->
-  <div x-show="setStockModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40" @click.self="setStockModal = null">
-    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full" x-show="setStockModal">
+  <!-- Set stock modal (vanilla DOM) -->
+  <div id="stock-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40" onclick="if(event.target===this)window.__closeStock()" style="display:none">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
       <h3 class="font-semibold mb-1">Definir estoque manualmente</h3>
-      <p class="text-sm text-slate-500 mb-4" x-text="setStockModal?.sku + ' — ' + (setStockModal?.product_name || '').slice(0, 50)"></p>
+      <p id="sm-info" class="text-sm text-slate-500 mb-4"></p>
       <div class="space-y-2 text-sm mb-4">
-        <div>Estoque atual ML: <span class="font-mono" x-text="setStockModal?.meli_stock ?? '—'"></span></div>
-        <div>Estoque atual Shopee: <span class="font-mono" x-text="setStockModal?.shopee_stock ?? '—'"></span></div>
+        <div>Estoque atual ML: <span id="sm-meli" class="font-mono">—</span></div>
+        <div>Estoque atual Shopee: <span id="sm-shopee" class="font-mono">—</span></div>
       </div>
-      <input x-model.number="newStockValue" type="number" min="0" placeholder="Novo estoque" class="w-full px-4 py-3 border border-slate-300 rounded-lg mb-4" />
+      <input id="sm-input" type="number" min="0" placeholder="Novo estoque" class="w-full px-4 py-3 border border-slate-300 rounded-lg mb-4" />
       <div class="flex gap-2">
-        <button @click="setStockModal = null" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Cancelar</button>
-        <button @click="setStock()" :disabled="loading.setStock" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">
-          <span x-show="!loading.setStock">Aplicar nos 2 marketplaces</span>
-          <span x-show="loading.setStock">Aplicando...</span>
-        </button>
+        <button onclick="window.__closeStock()" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Cancelar</button>
+        <button id="sm-apply" onclick="window.__applyStock()" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">Aplicar nos 2 marketplaces</button>
       </div>
     </div>
   </div>
@@ -1068,11 +964,200 @@ function app() {
     },
 
     async openPairModal(item, sourcePlatform) {
-      this.pairModal = { source: item, sourcePlatform, targetPlatform: sourcePlatform === 'shopee' ? 'meli' : 'shopee' };
-      this.pairSearch = '';
-      this.pairCatalog = [];
-      this.pairTarget = null;
-      this.pairSku = '';
+      const targetPlatform = sourcePlatform === 'shopee' ? 'meli' : 'shopee';
+      // Estado guardado no window pra acesso pelos handlers vanilla
+      window.__pairState = { source: item, sourcePlatform, targetPlatform, target: null };
+      // Popula DOM diretamente
+      document.getElementById('pm-source-name').textContent = (item.product_name || '').slice(0, 60);
+      document.getElementById('pm-source-meta').textContent = sourcePlatform + ' → ' + item.item_id;
+      document.getElementById('pm-target-label').textContent = 'Buscar no ' + (targetPlatform === 'meli' ? 'Mercado Livre' : 'Shopee') + ':';
+      document.getElementById('pm-search').value = '';
+      document.getElementById('pm-sku').value = '';
+      document.getElementById('pm-results').innerHTML = '<div class="p-4 text-center text-sm text-slate-400">Digite para buscar</div>';
+      document.getElementById('pm-confirm').disabled = true;
+      document.getElementById('pm-platform-toggle').style.display = 'none';
+      document.getElementById('pair-modal').style.display = 'flex';
+      document.getElementById('pm-search').focus();
+      // Configura handlers vanilla com closure pro contexto Alpine
+      const self = this;
+      window.__closePair = () => { document.getElementById('pair-modal').style.display = 'none'; window.__pairState = null; };
+      window.__searchPair = async () => {
+        const q = document.getElementById('pm-search').value;
+        clearTimeout(window.__pairSearchTimer);
+        window.__pairSearchTimer = setTimeout(async () => {
+          const d = await self.api('/api/catalog?platform=' + targetPlatform + '&include_paired=1&live=1&q=' + encodeURIComponent(q));
+          const items = d?.items || [];
+          const results = document.getElementById('pm-results');
+          if (items.length === 0) {
+            results.innerHTML = '<div class="p-4 text-center text-sm text-slate-400">' + (q ? 'Nenhum resultado' : 'Digite para buscar') + '</div>';
+          } else {
+            results.innerHTML = items.map(it => {
+              const name = (it.product_name || '—').slice(0, 65).replace(/</g, '&lt;');
+              const meta = (it.sku + ' | ID: ' + it.item_id + (it.variation_id ? '/' + it.variation_id : '')).replace(/</g, '&lt;');
+              return '<div class="pm-item px-4 py-3 hover:bg-indigo-50 cursor-pointer flex items-center gap-3" data-id="' + it.id + '"><div class="flex-1 min-w-0"><div class="text-sm truncate">' + name + '</div><div class="text-xs text-slate-400 font-mono">' + meta + '</div></div></div>';
+            }).join('');
+            results.querySelectorAll('.pm-item').forEach(el => {
+              el.addEventListener('click', () => {
+                const id = el.getAttribute('data-id');
+                const picked = items.find(x => String(x.id) === String(id));
+                window.__pairState.target = picked;
+                results.querySelectorAll('.pm-item').forEach(e => e.classList.remove('bg-indigo-50','border-l-2','border-indigo-500'));
+                el.classList.add('bg-indigo-50','border-l-2','border-indigo-500');
+                document.getElementById('pm-confirm').disabled = false;
+                // Auto SKU
+                const skuInput = document.getElementById('pm-sku');
+                if (!skuInput.value) {
+                  const src = window.__pairState.source;
+                  skuInput.value = src.platform === 'shopee' ? (src.sku || '') : (picked.sku || '');
+                }
+              });
+            });
+          }
+        }, 300);
+      };
+      window.__confirmPair = async () => {
+        const st = window.__pairState;
+        if (!st || !st.target) return;
+        const btn = document.getElementById('pm-confirm');
+        btn.disabled = true; btn.textContent = 'Salvando...';
+        const source = st.source, target = st.target;
+        const meliItem = source.platform === 'meli' ? source : target;
+        const shopeeItem = source.platform === 'shopee' ? source : target;
+        const sku = document.getElementById('pm-sku').value || undefined;
+        await self.api('/api/mappings/manual', { method: 'POST', body: JSON.stringify({
+          meli_unmapped_id: meliItem.id,
+          shopee_unmapped_id: shopeeItem.id,
+          sku,
+          product_name: shopeeItem.product_name || meliItem.product_name,
+        })});
+        window.__closePair();
+        btn.textContent = '✓ Confirmar pareamento';
+        await self.loadAll();
+      };
+    },
+    closePairModal() { if (window.__closePair) window.__closePair(); },
+
+    // Parear uma variação Shopee da aba Produtos com qualquer anúncio (ML ou outra Shopee não pareada)
+    openPairFromProduct(v, anuncio) {
+      const source = {
+        platform: 'shopee',
+        sku: v.sku || '',
+        item_id: v.shopee_item_id || anuncio?.shopee_item_id || '',
+        variation_id: v.shopee_model_id || null,
+        product_name: (anuncio?.product_name || '') + (v.variation ? ' — ' + v.variation : ''),
+      };
+      window.__pairState = { source, target: null, targetPlatform: 'meli' };
+
+      document.getElementById('pm-source-name').textContent = source.product_name.slice(0, 80);
+      document.getElementById('pm-source-meta').textContent = 'shopee → ' + source.item_id + (source.variation_id ? '/' + source.variation_id : '');
+      document.getElementById('pm-search').value = '';
+      document.getElementById('pm-sku').value = v.sku || '';
+      document.getElementById('pm-results').innerHTML = '<div class="p-4 text-center text-sm text-slate-400">Digite para buscar</div>';
+      document.getElementById('pm-confirm').disabled = true;
+      document.getElementById('pm-platform-toggle').style.display = 'flex';
+      document.getElementById('pair-modal').style.display = 'flex';
+
+      const self = this;
+      const setActiveTab = (plat) => {
+        const meli = document.getElementById('pm-tab-meli');
+        const shopee = document.getElementById('pm-tab-shopee');
+        const activeCls = ['bg-white','text-indigo-700','shadow-sm','font-semibold'];
+        const inactiveCls = ['text-slate-500'];
+        if (plat === 'meli') {
+          meli.classList.add(...activeCls); meli.classList.remove(...inactiveCls);
+          shopee.classList.remove(...activeCls); shopee.classList.add(...inactiveCls);
+          document.getElementById('pm-target-label').textContent = 'Buscar no Mercado Livre (inclui já pareados):';
+        } else {
+          shopee.classList.add(...activeCls); shopee.classList.remove(...inactiveCls);
+          meli.classList.remove(...activeCls); meli.classList.add(...inactiveCls);
+          document.getElementById('pm-target-label').textContent = 'Buscar na Shopee (inclui já pareados):';
+        }
+      };
+      setActiveTab('meli');
+
+      window.__setPairPlatform = (plat) => {
+        window.__pairState.targetPlatform = plat;
+        window.__pairState.target = null;
+        document.getElementById('pm-confirm').disabled = true;
+        setActiveTab(plat);
+        window.__searchPair();
+      };
+
+      window.__closePair = () => { document.getElementById('pair-modal').style.display = 'none'; window.__pairState = null; };
+
+      window.__searchPair = async () => {
+        const q = document.getElementById('pm-search').value;
+        const plat = window.__pairState.targetPlatform;
+        clearTimeout(window.__pairSearchTimer);
+        window.__pairSearchTimer = setTimeout(async () => {
+          // Sempre inclui pareados — permite re-mapeamento ou merge de variações duplicadas
+          const d = await self.api('/api/catalog?platform=' + plat + '&include_paired=1&live=1&q=' + encodeURIComponent(q));
+          let items = d?.items || [];
+          // Filtra o próprio item (não pode parear consigo mesmo) — só pra mesma plataforma
+          // Usa SKU como desambiguador quando variation_id é null nos dois lados
+          if (plat === source.platform) {
+            items = items.filter(it => {
+              const sameItem = String(it.item_id) === String(source.item_id);
+              const sameVar = String(it.variation_id || '') === String(source.variation_id || '');
+              const sameSku = String(it.sku || '') === String(source.sku || '');
+              return !(sameItem && sameVar && sameSku);
+            });
+          }
+          const results = document.getElementById('pm-results');
+          if (items.length === 0) {
+            results.innerHTML = '<div class="p-4 text-center text-sm text-slate-400">' + (q ? 'Nenhum resultado' : 'Digite para buscar') + '</div>';
+            return;
+          }
+          results.innerHTML = items.map((it, i) => {
+            const name = (it.product_name || '—').slice(0, 65).replace(/</g, '&lt;');
+            const meta = ((it.sku || '') + ' | ID: ' + it.item_id + (it.variation_id ? '/' + it.variation_id : '')).replace(/</g, '&lt;');
+            const tag = it.paired ? '<span class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded ml-2">já pareado</span>' : '';
+            return '<div class="pm-item px-4 py-3 hover:bg-indigo-50 cursor-pointer flex items-center gap-3" data-idx="' + i + '"><div class="flex-1 min-w-0"><div class="text-sm truncate">' + name + tag + '</div><div class="text-xs text-slate-400 font-mono">' + meta + '</div></div></div>';
+          }).join('');
+          results.querySelectorAll('.pm-item').forEach(el => {
+            el.addEventListener('click', () => {
+              const idx = parseInt(el.getAttribute('data-idx'));
+              window.__pairState.target = items[idx];
+              results.querySelectorAll('.pm-item').forEach(e => e.classList.remove('bg-indigo-50','border-l-2','border-indigo-500'));
+              el.classList.add('bg-indigo-50','border-l-2','border-indigo-500');
+              document.getElementById('pm-confirm').disabled = false;
+            });
+          });
+        }, 300);
+      };
+
+      window.__confirmPair = async () => {
+        const st = window.__pairState;
+        if (!st || !st.target) return;
+        const btn = document.getElementById('pm-confirm');
+        btn.disabled = true; btn.textContent = 'Salvando...';
+        const sku = document.getElementById('pm-sku').value || st.source.sku || ('sp-' + st.source.item_id + (st.source.variation_id ? '-' + st.source.variation_id : ''));
+        const payload = {
+          sku,
+          shopee_item_id: st.source.item_id,
+          shopee_model_id: st.source.variation_id,
+          meli_item_id: null,
+          meli_variation_id: null,
+          product_name: st.source.product_name || st.target.product_name,
+        };
+        if (st.targetPlatform === 'meli') {
+          payload.meli_item_id = st.target.item_id;
+          payload.meli_variation_id = st.target.variation_id;
+        } else {
+          // Pareando com OUTRO item Shopee: cria 2 mappings com mesmo SKU (ou usa mapping mesclando ambos shopee_item_ids — não suportado pela tabela, então criamos 2 entradas distintas que apontam ao mesmo SKU)
+          // Estratégia simples: o target Shopee fica como "alias" — atualiza só o mapping desse outro item_id pra usar o mesmo SKU
+          await self.api('/api/mappings', { method: 'POST', body: JSON.stringify({
+            sku,
+            shopee_item_id: st.target.item_id,
+            shopee_model_id: st.target.variation_id,
+            product_name: st.target.product_name,
+          })});
+        }
+        await self.api('/api/mappings', { method: 'POST', body: JSON.stringify(payload) });
+        window.__closePair();
+        btn.textContent = '✓ Confirmar pareamento';
+        await self.loadAll();
+      };
     },
 
     async searchPairCatalog() {
@@ -1099,7 +1184,7 @@ function app() {
         sku: this.pairSku || undefined,
         product_name: shopeeItem.product_name || meliItem.product_name,
       })});
-      this.pairModal = null;
+      this.closePairModal();
       this.loading.pair = false;
       await this.loadAll();
     },
@@ -1209,18 +1294,46 @@ function app() {
     },
 
     openSetStock(p) {
-      this.setStockModal = p;
-      this.newStockValue = p.master_stock || 0;
-    },
+      // Vanilla DOM (Alpine reativo está quebrado por extensão MetaMask)
+      const sku = p.sku || '';
+      const name = p.product_name || p.variation || sku;
+      const meli = p.meli_stock ?? '—';
+      const shopee = p.shopee_stock ?? '—';
+      const cur = p.master_stock ?? p.meli_stock ?? p.shopee_stock ?? 0;
+      document.getElementById('sm-info').textContent = sku + ' — ' + String(name).slice(0, 50);
+      document.getElementById('sm-meli').textContent = meli;
+      document.getElementById('sm-shopee').textContent = shopee;
+      document.getElementById('sm-input').value = cur;
+      const btn = document.getElementById('sm-apply');
+      btn.disabled = false; btn.textContent = 'Aplicar nos 2 marketplaces';
+      document.getElementById('stock-modal').style.display = 'flex';
+      document.getElementById('sm-input').focus();
+      document.getElementById('sm-input').select();
 
-    async setStock() {
-      this.loading.setStock = true;
-      await this.api('/api/products/' + encodeURIComponent(this.setStockModal.sku) + '/set-stock',
-        { method: 'POST', body: JSON.stringify({ stock: Number(this.newStockValue) }) });
-      this.setStockModal = null;
-      this.loading.setStock = false;
-      await this.loadProducts();
-      await this.loadChanges();
+      const self = this;
+      window.__closeStock = () => { document.getElementById('stock-modal').style.display = 'none'; };
+      window.__applyStock = async () => {
+        const val = Number(document.getElementById('sm-input').value);
+        if (isNaN(val) || val < 0) { alert('Valor inválido'); return; }
+        btn.disabled = true; btn.textContent = 'Aplicando...';
+        try {
+          const r = await self.api('/api/products/' + encodeURIComponent(sku) + '/set-stock',
+            { method: 'POST', body: JSON.stringify({ stock: val }) });
+          if (r?.error) {
+            alert('Erro: ' + r.error + (r.details ? '\\n' + JSON.stringify(r.details, null, 2) : ''));
+            btn.disabled = false; btn.textContent = 'Aplicar nos 2 marketplaces';
+            return;
+          }
+          if (r?.errors?.length) {
+            alert('Parcialmente aplicado.\\nSucesso: ' + (r.propagated || []).join(', ') + '\\nErros:\\n' + r.errors.map(function(e){return e.platform+': '+e.error;}).join('\\n'));
+          }
+          window.__closeStock();
+          await self.loadAll();
+        } catch (e) {
+          alert('Erro ao aplicar: ' + (e?.message || e));
+          btn.disabled = false; btn.textContent = 'Aplicar nos 2 marketplaces';
+        }
+      };
     },
 
     get lastRunText() {
