@@ -28,6 +28,26 @@ export default {
       return new Response('OK', { status: 200 });
     }
 
+    // PWA manifest (instalável no celular)
+    if (url.pathname === '/manifest.webmanifest') {
+      const manifest = {
+        name: 'Stock Sync — ML ↔ Shopee',
+        short_name: 'Stock Sync',
+        description: 'Sincronização de estoque entre Mercado Livre e Shopee (multi-loja)',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#0b0f17',
+        theme_color: '#4f46e5',
+        icons: [
+          { src: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='44' fill='%234f46e5'/><text x='96' y='140' text-anchor='middle' font-size='120' font-family='Arial' font-weight='800' fill='white'>S</text></svg>", sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='%234f46e5'/><text x='256' y='370' text-anchor='middle' font-size='320' font-family='Arial' font-weight='800' fill='white'>S</text></svg>", sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+        ],
+      };
+      return new Response(JSON.stringify(manifest), { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
+    }
+
     // TEMP: diagnóstico pública pra MAC orders (remover depois)
     if (url.pathname === '/_test-orders-x9k2') {
       const r = await fetch(env.MAC_URL, {

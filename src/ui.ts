@@ -5,6 +5,19 @@ export const html = `<!DOCTYPE html>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stock Sync — ML ↔ Shopee</title>
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Stock Sync" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%234f46e5'/><text x='90' y='130' text-anchor='middle' font-size='110' font-family='Inter,Arial' font-weight='800' fill='white'>S</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><text x='32' y='46' text-anchor='middle' font-size='40' font-family='Inter,Arial' font-weight='800' fill='white'>S</text></svg>" />
+  <script>
+    // Dark mode: aplica ANTES do Tailwind CDN inicializar (evita flash)
+    tailwind = { config: { darkMode: 'class' } };
+    (function(){ var t = localStorage.getItem('stocksync_theme'); if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark'); })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,19 +26,43 @@ export const html = `<!DOCTYPE html>
   <style>
     [x-cloak] { display: none !important; }
     html, body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    body { background: #f7f8fb; }
+    body { background: #f7f8fb; transition: background-color .2s ease, color .2s ease; }
+    html.dark body { background: #0b0f17; color: #e2e8f0; }
     /* Sidebar nav active state */
     .nav-item { transition: all .15s ease; }
     .nav-item:hover { background: rgba(99,102,241,.06); color: #4338ca; }
+    html.dark .nav-item:hover { background: rgba(99,102,241,.14); color: #c7d2fe; }
     .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.12), rgba(99,102,241,.02)); color: #4f46e5; font-weight: 600; box-shadow: inset 3px 0 0 #4f46e5; }
+    html.dark .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.22), rgba(99,102,241,.04)); color: #a5b4fc; box-shadow: inset 3px 0 0 #818cf8; }
     /* Card lift */
     .stat-card { transition: transform .15s ease, box-shadow .15s ease; }
     .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.06); }
+    html.dark .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.4); }
     /* Custom scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     ::-webkit-scrollbar-track { background: transparent; }
+    html.dark ::-webkit-scrollbar-thumb { background: #334155; }
+    html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    /* Mobile sidebar */
+    .sidebar-mobile-overlay { backdrop-filter: blur(2px); }
+    /* Dark mode overrides for legacy slate utilities used everywhere */
+    html.dark .bg-white { background-color: #111827 !important; }
+    html.dark .bg-slate-50 { background-color: #0f1623 !important; }
+    html.dark .bg-slate-100 { background-color: #1e293b !important; }
+    html.dark .text-slate-800 { color: #e2e8f0 !important; }
+    html.dark .text-slate-900 { color: #f1f5f9 !important; }
+    html.dark .text-slate-700 { color: #cbd5e1 !important; }
+    html.dark .text-slate-600 { color: #94a3b8 !important; }
+    html.dark .text-slate-500 { color: #94a3b8 !important; }
+    html.dark .text-slate-400 { color: #64748b !important; }
+    html.dark .border-slate-200 { border-color: #1f2937 !important; }
+    html.dark .border-slate-100 { border-color: #1f2937 !important; }
+    html.dark .border-slate-300 { border-color: #334155 !important; }
+    html.dark .divide-slate-100 > * + * { border-color: #1f2937 !important; }
+    /* SVG icon size default */
+    .ico { width: 18px; height: 18px; stroke-width: 1.75; }
   </style>
 </head>
 <body class="text-slate-800 min-h-screen">
@@ -53,110 +90,144 @@ export const html = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Inline SVG icons (Heroicons outline) — reusable via <template> -->
+  <template id="ico-orders"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg></template>
+  <template id="ico-stock"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg></template>
+  <template id="ico-products"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg></template>
+  <template id="ico-changes"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></template>
+  <template id="ico-unmapped"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg></template>
+  <template id="ico-config"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></template>
+  <template id="ico-sync"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg></template>
+  <template id="ico-logout"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/></svg></template>
+  <template id="ico-menu"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg></template>
+  <template id="ico-x"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg></template>
+  <template id="ico-sun"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg></template>
+  <template id="ico-moon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 8.992-5.998Z"/></svg></template>
+
   <!-- Main layout: sidebar + content -->
-  <div x-show="token" class="flex min-h-screen">
+  <div x-show="token" class="flex min-h-screen relative">
+
+    <!-- Mobile sidebar overlay -->
+    <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="sidebar-mobile-overlay fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
 
     <!-- Sidebar -->
-    <aside class="w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-screen">
+    <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
+      class="fixed md:sticky top-0 left-0 z-50 w-64 md:w-60 shrink-0 bg-white dark:bg-[#0f172a] border-r border-slate-200 flex flex-col h-screen transition-transform duration-200 md:translate-x-0">
       <!-- Brand -->
-      <div class="px-5 py-5 border-b border-slate-100">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-lg font-bold shadow-sm">S</div>
-          <div>
-            <div class="text-[15px] font-bold leading-tight text-slate-900">Stock Sync</div>
+      <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-lg font-bold shadow-sm shrink-0">S</div>
+          <div class="min-w-0">
+            <div class="text-[15px] font-bold leading-tight text-slate-900 truncate">Stock Sync</div>
             <div class="text-[10px] text-slate-400 leading-tight uppercase tracking-wide">ML ↔ Shopee</div>
           </div>
         </div>
-        <div class="mt-3 flex items-center gap-1.5">
-          <span x-show="!status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> AO VIVO
-          </span>
-          <span x-show="status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> MODO SOMBRA
-          </span>
-        </div>
+        <button @click="sidebarOpen = false" class="md:hidden text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar menu">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-5 pb-3 flex items-center gap-1.5">
+        <span x-show="!status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> AO VIVO
+        </span>
+        <span x-show="status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> MODO SOMBRA
+        </span>
       </div>
 
       <!-- Nav -->
       <nav class="flex-1 px-2 py-3 overflow-y-auto">
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 mb-1.5">Operação</div>
         <template x-for="t in tabs" :key="t.id">
-          <button @click="tab = t.id"
-            :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600'"
+          <button @click="tab = t.id; sidebarOpen = false"
+            :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600 dark:text-slate-400'"
             class="w-full text-left px-3 py-2 mb-0.5 rounded-r-md text-sm flex items-center justify-between">
-            <span class="flex items-center gap-2">
-              <span x-text="t.icon" class="text-base w-5 text-center"></span>
+            <span class="flex items-center gap-2.5">
+              <span x-html="getIcon(t.icon)" class="shrink-0"></span>
               <span x-text="t.label"></span>
             </span>
             <span x-show="t.count !== undefined" x-text="t.count || 0"
-              :class="tab === t.id ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'"
+              :class="tab === t.id ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
               class="text-[10px] font-semibold px-1.5 py-0.5 rounded"></span>
           </button>
         </template>
       </nav>
 
       <!-- Footer -->
-      <div class="px-3 py-3 border-t border-slate-100">
+      <div class="px-3 py-3 border-t border-slate-100 space-y-1">
         <div class="text-[10px] text-slate-400 px-2 mb-1.5" x-text="lastRunText"></div>
-        <button @click="logout()" class="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 rounded">↪ Sair</button>
+        <button @click="toggleTheme()" class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition">
+          <span x-html="theme === 'dark' ? getIcon('sun') : getIcon('moon')" class="shrink-0"></span>
+          <span x-text="theme === 'dark' ? 'Tema claro' : 'Tema escuro'"></span>
+        </button>
+        <button @click="logout()" class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition">
+          <span x-html="getIcon('logout')" class="shrink-0"></span> Sair
+        </button>
       </div>
     </aside>
 
     <!-- Content area -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 w-full">
 
       <!-- Top bar -->
-      <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="px-8 py-3.5 flex items-center justify-between gap-4">
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Painel</div>
-            <h1 class="text-[17px] font-bold text-slate-900 leading-tight" x-text="(tabs.find(t=>t.id===tab)?.label) || 'Stock Sync'"></h1>
+      <header class="bg-white dark:bg-[#0f172a] border-b border-slate-200 sticky top-0 z-30">
+        <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
+          <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Abrir menu">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+          </button>
+          <div class="min-w-0 flex-1">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold hidden sm:block">Painel</div>
+            <h1 class="text-[15px] sm:text-[17px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'Stock Sync'"></h1>
           </div>
-          <div class="flex items-center gap-2">
-            <button @click="runSync()" :disabled="loading.sync"
-              class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition">
-              <span x-show="!loading.sync">↻</span>
-              <span x-show="loading.sync" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span x-text="loading.sync ? 'Sincronizando...' : 'Sincronizar agora'"></span>
-            </button>
-          </div>
+          <button @click="runSync()" :disabled="loading.sync"
+            class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0">
+            <span x-show="!loading.sync" x-html="getIcon('sync')"></span>
+            <span x-show="loading.sync" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span class="hidden sm:inline" x-text="loading.sync ? 'Sincronizando...' : 'Sincronizar'"></span>
+          </button>
         </div>
 
         <!-- Stat cards strip -->
-        <div class="px-8 pb-4 grid grid-cols-4 gap-3">
-          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
-            <div class="flex items-center justify-between mb-1">
+        <div class="px-4 sm:px-6 lg:px-8 pb-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+            <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Produtos sync</span>
-              <span class="text-base">📦</span>
+              <span class="text-indigo-500" x-html="getIcon('stock')"></span>
             </div>
-            <div class="text-xl font-bold text-slate-900" x-text="status.active_mappings || 0"></div>
+            <div class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white pl-1.5" x-text="status.active_mappings || 0"></div>
           </div>
-          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
-            <div class="flex items-center justify-between mb-1">
+          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full" :class="lowStockCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'"></div>
+            <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Estoque baixo</span>
-              <span class="text-base">⚠️</span>
+              <span :class="lowStockCount > 0 ? 'text-amber-500' : 'text-emerald-500'">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.732 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+              </span>
             </div>
-            <div class="text-xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900'" x-text="lowStockCount"></div>
+            <div class="text-lg sm:text-xl font-bold pl-1.5" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900 dark:text-white'" x-text="lowStockCount"></div>
           </div>
-          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
-            <div class="flex items-center justify-between mb-1">
+          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full" :class="status.unmapped_items ? 'bg-orange-500' : 'bg-emerald-500'"></div>
+            <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Não pareados</span>
-              <span class="text-base">🔗</span>
+              <span :class="status.unmapped_items ? 'text-orange-500' : 'text-emerald-500'" x-html="getIcon('unmapped')"></span>
             </div>
-            <div class="text-xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : 'text-slate-900'" x-text="status.unmapped_items || 0"></div>
+            <div class="text-lg sm:text-xl font-bold pl-1.5" :class="status.unmapped_items ? 'text-orange-600' : 'text-slate-900 dark:text-white'" x-text="status.unmapped_items || 0"></div>
           </div>
-          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
-            <div class="flex items-center justify-between mb-1">
+          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+            <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Mudanças última</span>
-              <span class="text-base">📊</span>
+              <span class="text-emerald-500" x-html="getIcon('changes')"></span>
             </div>
-            <div class="text-xl font-bold text-slate-900" x-text="(status.last_run?.changes_detected ?? 0)"></div>
+            <div class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white pl-1.5" x-text="(status.last_run?.changes_detected ?? 0)"></div>
           </div>
         </div>
       </header>
 
       <!-- Tab content -->
-      <main class="flex-1 px-8 py-6 overflow-x-hidden">
+      <main class="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden">
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
@@ -1036,13 +1107,15 @@ function app() {
     loginError: '',
     tab: 'stock',
     tabs: [
-      { id: 'orders',   label: 'Pedidos',       icon: '🛒' },
-      { id: 'stock',    label: 'Estoque',       icon: '📦' },
-      { id: 'products', label: 'Produtos',      icon: '📊' },
-      { id: 'changes',  label: 'Movimentações', icon: '📜' },
-      { id: 'unmapped', label: 'Não pareados',  icon: '🔗' },
-      { id: 'config',   label: 'Configurações', icon: '⚙️' },
+      { id: 'orders',   label: 'Pedidos',       icon: 'orders' },
+      { id: 'stock',    label: 'Estoque',       icon: 'stock' },
+      { id: 'products', label: 'Produtos',      icon: 'products' },
+      { id: 'changes',  label: 'Movimentações', icon: 'changes' },
+      { id: 'unmapped', label: 'Não pareados',  icon: 'unmapped' },
+      { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
+    sidebarOpen: false,
+    theme: (localStorage.getItem('stocksync_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')),
     status: {},
     products: [],
     salesStats: [],
@@ -1864,6 +1937,19 @@ function app() {
     setAccountFilter(id) {
       // Toggle: clicar de novo desmarca
       this.accountFilter = (this.accountFilter === id) ? '' : id;
+    },
+
+    getIcon(name) {
+      // Lê o conteúdo de <template id="ico-<name>"> (SVG inline)
+      const tpl = document.getElementById('ico-' + name);
+      return tpl ? tpl.innerHTML : '';
+    },
+
+    toggleTheme() {
+      this.theme = (this.theme === 'dark') ? 'light' : 'dark';
+      localStorage.setItem('stocksync_theme', this.theme);
+      if (this.theme === 'dark') document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
     },
 
     async editVariationSku(v, anuncio) {
