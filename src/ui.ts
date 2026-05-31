@@ -804,7 +804,7 @@ export const html = `<!DOCTYPE html>
       </section>
 
       <!-- Config -->
-      <section x-show="tab === 'config'" x-cloak class="max-w-3xl mx-auto">
+      <section x-show="tab === 'config'" x-cloak class="max-w-4xl">
         <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-6 space-y-6">
           <!-- Contas conectadas -->
           <div>
