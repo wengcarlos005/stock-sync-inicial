@@ -13,11 +13,6 @@ export const html = `<!DOCTYPE html>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%234f46e5'/><text x='90' y='130' text-anchor='middle' font-size='110' font-family='Inter,Arial' font-weight='800' fill='white'>S</text></svg>" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><text x='32' y='46' text-anchor='middle' font-size='40' font-family='Inter,Arial' font-weight='800' fill='white'>S</text></svg>" />
-  <script>
-    // Dark mode: aplica ANTES do Tailwind CDN inicializar (evita flash)
-    tailwind = { config: { darkMode: 'class' } };
-    (function(){ var t = localStorage.getItem('stocksync_theme'); if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark'); })();
-  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,96 +21,27 @@ export const html = `<!DOCTYPE html>
   <style>
     [x-cloak] { display: none !important; }
     html, body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    body { background: #f8fafc; transition: background-color .2s ease, color .2s ease; } /* slate-50 */
-    html.dark body { background: #0f172a; color: #cbd5e1; }
+    body { background: #f8fafc; } /* slate-50 */
     /* Sidebar nav */
     .nav-item { transition: all .15s ease; color: #475569; }
     .nav-item:hover { background: rgba(99,102,241,.07); color: #4338ca; }
     .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.12), rgba(99,102,241,0)); color: #4f46e5; font-weight: 600; box-shadow: inset 3px 0 0 #4f46e5; }
-    html.dark .nav-item { color: #94a3b8; }
-    html.dark .nav-item:hover { background: rgba(129,140,248,.10); color: #c7d2fe; }
-    html.dark .nav-item.active { background: linear-gradient(90deg, rgba(129,140,248,.18), rgba(129,140,248,0)); color: #c7d2fe; box-shadow: inset 3px 0 0 #818cf8; }
-    /* Card lift */
-    .stat-card { transition: transform .15s ease, box-shadow .15s ease; }
-    .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.06); }
-    html.dark .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.45); }
     /* Custom scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     ::-webkit-scrollbar-track { background: transparent; }
-    html.dark ::-webkit-scrollbar-thumb { background: #334155; }
-    html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
     /* SVG icon size default */
     .ico { width: 18px; height: 18px; stroke-width: 1.75; }
-
-    /* Surfaces explícitas — não dependem do Tailwind dark: pra evitar inconsistência */
+    /* Surfaces: sidebar + topbar */
     .app-surface { background-color: #ffffff; }
-    html.dark .app-surface { background-color: #1e293b; } /* slate-800 */
-
-    /* Stat cards: light = indigo claro c/ número indigo (paleta azul). Dark = slate sutil */
-    .stat-surface { background-color: #eef2ff; } /* indigo-50 */
-    html.dark .stat-surface { background-color: #273449; }
-    .stat-surface .stat-num { color: #4338ca; } /* indigo-700 */
-    html.dark .stat-surface .stat-num { color: #c7d2fe; } /* indigo-200 */
-    .stat-surface .stat-label { color: #6366f1; } /* indigo-500 */
-    html.dark .stat-surface .stat-label { color: #94a3b8; }
-
-    /* Nav count badges: paleta indigo em ambos os modos */
+    /* Stat cards: paleta indigo (azul) */
+    .stat-surface { background-color: #eef2ff; }
+    .stat-surface .stat-num { color: #4338ca; }
+    .stat-surface .stat-label { color: #6366f1; }
+    /* Nav count badges: indigo */
     .nav-count { background-color: #e0e7ff; color: #4338ca; }
     .nav-count-active { background-color: #4f46e5; color: #ffffff; }
-    html.dark .nav-count { background-color: rgba(99,102,241,.18); color: #c7d2fe; }
-    html.dark .nav-count-active { background-color: #6366f1; color: #ffffff; }
-
-    /* Dark mode: badges de variação ficam com contraste melhor (texto + bg) */
-    html.dark .bg-slate-100.text-slate-700 { background-color: #334155; color: #f1f5f9; }
-    /* Dark mode: rows hover/zebra mais suaves */
-    html.dark .hover\\:bg-slate-50:hover { background-color: rgba(99,102,241,.06); }
-
-    /* ─────────────── DARK MODE: overrides minimalistas ───────────────
-       Em vez de !important hardcoded, usamos selectors específicos pra
-       não brigar com classes Tailwind. Paleta = slate-800/900 (suave). */
-    html.dark { color-scheme: dark; }
-    html.dark .bg-white { background-color: #1e293b; }
-    html.dark .bg-slate-50 { background-color: #1a2435; }
-    html.dark .bg-slate-100 { background-color: #273449; }
-    html.dark .bg-slate-200 { background-color: #334155; }
-    html.dark .text-slate-900 { color: #f1f5f9; }
-    html.dark .text-slate-800 { color: #e2e8f0; }
-    html.dark .text-slate-700 { color: #cbd5e1; }
-    html.dark .text-slate-600 { color: #94a3b8; }
-    html.dark .text-slate-500 { color: #94a3b8; }
-    html.dark .text-slate-400 { color: #64748b; }
-    html.dark .text-slate-300 { color: #64748b; }
-    html.dark .border-slate-100,
-    html.dark .border-slate-200,
-    html.dark .border { border-color: #334155; }
-    html.dark .border-slate-300 { border-color: #475569; }
-    html.dark .divide-slate-100 > * + *,
-    html.dark .divide-slate-200 > * + * { border-color: #334155; }
-    html.dark hr { border-color: #334155; }
-    html.dark .bg-slate-50\\/40 { background-color: rgba(30,41,59,.55); }
-    html.dark .bg-amber-50 { background-color: rgba(180,83,9,.12); }
-    html.dark .bg-amber-100 { background-color: rgba(180,83,9,.20); }
-    html.dark .bg-amber-50.border-amber-200 { border-color: #b45309; }
-    html.dark .bg-yellow-50 { background-color: rgba(161,98,7,.12); }
-    html.dark .bg-yellow-100 { background-color: rgba(161,98,7,.22); }
-    html.dark .bg-orange-50 { background-color: rgba(154,52,18,.14); }
-    html.dark .bg-orange-100 { background-color: rgba(154,52,18,.22); }
-    html.dark .bg-emerald-50 { background-color: rgba(6,95,70,.18); }
-    html.dark .bg-emerald-100 { background-color: rgba(6,95,70,.28); }
-    html.dark .bg-red-50 { background-color: rgba(127,29,29,.18); }
-    html.dark .bg-red-100 { background-color: rgba(127,29,29,.30); }
-    html.dark .bg-purple-100 { background-color: rgba(88,28,135,.30); }
-    html.dark .bg-indigo-50 { background-color: rgba(55,48,163,.20); }
-    html.dark .bg-indigo-100 { background-color: rgba(55,48,163,.30); }
-    /* Inputs em dark */
-    html.dark input, html.dark select, html.dark textarea {
-      background-color: #1a2435; color: #e2e8f0; border-color: #334155;
-    }
-    html.dark input::placeholder { color: #64748b; }
-    /* Buttons: mantém cor de marca, só ajusta light-grays */
-    html.dark .bg-slate-100.hover\\:bg-slate-200:hover { background-color: #334155; }
   </style>
 </head>
 <body class="text-slate-800 min-h-screen">
@@ -187,7 +113,7 @@ export const html = `<!DOCTYPE html>
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 mb-1.5">Operação</div>
         <template x-for="t in tabs" :key="t.id">
           <button @click="tab = t.id; sidebarOpen = false"
-            :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600 dark:text-slate-400'"
+            :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600'"
             class="w-full text-left px-3 py-2 mb-0.5 rounded-r-md text-sm flex items-center justify-between">
             <span class="flex items-center gap-2.5">
               <span x-html="getIcon(t.icon)" class="shrink-0"></span>
@@ -203,11 +129,7 @@ export const html = `<!DOCTYPE html>
       <!-- Footer -->
       <div class="px-3 py-3 border-t border-slate-100 space-y-1">
         <div class="text-[10px] text-slate-400 px-2 mb-1.5" x-text="lastRunText"></div>
-        <button @click="toggleTheme()" class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition">
-          <span x-html="theme === 'dark' ? getIcon('sun') : getIcon('moon')" class="shrink-0"></span>
-          <span x-text="theme === 'dark' ? 'Tema claro' : 'Tema escuro'"></span>
-        </button>
-        <button @click="logout()" class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition">
+        <button @click="logout()" class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 rounded transition">
           <span x-html="getIcon('logout')" class="shrink-0"></span> Sair
         </button>
       </div>
@@ -219,7 +141,7 @@ export const html = `<!DOCTYPE html>
       <!-- Top bar -->
       <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
-          <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Abrir menu">
+          <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
           </button>
           <div class="min-w-0 flex-1">
@@ -1160,7 +1082,6 @@ function app() {
       { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
     sidebarOpen: false,
-    theme: (localStorage.getItem('stocksync_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')),
     status: {},
     products: [],
     salesStats: [],
@@ -1988,13 +1909,6 @@ function app() {
       // Lê o conteúdo de <template id="ico-<name>"> (SVG inline)
       const tpl = document.getElementById('ico-' + name);
       return tpl ? tpl.innerHTML : '';
-    },
-
-    toggleTheme() {
-      this.theme = (this.theme === 'dark') ? 'light' : 'dark';
-      localStorage.setItem('stocksync_theme', this.theme);
-      if (this.theme === 'dark') document.documentElement.classList.add('dark');
-      else document.documentElement.classList.remove('dark');
     },
 
     async editVariationSku(v, anuncio) {
