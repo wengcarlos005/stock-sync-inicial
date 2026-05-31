@@ -26,7 +26,7 @@ export const html = `<!DOCTYPE html>
   <style>
     [x-cloak] { display: none !important; }
     html, body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    body { background: #f6f7fb; transition: background-color .2s ease, color .2s ease; }
+    body { background: #f8fafc; transition: background-color .2s ease, color .2s ease; } /* slate-50 */
     html.dark body { background: #0f172a; color: #cbd5e1; }
     /* Sidebar nav */
     .nav-item { transition: all .15s ease; color: #475569; }
@@ -158,15 +158,6 @@ export const html = `<!DOCTYPE html>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="px-5 pb-3 flex items-center gap-1.5">
-        <span x-show="!status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> AO VIVO
-        </span>
-        <span x-show="status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
-          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> MODO SOMBRA
-        </span>
-      </div>
-
       <!-- Nav -->
       <nav class="flex-1 px-2 py-3 overflow-y-auto">
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 mb-1.5">Operação</div>
@@ -219,41 +210,23 @@ export const html = `<!DOCTYPE html>
           </button>
         </div>
 
-        <!-- Stat cards strip -->
+        <!-- Stat cards strip — visual igual à v1 (slate-100 chapado, sem accent bar) -->
         <div class="px-4 sm:px-6 lg:px-8 pb-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-            <div class="flex items-center justify-between mb-1 pl-1.5">
-              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Produtos sync</span>
-              <span class="text-indigo-500" x-html="getIcon('stock')"></span>
-            </div>
-            <div class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white pl-1.5" x-text="status.active_mappings || 0"></div>
+          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
+            <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100" x-text="status.active_mappings || 0"></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Produtos sincronizados</div>
           </div>
-          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-1 h-full" :class="lowStockCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'"></div>
-            <div class="flex items-center justify-between mb-1 pl-1.5">
-              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Estoque baixo</span>
-              <span :class="lowStockCount > 0 ? 'text-amber-500' : 'text-emerald-500'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.732 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-              </span>
-            </div>
-            <div class="text-lg sm:text-xl font-bold pl-1.5" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900 dark:text-white'" x-text="lowStockCount"></div>
+          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
+            <div class="text-xl sm:text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'" x-text="lowStockCount"></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque baixo / zerado</div>
           </div>
-          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-1 h-full" :class="status.unmapped_items ? 'bg-orange-500' : 'bg-emerald-500'"></div>
-            <div class="flex items-center justify-between mb-1 pl-1.5">
-              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Não pareados</span>
-              <span :class="status.unmapped_items ? 'text-orange-500' : 'text-emerald-500'" x-html="getIcon('unmapped')"></span>
-            </div>
-            <div class="text-lg sm:text-xl font-bold pl-1.5" :class="status.unmapped_items ? 'text-orange-600' : 'text-slate-900 dark:text-white'" x-text="status.unmapped_items || 0"></div>
+          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
+            <div class="text-xl sm:text-2xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'" x-text="status.unmapped_items || 0"></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">SKUs não pareados</div>
           </div>
-          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-            <div class="flex items-center justify-between mb-1 pl-1.5">
-              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Mudanças última</span>
-              <span class="text-emerald-500" x-html="getIcon('changes')"></span>
-            </div>
-            <div class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white pl-1.5" x-text="(status.last_run?.changes_detected ?? 0)"></div>
+          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
+            <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100" x-text="(status.last_run?.changes_detected ?? 0)"></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Mudanças (última execução)</div>
           </div>
         </div>
       </header>
