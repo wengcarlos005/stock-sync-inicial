@@ -101,6 +101,7 @@ export const html = `<!DOCTYPE html>
           <div class="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
             <button @click="orderStatus=''; orderPage=1; loadOrders()" :class="orderStatus==='' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">Todos</button>
             <button @click="orderStatus='to_ship'; orderPage=1; loadOrders()" :class="orderStatus==='to_ship' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">📦 A enviar</button>
+            <button @click="orderStatus='unpaid'; orderPage=1; loadOrders()" :class="orderStatus==='unpaid' ? 'bg-orange-500 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">💸 Aguardando pagto</button>
             <button @click="orderStatus='completed'; orderPage=1; loadOrders()" :class="orderStatus==='completed' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">✅ Concluídos</button>
             <button @click="orderStatus='cancelled'; orderPage=1; loadOrders()" :class="orderStatus==='cancelled' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-100'" class="text-xs px-3 py-1.5 rounded">❌ Cancelados</button>
           </div>
@@ -184,10 +185,12 @@ export const html = `<!DOCTYPE html>
         <div class="flex flex-wrap gap-3 mb-4 items-center">
           <input x-model="masterSearch" @input.debounce.300ms="loadMaster()" placeholder="Buscar por nome, SKU ou variação..."
             class="flex-1 min-w-[260px] px-4 py-2 border border-slate-300 rounded-lg" />
-          <div class="flex bg-slate-100 p-1 rounded-lg gap-1">
+          <div class="flex bg-slate-100 p-1 rounded-lg gap-1 flex-wrap">
             <button @click="masterFilter='all'; loadMaster()" :class="masterFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">Todos</button>
             <button @click="masterFilter='paired'; loadMaster()" :class="masterFilter==='paired' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">✓ Pareados</button>
             <button @click="masterFilter='unpaired'; loadMaster()" :class="masterFilter==='unpaired' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded">⚠ Sem par</button>
+            <button @click="setMasterFilter('low_stock')" :class="masterFilter==='low_stock' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded" title="Variações com menos de 3 unidades (inclui zeradas)">⚠ Estoque baixo</button>
+            <button @click="setMasterFilter('out_of_stock')" :class="masterFilter==='out_of_stock' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-200'" class="text-xs px-3 py-1.5 rounded" title="Só variações com 0 unidades">🔴 Zerado</button>
           </div>
           <button @click="loadMaster()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
         </div>
@@ -207,10 +210,14 @@ export const html = `<!DOCTYPE html>
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
                   <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
+                    <span x-show="anuncio.shopee_account_label" class="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-200 text-orange-700 rounded font-medium" x-text="'🏬 ' + anuncio.shopee_account_label"></span>
                     <span x-show="anuncio.meli_item_id">🟡 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
                   </div>
                 </div>
+                <template x-if="anuncio.shopee_item_id">
+                  <button @click="refreshVariations(anuncio.shopee_item_id)" class="shrink-0 text-xs px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded font-medium" title="Busca os modelos atuais na Shopee, limpa variações fantasma e atualiza nomes">↻ Atualizar variações</button>
+                </template>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
@@ -228,26 +235,25 @@ export const html = `<!DOCTYPE html>
                   <template x-for="(v, vi) in (anuncio.variations || [])" :key="vi">
                     <tr :class="v.mapped ? (v.active === 0 ? 'opacity-50' : '') : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
-                        <span x-show="v.variation" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="v.variation"></span>
+                        <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
                       <td class="px-3 py-2 text-center font-mono text-xs" :class="unitsClass(v.meli_stock)" x-text="v.meli_stock ?? '—'"></td>
                       <td class="px-3 py-2 text-center font-mono text-xs" :class="unitsClass(v.shopee_stock)" x-text="v.shopee_stock ?? '—'"></td>
                       <td class="px-3 py-2 text-center">
-                        <span x-show="v.mapped" class="text-base font-bold font-mono" :class="unitsClass(unifiedStock(v))" x-text="unifiedStockDisplay(v)"></span>
-                        <span x-show="!v.mapped" class="text-xs text-slate-300">—</span>
+                        <span class="text-base font-bold font-mono" :class="unitsClass(unifiedStock(v))" x-text="unifiedStockDisplay(v)"></span>
                       </td>
                       <td class="px-3 py-2 text-center">
                         <div class="flex gap-1 justify-center flex-wrap">
-                          <template x-if="v.mapped">
+                          <template x-if="v.shopee_item_id || v.meli_item_id">
                             <button @click="openSetStock(v)" class="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">Atualizar</button>
                           </template>
                           <template x-if="v.mapped">
                             <button @click="toggleMapping(v.sku)" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" x-text="v.active ? 'pausar' : 'ativar'"></button>
                           </template>
-                          <template x-if="!v.mapped">
-                            <button @click="openPairFromProduct(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">Mapear</button>
+                          <template x-if="v.shopee_item_id || v.meli_item_id">
+                            <button @click="openPairFromProduct(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded" x-text="v.paired ? 'Re-parear' : 'Parear'"></button>
                           </template>
                         </div>
                       </td>
@@ -300,10 +306,14 @@ export const html = `<!DOCTYPE html>
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
                   <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
+                    <span x-show="anuncio.shopee_account_label" class="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-200 text-orange-700 rounded font-medium" x-text="'🏬 ' + anuncio.shopee_account_label"></span>
                     <span x-show="anuncio.meli_item_id">🟡 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
                   </div>
                 </div>
+                <template x-if="anuncio.shopee_item_id">
+                  <button @click="refreshVariations(anuncio.shopee_item_id)" class="shrink-0 text-xs px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded font-medium" title="Busca os modelos atuais na Shopee, limpa variações fantasma e atualiza nomes">↻ Atualizar variações</button>
+                </template>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
@@ -324,7 +334,7 @@ export const html = `<!DOCTYPE html>
                   <template x-for="(v, vi) in (anuncio.variations || [])" :key="vi">
                     <tr :class="v.paired ? '' : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
-                        <span x-show="v.variation" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="v.variation"></span>
+                        <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
@@ -512,7 +522,109 @@ export const html = `<!DOCTYPE html>
       <!-- Config -->
       <section x-show="tab === 'config'" x-cloak class="max-w-3xl mx-auto">
         <div class="bg-white border border-slate-200 rounded-lg p-6 space-y-6">
+          <!-- Contas conectadas -->
           <div>
+            <h3 class="font-semibold mb-2 flex items-center gap-2 flex-wrap">🏬 Contas conectadas
+              <button @click="syncAccounts()" :disabled="loading.acctSync" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded font-normal">
+                <span x-show="!loading.acctSync">↻ Sincronizar com MAC</span>
+                <span x-show="loading.acctSync">Sincronizando...</span>
+              </button>
+              <a href="https://marketplaces.tiops.com.br/skill-claude" target="_blank" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded font-normal text-amber-800">+ Conectar nova conta (abre MAC)</a>
+              <button @click="backfillAccountIds()" :disabled="loading.acctBackfill" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded font-normal">
+                <span x-show="!loading.acctBackfill">⚙ Inicializar colunas (migrate)</span>
+                <span x-show="loading.acctBackfill">Migrando...</span>
+              </button>
+            </h3>
+            <p class="text-sm text-slate-500 mb-3">Lojas conectadas no MAC. Você pode dar um nome amigável pra cada uma. <strong>Fluxo:</strong> (1) Conecta nova conta no MAC → (2) "Sincronizar com MAC" → (3) nomeia → (4) clica "Inicializar colunas" UMA VEZ pra adicionar shopee_account_id no banco → (5) roda discovery pra puxar items.</p>
+            <div class="space-y-2">
+              <template x-for="a in accounts" :key="a.external_id">
+                <div class="flex items-center gap-3 p-3 border border-slate-200 rounded">
+                  <span class="text-xs px-2 py-0.5 rounded" :class="a.marketplace==='meli' ? 'bg-amber-100 text-amber-800' : 'bg-orange-100 text-orange-800'" x-text="a.marketplace==='meli' ? '🟡 ML' : '🛒 Shopee'"></span>
+                  <span class="font-mono text-xs text-slate-500" x-text="a.external_id"></span>
+                  <input :value="a.label || ''" @blur="saveAccountLabel(a.external_id, $event.target.value)" placeholder="Nome da loja (ex: Geek Aura)" class="flex-1 px-2 py-1 border border-slate-300 rounded text-sm" />
+                  <span x-show="a.is_active" class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">conectado</span>
+                  <span x-show="!a.is_active" class="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded">desconectado</span>
+                </div>
+              </template>
+              <div x-show="!accounts.length" class="text-sm text-slate-400">Nenhuma conta carregada — clica "Sincronizar com MAC" acima.</div>
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Corrigir IDs de variação ML</h3>
+            <p class="text-sm text-slate-500 mb-3">Discoveries antigas armazenavam o <strong>SKU</strong> no lugar do <strong>variation_id</strong> real do ML. Esse fix busca cada anúncio ML ao vivo, encontra o ID correto via SELLER_SKU, e corrige todos os mappings. Necessário pra atualização de estoque ML funcionar.</p>
+            <button @click="fixMeliVariationIds()" :disabled="loading.fixMlVar" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-medium rounded">
+              <span x-show="!loading.fixMlVar">🔧 Corrigir variation_ids do ML</span>
+              <span x-show="loading.fixMlVar">Corrigindo...</span>
+            </button>
+            <div x-show="fixMlVarResult" class="mt-3 p-3 bg-cyan-50 border border-cyan-200 rounded text-sm text-cyan-900">
+              ✓ Anúncios consultados: <strong x-text="fixMlVarResult?.items_checked"></strong>.
+              Mappings escaneados: <strong x-text="fixMlVarResult?.mappings_scanned"></strong>.
+              <span class="text-emerald-700 font-semibold">Corrigidos: <span x-text="fixMlVarResult?.mappings_fixed"></span></span>.
+              <span x-show="fixMlVarResult?.errors" class="text-amber-700">Erros: <span x-text="fixMlVarResult?.errors"></span></span>
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">🔥 Parear & Sincronizar Tudo</h3>
+            <p class="text-sm text-slate-500 mb-3">Roda em sequência: <strong>(1)</strong> match unmapped × unmapped por padrão de SKU; <strong>(2)</strong> completa mappings parciais (só ML ou só SP) buscando o outro lado; <strong>(3)</strong> pra cada anúncio ML, busca variações ao vivo e pareia com Shopee usando SKU. <em>Use sempre que mexer em SKUs no ML/Shopee.</em></p>
+            <button @click="superPair()" :disabled="loading.superPair" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-medium rounded">
+              <span x-show="!loading.superPair">🔥 Parear & Sincronizar Tudo</span>
+              <span x-show="loading.superPair">Pareando (pode demorar 1-3 min)...</span>
+            </button>
+            <div x-show="superPairResult" class="mt-3 p-3 bg-pink-50 border border-pink-200 rounded text-sm text-pink-900 space-y-1">
+              <div>📌 Match unmapped × unmapped: <strong x-text="superPairResult?.match_sku?.matched||0"></strong> pares</div>
+              <div>🔗 Completou parciais (SP only ← ML): <strong x-text="superPairResult?.complete_partial?.shopee_only_filled_with_ml||0"></strong></div>
+              <div>🔗 Completou parciais (ML only ← SP): <strong x-text="superPairResult?.complete_partial?.ml_only_filled_with_shopee||0"></strong></div>
+              <div>🧹 Duplicados/sujos desativados: <strong x-text="(superPairResult?.complete_partial?.dirty_sku_duplicates_deactivated||0) + (superPairResult?.complete_partial?.partial_mapping_pairs_merged||0)"></strong></div>
+              <div>🆕 Variações ML novas pareadas: <strong x-text="superPairResult?.summary?.new_pairings||0"></strong> | atualizadas: <strong x-text="superPairResult?.summary?.updated_pairings||0"></strong> (em <span x-text="superPairResult?.summary?.ml_items_processed||0"></span> anúncios)</div>
+              <div>🌐 Duplicatas globais (mesmo modelo SP/ML em 2+ mappings) desativadas: <strong x-text="superPairResult?.summary?.global_duplicates_deactivated||0"></strong></div>
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Pareamento automático por SKU</h3>
+            <p class="text-sm text-slate-500 mb-3">Varre todos os <strong>unmapped</strong> dos 2 lados e cria mappings onde o SKU bate (normalizado: sem acento, case-insensitive, sem caracteres especiais). Roda na hora, sem chamar GitHub Actions.</p>
+            <button @click="matchBySkuNow()" :disabled="loading.matchSku" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded">
+              <span x-show="!loading.matchSku">🔗 Parear agora por SKU</span>
+              <span x-show="loading.matchSku">Pareando...</span>
+            </button>
+            <div x-show="matchSkuResult" class="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-sm text-emerald-900">
+              <div>✓ <strong x-text="matchSkuResult?.matched||0"></strong> pares criados (de <span x-text="matchSkuResult?.shopee_total||0"></span> Shopee × <span x-text="matchSkuResult?.meli_total||0"></span> ML candidatos)</div>
+              <div x-show="matchSkuResult?.errors" class="text-amber-700">⚠ <span x-text="matchSkuResult?.errors"></span> erros</div>
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Reprocessar status dos pedidos</h3>
+            <p class="text-sm text-slate-500 mb-3">Atualiza status de pedidos antigos (que ficaram como <code>paid</code>/<code>ready_to_ship</code> mesmo depois de enviados). Re-consulta ML <strong>e</strong> Shopee ao vivo. Necessário pra "A enviar" filtrar certo.</p>
+            <button @click="reprocessAllStatus()" :disabled="loading.reprocessMl" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium rounded">
+              <span x-show="!loading.reprocessMl">🔄 Reprocessar status ML + Shopee</span>
+              <span x-show="loading.reprocessMl">Processando...</span>
+            </button>
+            <div x-show="reprocessMlResult" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-900">
+              <div>ML: escaneado <strong x-text="reprocessMlResult?.ml?.scanned||0"></strong>, atualizado <strong x-text="reprocessMlResult?.ml?.status_updates||0"></strong>.</div>
+              <div>Shopee: escaneado <strong x-text="reprocessMlResult?.shopee?.scanned||0"></strong>, atualizado <strong x-text="reprocessMlResult?.shopee?.status_updates||0"></strong>.</div>
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Atualizar variações em massa</h3>
+            <p class="text-sm text-slate-500 mb-3">Itera por <strong>cada anúncio Shopee</strong>, busca os modelos ao vivo na API da Shopee, limpa duplicatas e fantasmas, e atualiza nomes de variação. Demora ~1 min pra cada 30 anúncios.</p>
+            <button @click="refreshAllVariations()" :disabled="loading.refreshAll" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-medium rounded">
+              <span x-show="!loading.refreshAll">↻ Atualizar variações de TODOS</span>
+              <span x-show="loading.refreshAll">Processando...</span>
+            </button>
+            <div x-show="refreshAllResult" class="mt-3 p-3 bg-purple-50 border border-purple-200 rounded text-sm text-purple-900">
+              ✅ <strong x-text="refreshAllResult?.processed"></strong> / <span x-text="refreshAllResult?.total_items"></span> anúncios processados.
+              Duplicatas: <strong x-text="refreshAllResult?.duplicates_cleaned||0"></strong>,
+              Fantasmas: <strong x-text="refreshAllResult?.phantoms_cleaned||0"></strong>,
+              Nomes atualizados: <strong x-text="refreshAllResult?.names_updated||0"></strong>,
+              Mappings atualizados: <strong x-text="refreshAllResult?.mappings_updated||0"></strong>.
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
             <h3 class="font-semibold mb-2">Discovery</h3>
             <p class="text-sm text-slate-500 mb-3">Varre todos os produtos em ML e Shopee e pareia por SKU. Roda via <strong>GitHub Actions</strong> (sem limite de produtos). Também roda automaticamente todo dia às 6h.</p>
             <button @click="runDiscover()" :disabled="loading.discover" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">
@@ -721,7 +833,13 @@ function app() {
     runs: [],
     productSearch: '',
     productFilter: 'all',
-    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false },
+    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false, refreshAll: false, reprocessMl: false, matchSku: false, fixMlVar: false, superPair: false, acctSync: false, acctBackfill: false },
+    refreshAllResult: null,
+    reprocessMlResult: null,
+    matchSkuResult: null,
+    fixMlVarResult: null,
+    superPairResult: null,
+    accounts: [],
     batchShopeeId: '',
     batchMeliId: '',
     batchPairResult: null,
@@ -790,6 +908,7 @@ function app() {
         this.loadChanges(),
         this.loadUnmapped(),
         this.loadRuns(),
+        this.loadAccounts(),
       ]);
     },
 
@@ -1318,14 +1437,30 @@ function app() {
         btn.disabled = true; btn.textContent = 'Aplicando...';
         try {
           const r = await self.api('/api/products/' + encodeURIComponent(sku) + '/set-stock',
-            { method: 'POST', body: JSON.stringify({ stock: val }) });
+            { method: 'POST', body: JSON.stringify({
+              stock: val,
+              shopee_item_id: p.shopee_item_id || null,
+              shopee_model_id: p.shopee_model_id || null,
+              meli_item_id: p.meli_item_id || null,
+              meli_variation_id: p.meli_variation_id || null,
+              product_name: p.product_name || ''
+            }) });
           if (r?.error) {
             alert('Erro: ' + r.error + (r.details ? '\\n' + JSON.stringify(r.details, null, 2) : ''));
             btn.disabled = false; btn.textContent = 'Aplicar nos 2 marketplaces';
             return;
           }
-          if (r?.errors?.length) {
-            alert('Parcialmente aplicado.\\nSucesso: ' + (r.propagated || []).join(', ') + '\\nErros:\\n' + r.errors.map(function(e){return e.platform+': '+e.error;}).join('\\n'));
+          var propagated = (r && r.propagated) || [];
+          var errs = (r && r.errors) || [];
+          // Só alerta quando há ERRO real OU nada foi propagado.
+          // Plataforma não-pareada não é erro (é o esperado pra item single-platform).
+          if (errs.length > 0) {
+            var msg = '';
+            if (propagated.length) msg += '✓ Atualizado: ' + propagated.join(', ') + '\\n\\n';
+            msg += '✗ Erros:\\n' + errs.map(function(e){return '  '+e.platform+': '+e.error;}).join('\\n');
+            alert(msg);
+          } else if (propagated.length === 0) {
+            alert('⚠ Nenhuma plataforma foi atualizada (item sem mapeamento).');
           }
           window.__closeStock();
           await self.loadAll();
@@ -1381,6 +1516,173 @@ function app() {
       if (n === 0) return 'text-red-600';
       if (n < 3) return 'text-amber-600';
       return 'text-slate-800';
+    },
+
+    setMasterFilter(f) {
+      this.masterFilter = f;
+      console.log('[setMasterFilter]', f);
+      this.loadMaster();
+    },
+
+    async fixMeliVariationIds() {
+      this.loading.fixMlVar = true;
+      this.fixMlVarResult = null;
+      try {
+        this.fixMlVarResult = await this.api('/api/fix-meli-variation-ids', { method: 'POST' });
+        await this.loadAll();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.fixMlVar = false;
+      }
+    },
+
+    async loadAccounts() {
+      const d = await this.api('/api/accounts');
+      this.accounts = d?.items || [];
+    },
+
+    async backfillAccountIds() {
+      if (!confirm('Vai adicionar a coluna shopee_account_id nas tabelas e marcar todos os dados existentes como sendo da conta atual. Faz só 1 vez.')) return;
+      this.loading.acctBackfill = true;
+      try {
+        const r = await this.api('/api/accounts/migrate-columns', { method: 'POST' });
+        var msg = '✓ Migration concluída\\n';
+        if (r.added && r.added.length) msg += 'Colunas adicionadas: ' + r.added.join(', ') + '\\n';
+        if (r.skipped && r.skipped.length) msg += 'Já existiam: ' + r.skipped.length + '\\n';
+        if (r.backfilled) msg += '\\nBackfill com shop_id ' + r.backfilled.shop_id + ':\\n  mappings: ' + r.backfilled.mappings + '\\n  unmapped: ' + r.backfilled.unmapped + '\\n  orders: ' + r.backfilled.orders;
+        alert(msg);
+        await this.loadAll();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.acctBackfill = false;
+      }
+    },
+
+    async syncAccounts() {
+      this.loading.acctSync = true;
+      try {
+        // Cria tabela se ainda não existe (idempotente)
+        await this.api('/api/accounts/migrate', { method: 'POST' });
+        await this.api('/api/accounts/sync', { method: 'POST' });
+        await this.loadAccounts();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.acctSync = false;
+      }
+    },
+
+    async saveAccountLabel(externalId, label) {
+      try {
+        await this.api('/api/accounts/' + encodeURIComponent(externalId) + '/label',
+          { method: 'PUT', body: JSON.stringify({ label }) });
+      } catch (e) {
+        alert('Erro ao salvar nome: ' + (e?.message || e));
+      }
+    },
+
+    async superPair() {
+      this.loading.superPair = true;
+      this.superPairResult = null;
+      try {
+        this.superPairResult = await this.api('/api/super-pair', { method: 'POST' });
+        await this.loadAll();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.superPair = false;
+      }
+    },
+
+    async matchBySkuNow() {
+      this.loading.matchSku = true;
+      this.matchSkuResult = null;
+      try {
+        this.matchSkuResult = await this.api('/api/match-by-sku-now', { method: 'POST' });
+        await this.loadAll();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.matchSku = false;
+      }
+    },
+
+    async reprocessAllStatus() {
+      this.loading.reprocessMl = true;
+      this.reprocessMlResult = null;
+      try {
+        // ML e Shopee em paralelo
+        var ml = await this.api('/api/orders/reprocess-ml-status?pages=20', { method: 'POST' });
+        var sp = await this.api('/api/orders/reprocess-shopee-status?days=30', { method: 'POST' });
+        this.reprocessMlResult = { ml: ml || {}, shopee: sp || {} };
+        await this.loadOrders();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.reprocessMl = false;
+      }
+    },
+
+    async refreshAllVariations() {
+      if (!confirm('Vai chamar a API da Shopee uma vez por anúncio. Pode demorar uns minutos. Continuar?')) return;
+      this.loading.refreshAll = true;
+      this.refreshAllResult = null;
+      try {
+        this.refreshAllResult = await this.api('/api/refresh-all-variations', { method: 'POST' });
+        await this.loadMaster();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally {
+        this.loading.refreshAll = false;
+      }
+    },
+
+    async refreshVariations(itemId) {
+      if (!itemId) return;
+      try {
+        const r = await this.api('/api/refresh-variations/' + itemId, { method: 'POST' });
+        if (r?.error) { alert('Erro: ' + r.error); return; }
+        var msg = '✓ ' + (r.item_name || 'Item ' + itemId);
+        msg += '\\n  Shopee → has_model: ' + (r.has_model ? 'sim' : 'não') + ' | modelos live: ' + (r.live_models || 0);
+        if (r.duplicates_cleaned) msg += '\\n  Duplicatas SP removidas: ' + r.duplicates_cleaned;
+        if (r.phantoms_cleaned) msg += '\\n  Fantasmas SP removidos: ' + r.phantoms_cleaned;
+        if (r.names_updated) msg += '\\n  Nomes atualizados: ' + r.names_updated;
+        if (r.mappings_updated) msg += '\\n  Mappings atualizados: ' + r.mappings_updated;
+        if (r.ml_phantoms_cleaned) msg += '\\n  Fantasmas ML removidos: ' + r.ml_phantoms_cleaned;
+        if (r.ml_variation_ids_fixed) msg += '\\n  variation_ids ML corrigidos: ' + r.ml_variation_ids_fixed;
+        if (r.unmapped_covered_by_mapping) msg += '\\n  Unmapped redundantes (já em mapping): ' + r.unmapped_covered_by_mapping;
+        if (r.duplicate_mappings_removed) msg += '\\n  Mappings duplicados removidos: ' + r.duplicate_mappings_removed;
+        var changed = (r.duplicates_cleaned || 0) + (r.phantoms_cleaned || 0) + (r.names_updated || 0)
+                    + (r.mappings_updated || 0) + (r.ml_phantoms_cleaned || 0) + (r.ml_variation_ids_fixed || 0)
+                    + (r.unmapped_covered_by_mapping || 0) + (r.duplicate_mappings_removed || 0);
+        if (!changed) msg += '\\n  Já estava em dia.';
+        alert(msg);
+        await this.loadMaster();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      }
+    },
+
+    cleanVariation(s) {
+      // Limpa variações ML do tipo "Versão do personagem: Charizard | Quantidade de peças: 305"
+      // → "Charizard". Remove nomes de atributos e descarta valores puramente numéricos
+      // (quantidade de peças, peso, etc).
+      if (!s) return '';
+      const parts = String(s).split(/\\s*\\|\\s*/);
+      const cleaned = parts.map(p => {
+        const idx = p.indexOf(':');
+        const val = idx >= 0 ? p.slice(idx + 1) : p;
+        return val.trim();
+      }).filter(v => v && !/^\\d+$/.test(v));
+      // Se sobrou nada (tudo era numérico), volta o primeiro valor original sem prefixo
+      if (cleaned.length === 0 && parts.length > 0) {
+        const first = parts[0];
+        const idx = first.indexOf(':');
+        return (idx >= 0 ? first.slice(idx + 1) : first).trim();
+      }
+      return cleaned.join(' / ');
     },
 
     get lowStockCount() {

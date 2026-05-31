@@ -2,6 +2,7 @@ name = "stock-sync"
 main = "src/worker.ts"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
+account_id = "ce81a10872946b5bb801e22b0dcf15fc"
 
 # Cron: a cada 5 minutos
 [triggers]

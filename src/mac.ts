@@ -12,7 +12,8 @@ export async function call(env: MacEnv, action: string, params: any = {}): Promi
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`MAC ${action} HTTP ${res.status}: ${text.slice(0, 200)}`);
+    // Mantém payload grande pra cleanApiError extrair `message`/`code` completos
+    throw new Error(`MAC ${action} HTTP ${res.status}: ${text.slice(0, 2000)}`);
   }
   const json = await res.json() as any;
   // MAC tem 2 envelopes possíveis para o action 'raw':
@@ -39,11 +40,14 @@ export interface ShopeeItem {
   models?: Array<{ model_id: number; model_sku?: string; model_name?: string; stock_info_v2?: any }>;
 }
 
-export async function shopeeListItemIds(env: MacEnv): Promise<number[]> {
+// Helper pra adicionar shopId quando especificado (multi-conta Shopee)
+const withShop = (params: any, shopId?: string) => shopId ? { ...params, shopId } : params;
+
+export async function shopeeListItemIds(env: MacEnv, shopId?: string): Promise<number[]> {
   const ids: number[] = [];
   let offset = 0;
   while (true) {
-    const d = await call(env, 'shopee_list_items', { page_size: 50, offset });
+    const d = await call(env, 'shopee_list_items', withShop({ page_size: 50, offset }, shopId));
     const items = d?.response?.item || [];
     for (const it of items) ids.push(it.item_id);
     if (!d?.response?.has_next_page) break;
@@ -53,26 +57,54 @@ export async function shopeeListItemIds(env: MacEnv): Promise<number[]> {
   return ids;
 }
 
-export async function shopeeGetItem(env: MacEnv, itemId: number): Promise<ShopeeItem | null> {
-  const d = await call(env, 'shopee_get_item', { item_id: itemId });
+export async function shopeeGetItem(env: MacEnv, itemId: number, shopId?: string): Promise<ShopeeItem | null> {
+  const d = await call(env, 'shopee_get_item', withShop({ item_id: itemId }, shopId));
   return d?.response?.item_list?.[0] || null;
 }
 
-export async function shopeeGetModels(env: MacEnv, itemId: number): Promise<any[]> {
-  const d = await call(env, 'shopee_get_models', { item_id: itemId });
+export async function shopeeGetModels(env: MacEnv, itemId: number, shopId?: string): Promise<any[]> {
+  const d = await call(env, 'shopee_get_models', withShop({ item_id: itemId }, shopId));
   return d?.response?.model || [];
+}
+
+// Devolve models + tier_variation pra construir nomes reais das variações
+export async function shopeeGetModelsFull(env: MacEnv, itemId: number, shopId?: string): Promise<{ models: any[]; tierVariation: any[] }> {
+  const d = await call(env, 'shopee_get_models', withShop({ item_id: itemId }, shopId));
+  return {
+    models: d?.response?.model || [],
+    tierVariation: d?.response?.tier_variation || [],
+  };
+}
+
+// Constrói nome humano da variação Shopee a partir dos tier_indexes
+// Ex: tier_variation=[{name:"Personagem", option_list:[{option:"Guerreiro Azul"}, ...]}]
+//     model.tier_index=[0] → "Guerreiro Azul"
+export function buildShopeeModelName(model: any, tierVariation: any[]): string {
+  if (!model) return '';
+  // Prioridade 1: model.model_name (pode estar preenchido pra itens mais antigos)
+  if (model.model_name && String(model.model_name).trim()) return String(model.model_name).trim();
+  // Prioridade 2: monta a partir do tier_variation + tier_index
+  if (!Array.isArray(tierVariation) || tierVariation.length === 0) return '';
+  const tierIndex: number[] = Array.isArray(model.tier_index) ? model.tier_index : [];
+  const parts: string[] = [];
+  for (let i = 0; i < tierIndex.length && i < tierVariation.length; i++) {
+    const opt = tierVariation[i]?.option_list?.[tierIndex[i]]?.option;
+    if (opt) parts.push(String(opt));
+  }
+  return parts.join(' / ');
 }
 
 export async function shopeeUpdateStock(
   env: MacEnv,
   itemId: number,
   newStock: number,
-  modelId?: number
+  modelId?: number,
+  shopId?: string
 ): Promise<any> {
   const stockList = modelId
     ? [{ model_id: modelId, seller_stock: [{ stock: newStock }] }]
     : [{ seller_stock: [{ stock: newStock }] }];
-  return call(env, 'shopee_update_stock', { item_id: itemId, stock_list: stockList });
+  return call(env, 'shopee_update_stock', withShop({ item_id: itemId, stock_list: stockList }, shopId));
 }
 
 // ============ Mercado Livre ============
@@ -121,10 +153,13 @@ export async function meliGetItem(env: MacEnv, itemId: string): Promise<MeliItem
 
 export async function meliUpdateStock(env: MacEnv, itemId: string, qty: number, variationId?: number): Promise<any> {
   if (variationId) {
-    return meliRaw(env, 'PUT', `/items/${itemId}`, {
-      variations: [{ id: variationId, available_quantity: qty }],
+    // Endpoint específico de variação BYPASSA validação do item inteiro (pictures.max etc).
+    // Esse é o que ERPs grandes (Bling, Tiny etc) usam — descoberto via teste empírico.
+    return meliRaw(env, 'PUT', `/items/${itemId}/variations/${variationId}`, {
+      available_quantity: qty,
     });
   }
+  // Sem variação: PUT item-level. Aceita validação completa.
   return meliRaw(env, 'PUT', `/items/${itemId}`, { available_quantity: qty });
 }
 

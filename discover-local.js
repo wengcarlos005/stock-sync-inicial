@@ -137,79 +137,93 @@ async function main() {
   const meliItems = [];      // todos os ML items para parear depois
   const meliNoSku = [];      // ML variations sem SKU
 
-  // ── SHOPEE ──────────────────────────────────────────────────
-  console.log('Varrendo Shopee...');
-  let shopeeIds = [], offset = 0;
-  while (true) {
-    const d = await macCall('shopee_list_items', { page_size: 50, offset });
-    const items = d?.response?.item || [];
-    shopeeIds.push(...items.map(i => i.item_id));
-    if (!d?.response?.has_next_page) break;
-    offset = d.response.next_offset;
-    if (shopeeIds.length > 5000) break;
+  // ── SHOPEE — itera por TODAS as contas Shopee conectadas no MAC ──
+  console.log('Listando contas Shopee no MAC...');
+  let shopeeAccounts = [];
+  try {
+    const acctData = await macCall('list_accounts', {});
+    const allAccounts = acctData?.accounts || [];
+    shopeeAccounts = allAccounts.filter(a => a.marketplace === 'shopee' && a.connected).map(a => String(a.external_id));
+  } catch (e) {
+    console.error('  ⚠ Falha em list_accounts, usando conta padrão:', e.message);
+    shopeeAccounts = [undefined]; // undefined = sem shopId (conta default)
   }
-  console.log(`  ${shopeeIds.length} items`);
+  if (shopeeAccounts.length === 0) shopeeAccounts = [undefined];
+  console.log(`  ${shopeeAccounts.length} conta(s) Shopee: ${shopeeAccounts.join(', ')}`);
 
   let debugShopeeDumped = 0;
-  for (let i = 0; i < shopeeIds.length; i++) {
-    const id = shopeeIds[i];
-    process.stdout.write(`  Shopee ${i + 1}/${shopeeIds.length}...\r`);
-    try {
-      const d = await macCall('shopee_get_item', { item_id: id });
-      const item = d?.response?.item_list?.[0];
-      if (!item) continue;
+  for (const shopId of shopeeAccounts) {
+    console.log(`\nVarrendo Shopee${shopId ? ` [${shopId}]` : ''}...`);
+    let shopeeIds = [], offset = 0;
+    while (true) {
+      const params = shopId ? { page_size: 50, offset, shopId } : { page_size: 50, offset };
+      const d = await macCall('shopee_list_items', params);
+      const items = d?.response?.item || [];
+      shopeeIds.push(...items.map(i => i.item_id));
+      if (!d?.response?.has_next_page) break;
+      offset = d.response.next_offset;
+      if (shopeeIds.length > 5000) break;
+    }
+    console.log(`  ${shopeeIds.length} items`);
 
-      if (DEBUG && debugShopeeDumped < 3) {
-        console.log(`\n[DEBUG Shopee ${id}]`);
-        console.log('  item.item_name:', item.item_name);
-        console.log('  item.item_sku:', JSON.stringify(item.item_sku));
-        console.log('  item.has_model:', item.has_model);
-        console.log('  item.tier_variation:', JSON.stringify(item.tier_variation));
-        debugShopeeDumped++;
-      }
+    for (let i = 0; i < shopeeIds.length; i++) {
+      const id = shopeeIds[i];
+      process.stdout.write(`  Shopee ${shopId || 'default'} ${i + 1}/${shopeeIds.length}...\r`);
+      try {
+        const getParams = shopId ? { item_id: id, shopId } : { item_id: id };
+        const d = await macCall('shopee_get_item', getParams);
+        const item = d?.response?.item_list?.[0];
+        if (!item) continue;
 
-      const normTitle = normalize(item.item_name || '');
-      if (!itemTitleToShopee[normTitle]) itemTitleToShopee[normTitle] = [];
-      if (!shopeeByItemId[String(id)]) shopeeByItemId[String(id)] = [];
-
-      if (item.has_model) {
-        const md = await macCall('shopee_get_models', { item_id: id });
-        const models = md?.response?.model || [];
-        if (DEBUG && debugShopeeDumped <= 3) {
-          for (const m of models.slice(0, 3)) {
-            console.log(`  model_id=${m.model_id} model_sku=${JSON.stringify(m.model_sku)} model_name=${JSON.stringify(m.model_name)}`);
-          }
+        if (DEBUG && debugShopeeDumped < 3) {
+          console.log(`\n[DEBUG Shopee ${id}]`);
+          console.log('  item.item_name:', item.item_name);
+          console.log('  item.item_sku:', JSON.stringify(item.item_sku));
+          console.log('  item.has_model:', item.has_model);
+          debugShopeeDumped++;
         }
-        for (const m of models) {
-          const sku = (m.model_sku || '').toString().trim();
-          const modelName = (m.model_name || '').toString().trim();
+
+        const normTitle = normalize(item.item_name || '');
+        if (!itemTitleToShopee[normTitle]) itemTitleToShopee[normTitle] = [];
+        if (!shopeeByItemId[String(id)]) shopeeByItemId[String(id)] = [];
+
+        if (item.has_model) {
+          const mdParams = shopId ? { item_id: id, shopId } : { item_id: id };
+          const md = await macCall('shopee_get_models', mdParams);
+          const models = md?.response?.model || [];
+          for (const m of models) {
+            const sku = (m.model_sku || '').toString().trim();
+            const modelName = (m.model_name || '').toString().trim();
+            const entry = {
+              item_id: String(id),
+              model_id: String(m.model_id),
+              modelName,
+              sku: sku || null,
+              itemName: item.item_name || '',
+              normModelName: normalize(modelName),
+              shopeeAccountId: shopId || null,
+            };
+            itemTitleToShopee[normTitle].push(entry);
+            shopeeByItemId[String(id)].push(entry);
+            if (sku) skuToShopee[normalize(sku)] = entry;
+          }
+        } else {
+          const sku = (item.item_sku || '').toString().trim();
           const entry = {
             item_id: String(id),
-            model_id: String(m.model_id),
-            modelName,
+            model_id: null,
+            modelName: '',
             sku: sku || null,
             itemName: item.item_name || '',
-            normModelName: normalize(modelName),
+            normModelName: '',
+            shopeeAccountId: shopId || null,
           };
           itemTitleToShopee[normTitle].push(entry);
           shopeeByItemId[String(id)].push(entry);
           if (sku) skuToShopee[normalize(sku)] = entry;
         }
-      } else {
-        const sku = (item.item_sku || '').toString().trim();
-        const entry = {
-          item_id: String(id),
-          model_id: null,
-          modelName: '',
-          sku: sku || null,
-          itemName: item.item_name || '',
-          normModelName: '',
-        };
-        itemTitleToShopee[normTitle].push(entry);
-        shopeeByItemId[String(id)].push(entry);
-        if (sku) skuToShopee[normalize(sku)] = entry;
-      }
-    } catch (e) { console.error(`\n  ERRO shopee ${id}: ${e.message}`); }
+      } catch (e) { console.error(`\n  ERRO shopee ${shopId || 'default'} ${id}: ${e.message}`); }
+    }
   }
   console.log(`\n  Shopee SKUs indexados: ${Object.keys(skuToShopee).length} | títulos: ${Object.keys(itemTitleToShopee).length}`);
 
@@ -312,6 +326,7 @@ async function main() {
         meli_variation_id: meliE.variation_id,
         shopee_item_id: shopeeE.item_id,
         shopee_model_id: shopeeE.model_id,
+        shopee_account_id: shopeeE.shopeeAccountId || null,
         product_name: meliE.name || shopeeE.itemName,
       });
       pairedShopeeKeys.add(`${shopeeE.item_id}|${shopeeE.model_id || ''}`);
@@ -484,6 +499,7 @@ async function main() {
         sku: s.sku || '',
         item_id: s.item_id,
         variation_id: s.model_id,
+        shopee_account_id: s.shopeeAccountId || null,
         product_name: s.itemName + (s.modelName ? ' — ' + s.modelName : ''),
       });
     }
