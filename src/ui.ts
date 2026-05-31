@@ -26,18 +26,19 @@ export const html = `<!DOCTYPE html>
   <style>
     [x-cloak] { display: none !important; }
     html, body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    body { background: #f7f8fb; transition: background-color .2s ease, color .2s ease; }
-    html.dark body { background: #0b0f17; color: #e2e8f0; }
-    /* Sidebar nav active state */
-    .nav-item { transition: all .15s ease; }
-    .nav-item:hover { background: rgba(99,102,241,.06); color: #4338ca; }
-    html.dark .nav-item:hover { background: rgba(99,102,241,.14); color: #c7d2fe; }
-    .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.12), rgba(99,102,241,.02)); color: #4f46e5; font-weight: 600; box-shadow: inset 3px 0 0 #4f46e5; }
-    html.dark .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.22), rgba(99,102,241,.04)); color: #a5b4fc; box-shadow: inset 3px 0 0 #818cf8; }
+    body { background: #f6f7fb; transition: background-color .2s ease, color .2s ease; }
+    html.dark body { background: #0f172a; color: #cbd5e1; }
+    /* Sidebar nav */
+    .nav-item { transition: all .15s ease; color: #475569; }
+    .nav-item:hover { background: rgba(99,102,241,.07); color: #4338ca; }
+    .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.12), rgba(99,102,241,0)); color: #4f46e5; font-weight: 600; box-shadow: inset 3px 0 0 #4f46e5; }
+    html.dark .nav-item { color: #94a3b8; }
+    html.dark .nav-item:hover { background: rgba(129,140,248,.10); color: #c7d2fe; }
+    html.dark .nav-item.active { background: linear-gradient(90deg, rgba(129,140,248,.18), rgba(129,140,248,0)); color: #c7d2fe; box-shadow: inset 3px 0 0 #818cf8; }
     /* Card lift */
     .stat-card { transition: transform .15s ease, box-shadow .15s ease; }
     .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.06); }
-    html.dark .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+    html.dark .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.45); }
     /* Custom scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -45,24 +46,53 @@ export const html = `<!DOCTYPE html>
     ::-webkit-scrollbar-track { background: transparent; }
     html.dark ::-webkit-scrollbar-thumb { background: #334155; }
     html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    /* Mobile sidebar */
-    .sidebar-mobile-overlay { backdrop-filter: blur(2px); }
-    /* Dark mode overrides for legacy slate utilities used everywhere */
-    html.dark .bg-white { background-color: #111827 !important; }
-    html.dark .bg-slate-50 { background-color: #0f1623 !important; }
-    html.dark .bg-slate-100 { background-color: #1e293b !important; }
-    html.dark .text-slate-800 { color: #e2e8f0 !important; }
-    html.dark .text-slate-900 { color: #f1f5f9 !important; }
-    html.dark .text-slate-700 { color: #cbd5e1 !important; }
-    html.dark .text-slate-600 { color: #94a3b8 !important; }
-    html.dark .text-slate-500 { color: #94a3b8 !important; }
-    html.dark .text-slate-400 { color: #64748b !important; }
-    html.dark .border-slate-200 { border-color: #1f2937 !important; }
-    html.dark .border-slate-100 { border-color: #1f2937 !important; }
-    html.dark .border-slate-300 { border-color: #334155 !important; }
-    html.dark .divide-slate-100 > * + * { border-color: #1f2937 !important; }
     /* SVG icon size default */
     .ico { width: 18px; height: 18px; stroke-width: 1.75; }
+
+    /* ─────────────── DARK MODE: overrides minimalistas ───────────────
+       Em vez de !important hardcoded, usamos selectors específicos pra
+       não brigar com classes Tailwind. Paleta = slate-800/900 (suave). */
+    html.dark { color-scheme: dark; }
+    html.dark .bg-white { background-color: #1e293b; }
+    html.dark .bg-slate-50 { background-color: #1a2435; }
+    html.dark .bg-slate-100 { background-color: #273449; }
+    html.dark .bg-slate-200 { background-color: #334155; }
+    html.dark .text-slate-900 { color: #f1f5f9; }
+    html.dark .text-slate-800 { color: #e2e8f0; }
+    html.dark .text-slate-700 { color: #cbd5e1; }
+    html.dark .text-slate-600 { color: #94a3b8; }
+    html.dark .text-slate-500 { color: #94a3b8; }
+    html.dark .text-slate-400 { color: #64748b; }
+    html.dark .text-slate-300 { color: #64748b; }
+    html.dark .border-slate-100,
+    html.dark .border-slate-200,
+    html.dark .border { border-color: #334155; }
+    html.dark .border-slate-300 { border-color: #475569; }
+    html.dark .divide-slate-100 > * + *,
+    html.dark .divide-slate-200 > * + * { border-color: #334155; }
+    html.dark hr { border-color: #334155; }
+    html.dark .bg-slate-50\\/40 { background-color: rgba(30,41,59,.55); }
+    html.dark .bg-amber-50 { background-color: rgba(180,83,9,.12); }
+    html.dark .bg-amber-100 { background-color: rgba(180,83,9,.20); }
+    html.dark .bg-amber-50.border-amber-200 { border-color: #b45309; }
+    html.dark .bg-yellow-50 { background-color: rgba(161,98,7,.12); }
+    html.dark .bg-yellow-100 { background-color: rgba(161,98,7,.22); }
+    html.dark .bg-orange-50 { background-color: rgba(154,52,18,.14); }
+    html.dark .bg-orange-100 { background-color: rgba(154,52,18,.22); }
+    html.dark .bg-emerald-50 { background-color: rgba(6,95,70,.18); }
+    html.dark .bg-emerald-100 { background-color: rgba(6,95,70,.28); }
+    html.dark .bg-red-50 { background-color: rgba(127,29,29,.18); }
+    html.dark .bg-red-100 { background-color: rgba(127,29,29,.30); }
+    html.dark .bg-purple-100 { background-color: rgba(88,28,135,.30); }
+    html.dark .bg-indigo-50 { background-color: rgba(55,48,163,.20); }
+    html.dark .bg-indigo-100 { background-color: rgba(55,48,163,.30); }
+    /* Inputs em dark */
+    html.dark input, html.dark select, html.dark textarea {
+      background-color: #1a2435; color: #e2e8f0; border-color: #334155;
+    }
+    html.dark input::placeholder { color: #64748b; }
+    /* Buttons: mantém cor de marca, só ajusta light-grays */
+    html.dark .bg-slate-100.hover\\:bg-slate-200:hover { background-color: #334155; }
   </style>
 </head>
 <body class="text-slate-800 min-h-screen">
@@ -110,9 +140,11 @@ export const html = `<!DOCTYPE html>
     <!-- Mobile sidebar overlay -->
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="sidebar-mobile-overlay fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
 
-    <!-- Sidebar -->
-    <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
-      class="fixed md:sticky top-0 left-0 z-50 w-64 md:w-60 shrink-0 bg-white dark:bg-[#0f172a] border-r border-slate-200 flex flex-col h-screen transition-transform duration-200 md:translate-x-0">
+    <!-- Sidebar
+         Mobile: fixed overlay (z-50) abre/fecha via sidebarOpen
+         Desktop (md+): sticky no fluxo normal, ocupa 240px do flex -->
+    <aside :class="sidebarOpen ? 'translate-x-0 fixed' : '-translate-x-full fixed'"
+      class="top-0 left-0 z-50 w-64 md:!w-60 md:!translate-x-0 md:!sticky md:!flex shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 flex flex-col h-screen transition-transform duration-200">
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div class="flex items-center gap-2.5 min-w-0">
@@ -170,7 +202,7 @@ export const html = `<!DOCTYPE html>
     <div class="flex-1 flex flex-col min-w-0 w-full">
 
       <!-- Top bar -->
-      <header class="bg-white dark:bg-[#0f172a] border-b border-slate-200 sticky top-0 z-30">
+      <header class="bg-white dark:bg-slate-900 border-b border-slate-200 sticky top-0 z-30">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
@@ -189,7 +221,7 @@ export const html = `<!DOCTYPE html>
 
         <!-- Stat cards strip -->
         <div class="px-4 sm:px-6 lg:px-8 pb-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
             <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Produtos sync</span>
@@ -197,7 +229,7 @@ export const html = `<!DOCTYPE html>
             </div>
             <div class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white pl-1.5" x-text="status.active_mappings || 0"></div>
           </div>
-          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full" :class="lowStockCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'"></div>
             <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Estoque baixo</span>
@@ -207,7 +239,7 @@ export const html = `<!DOCTYPE html>
             </div>
             <div class="text-lg sm:text-xl font-bold pl-1.5" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900 dark:text-white'" x-text="lowStockCount"></div>
           </div>
-          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full" :class="status.unmapped_items ? 'bg-orange-500' : 'bg-emerald-500'"></div>
             <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Não pareados</span>
@@ -215,7 +247,7 @@ export const html = `<!DOCTYPE html>
             </div>
             <div class="text-lg sm:text-xl font-bold pl-1.5" :class="status.unmapped_items ? 'text-orange-600' : 'text-slate-900 dark:text-white'" x-text="status.unmapped_items || 0"></div>
           </div>
-          <div class="stat-card bg-white dark:bg-[#111827] border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
+          <div class="stat-card bg-white dark:bg-slate-800 border border-slate-200 rounded-lg p-3 sm:p-3.5 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
             <div class="flex items-center justify-between mb-1 pl-1.5">
               <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Mudanças última</span>
@@ -712,11 +744,13 @@ export const html = `<!DOCTYPE html>
         <div class="mb-4 bg-white border border-slate-200 rounded-lg p-4">
           <h3 class="text-sm font-semibold mb-2">⚡ Pareamento em lote por anúncio</h3>
           <p class="text-xs text-slate-500 mb-3">Cole o <strong>item_id</strong> do Shopee e do ML que são o "mesmo anúncio" (mesmo produto). O sistema pareia as variações automaticamente.</p>
-          <div class="flex gap-2">
-            <input id="batch-shopee-input" x-model="batchShopeeId" placeholder="Shopee item_id (ex: 29443482352)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
-            <input id="batch-meli-input" x-model="batchMeliId" placeholder="ML item_id (ex: MLB6139127802)" class="flex-1 px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
-            <button @click="batchPairDry()" :disabled="loading.batchPair" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Pré-visualizar</button>
-            <button @click="batchPairApply()" :disabled="loading.batchPair" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Aplicar</button>
+          <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+            <input id="batch-shopee-input" x-model="batchShopeeId" placeholder="Shopee item_id (ex: 29443482352)" class="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
+            <input id="batch-meli-input" x-model="batchMeliId" placeholder="ML item_id (ex: MLB6139127802)" class="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded text-sm font-mono" />
+            <div class="flex gap-2 shrink-0">
+              <button @click="batchPairDry()" :disabled="loading.batchPair" class="flex-1 sm:flex-none px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Pré-visualizar</button>
+              <button @click="batchPairApply()" :disabled="loading.batchPair" class="flex-1 sm:flex-none px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Aplicar</button>
+            </div>
           </div>
           <div x-show="batchPairResult" class="mt-3 p-3 bg-slate-50 rounded text-xs">
             <div x-show="batchPairResult?.dry_run" class="font-semibold mb-2">Pré-visualização:</div>
@@ -739,7 +773,7 @@ export const html = `<!DOCTYPE html>
             </template>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <!-- Coluna Shopee -->
           <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div class="bg-orange-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
@@ -794,7 +828,7 @@ export const html = `<!DOCTYPE html>
 
       <!-- Config -->
       <section x-show="tab === 'config'" x-cloak class="max-w-3xl mx-auto">
-        <div class="bg-white border border-slate-200 rounded-lg p-6 space-y-6">
+        <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-6 space-y-6">
           <!-- Contas conectadas -->
           <div>
             <h3 class="font-semibold mb-2 flex items-center gap-2 flex-wrap">🏬 Contas conectadas
@@ -811,12 +845,12 @@ export const html = `<!DOCTYPE html>
             <p class="text-sm text-slate-500 mb-3">Lojas conectadas no MAC. Você pode dar um nome amigável pra cada uma. <strong>Fluxo:</strong> (1) Conecta nova conta no MAC → (2) "Sincronizar com MAC" → (3) nomeia → (4) clica "Inicializar colunas" UMA VEZ pra adicionar shopee_account_id no banco → (5) roda discovery pra puxar items.</p>
             <div class="space-y-2">
               <template x-for="a in accounts" :key="a.external_id">
-                <div class="flex items-center gap-3 p-3 border border-slate-200 rounded">
-                  <span class="text-xs px-2 py-0.5 rounded" :class="a.marketplace==='meli' ? 'bg-amber-100 text-amber-800' : 'bg-orange-100 text-orange-800'" x-text="a.marketplace==='meli' ? '🟡 ML' : '🛒 Shopee'"></span>
-                  <span class="font-mono text-xs text-slate-500" x-text="a.external_id"></span>
-                  <input :value="a.label || ''" @blur="saveAccountLabel(a.external_id, $event.target.value)" placeholder="Nome da loja (ex: Geek Aura)" class="flex-1 px-2 py-1 border border-slate-300 rounded text-sm" />
-                  <span x-show="a.is_active" class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">conectado</span>
-                  <span x-show="!a.is_active" class="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded">desconectado</span>
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3 p-3 border border-slate-200 rounded">
+                  <span class="text-xs px-2 py-0.5 rounded shrink-0" :class="a.marketplace==='meli' ? 'bg-amber-100 text-amber-800' : 'bg-orange-100 text-orange-800'" x-text="a.marketplace==='meli' ? '🟡 ML' : '🛒 Shopee'"></span>
+                  <span class="font-mono text-xs text-slate-500 shrink-0" x-text="a.external_id"></span>
+                  <input :value="a.label || ''" @blur="saveAccountLabel(a.external_id, $event.target.value)" placeholder="Nome da loja (ex: Geek Aura)" class="flex-1 min-w-[140px] px-2 py-1 border border-slate-300 rounded text-sm" />
+                  <span x-show="a.is_active" class="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded shrink-0">conectado</span>
+                  <span x-show="!a.is_active" class="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded shrink-0">desconectado</span>
                 </div>
               </template>
               <div x-show="!accounts.length" class="text-sm text-slate-400">Nenhuma conta carregada — clica "Sincronizar com MAC" acima.</div>
