@@ -1538,7 +1538,14 @@ function app() {
 
     openSetStock(p) {
       // Vanilla DOM (Alpine reativo está quebrado por extensão MetaMask)
-      const sku = p.sku || '';
+      // Quando SKU está vazio (variação sem SKU em Shopee), gera um sintético
+      // a partir dos IDs pra a URL não dar 404 e o backend criar mapping.
+      const realSku = p.sku || '';
+      const synth = !realSku
+        ? (p.shopee_item_id ? 'SP_' + p.shopee_item_id + (p.shopee_model_id ? '_' + p.shopee_model_id : '') : (p.meli_item_id ? 'ML_' + p.meli_item_id + (p.meli_variation_id ? '_' + p.meli_variation_id : '') : ''))
+        : '';
+      const sku = realSku || synth;
+      if (!sku) { alert('Sem SKU nem IDs de plataforma. Não consigo atualizar.'); return; }
       const name = p.product_name || p.variation || sku;
       const meli = p.meli_stock ?? '—';
       const shopee = p.shopee_stock ?? '—';
@@ -1565,9 +1572,10 @@ function app() {
               stock: val,
               shopee_item_id: p.shopee_item_id || null,
               shopee_model_id: p.shopee_model_id || null,
+              shopee_account_id: p.shopee_account_id || null,
               meli_item_id: p.meli_item_id || null,
               meli_variation_id: p.meli_variation_id || null,
-              product_name: p.product_name || ''
+              product_name: p.product_name || p.variation || ''
             }) });
           if (r?.error) {
             alert('Erro: ' + r.error + (r.details ? '\\n' + JSON.stringify(r.details, null, 2) : ''));

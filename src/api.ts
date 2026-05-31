@@ -1123,6 +1123,7 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
     stock: number;
     shopee_item_id?: string | null;
     shopee_model_id?: string | null;
+    shopee_account_id?: string | null;
     meli_item_id?: string | null;
     meli_variation_id?: string | null;
     product_name?: string | null;
@@ -1135,15 +1136,17 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
   if (!map && (body.shopee_item_id || body.meli_item_id)) {
     const now = Date.now();
     await env.DB.prepare(`
-      INSERT INTO mappings (sku, meli_item_id, meli_variation_id, shopee_item_id, shopee_model_id, product_name, active, notes, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, 'auto: criado ao atualizar estoque', ?, ?)
-      ON CONFLICT(sku) DO NOTHING
+      INSERT INTO mappings (sku, meli_item_id, meli_variation_id, shopee_item_id, shopee_model_id, shopee_account_id, product_name, active, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'auto: criado ao atualizar estoque', ?, ?)
+      ON CONFLICT(sku) DO UPDATE SET
+        shopee_account_id = COALESCE(excluded.shopee_account_id, mappings.shopee_account_id)
     `).bind(
       params.sku,
       body.meli_item_id || null,
       body.meli_variation_id || null,
       body.shopee_item_id || null,
       body.shopee_model_id || null,
+      body.shopee_account_id || null,
       body.product_name || null,
       now, now
     ).run();
