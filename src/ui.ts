@@ -35,10 +35,13 @@ export const html = `<!DOCTYPE html>
     .ico { width: 18px; height: 18px; stroke-width: 1.75; }
     /* Surfaces: sidebar + topbar */
     .app-surface { background-color: #ffffff; }
-    /* Topbar sticky com sombra sutil pra separar visualmente do conteúdo abaixo */
-    header.app-surface { box-shadow: 0 1px 2px rgba(15,23,42,.04); }
-    /* Brand logo container — sem clip pra SVG aparecer inteiro */
-    .brand-mark svg { display: block; }
+    /* Topbar sticky com sombra mais clara quando "stuck" pra separar do conteúdo */
+    header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); }
+    /* Brand logo container */
+    .brand-mark { display: flex; align-items: center; justify-content: center; }
+    .brand-mark svg { display: block; width: 100%; height: 100%; }
+    /* Layout robusto: garante que sections estão em block (sem flex herdado) */
+    main > section { display: block; clear: both; }
     /* Stat cards: paleta indigo (azul) */
     .stat-surface { background-color: #eef2ff; }
     .stat-surface .stat-num { color: #4338ca; }
@@ -56,9 +59,7 @@ export const html = `<!DOCTYPE html>
   <div x-show="!token" class="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full border border-slate-100">
       <div class="flex items-center gap-3 mb-6">
-        <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm p-1.5">
-          <span x-html="getIcon('brand')" class="w-full h-full text-blue-600"></span>
-        </div>
+        <div class="brand-mark w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm p-1" x-html="getIcon('brand')"></div>
         <div>
           <h1 class="text-lg font-bold text-slate-900 leading-tight">UniHub</h1>
           <p class="text-[11px] text-slate-400 uppercase tracking-wide leading-tight">Sincronização Integrada</p>
@@ -76,7 +77,7 @@ export const html = `<!DOCTYPE html>
   </div>
 
   <!-- Inline SVG icons (Heroicons outline) — reusable via <template> -->
-  <template id="ico-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><defs><linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient><linearGradient id="bg2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#2563eb"/></linearGradient><linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#7dd3fc"/></linearGradient></defs><g fill="none" stroke-width="7" stroke-linecap="round"><circle cx="36" cy="60" r="22" stroke="url(#bg1)"/><circle cx="64" cy="60" r="22" stroke="url(#bg2)"/><circle cx="50" cy="36" r="22" stroke="url(#bg3)"/></g></svg></template>
+  <template id="ico-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="ub1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0c3a85"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient><linearGradient id="ub2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#2563eb"/></linearGradient><linearGradient id="ub3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs><g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="62" r="22" stroke="url(#ub1)"/><circle cx="68" cy="62" r="22" stroke="url(#ub2)"/><circle cx="50" cy="32" r="22" stroke="url(#ub3)"/></g></svg></template>
   <template id="ico-orders"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg></template>
   <template id="ico-stock"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg></template>
   <template id="ico-products"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg></template>
@@ -105,9 +106,7 @@ export const html = `<!DOCTYPE html>
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shadow-sm shrink-0 p-1">
-            <span x-html="getIcon('brand')" class="w-full h-full block"></span>
-          </div>
+          <div class="brand-mark w-10 h-10 rounded-lg bg-white border border-slate-200 shadow-sm shrink-0 p-1" x-html="getIcon('brand')"></div>
           <div class="min-w-0">
             <div class="text-[15px] font-bold leading-tight text-slate-900 truncate">UniHub</div>
             <div class="text-[10px] text-slate-400 leading-tight uppercase tracking-wide">Sincronização Integrada</div>
@@ -200,7 +199,7 @@ export const html = `<!DOCTYPE html>
       </header>
 
       <!-- Tab content -->
-      <main class="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden">
+      <main class="flex-1 px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden">
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
