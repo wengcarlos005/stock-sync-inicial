@@ -1629,6 +1629,7 @@ add('POST', '/api/variation/set-sku', async (req, env) => {
 
   const updates: Record<string, any> = {};
   const errors: Record<string, string> = {};
+  const mac = await import('./mac');
 
   // 1) Atualiza SKU no marketplace
   if (meliItem) {
