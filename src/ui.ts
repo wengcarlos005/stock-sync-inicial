@@ -49,6 +49,16 @@ export const html = `<!DOCTYPE html>
     /* SVG icon size default */
     .ico { width: 18px; height: 18px; stroke-width: 1.75; }
 
+    /* Surfaces explícitas — não dependem do Tailwind dark: pra evitar inconsistência */
+    .app-surface { background-color: #ffffff; }
+    html.dark .app-surface { background-color: #1e293b; } /* slate-800 */
+    .stat-surface { background-color: #f1f5f9; } /* slate-100 */
+    html.dark .stat-surface { background-color: #273449; }
+    .stat-surface .text-slate-900 { color: #0f172a; }
+    html.dark .stat-surface .text-slate-900 { color: #f1f5f9; }
+    .stat-surface .text-slate-500 { color: #64748b; }
+    html.dark .stat-surface .text-slate-500 { color: #94a3b8; }
+
     /* ─────────────── DARK MODE: overrides minimalistas ───────────────
        Em vez de !important hardcoded, usamos selectors específicos pra
        não brigar com classes Tailwind. Paleta = slate-800/900 (suave). */
@@ -142,9 +152,10 @@ export const html = `<!DOCTYPE html>
 
     <!-- Sidebar
          Mobile: fixed overlay (z-50) abre/fecha via sidebarOpen
-         Desktop (md+): sticky no fluxo normal, ocupa 240px do flex -->
+         Desktop (md+): sticky no fluxo normal, ocupa 240px do flex
+         bg controlado via CSS (.app-surface) pra evitar dark: do Tailwind brigar -->
     <aside :class="sidebarOpen ? 'translate-x-0 fixed' : '-translate-x-full fixed'"
-      class="top-0 left-0 z-50 w-64 md:!w-60 md:!translate-x-0 md:!sticky md:!flex shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 flex flex-col h-screen transition-transform duration-200">
+      class="app-surface top-0 left-0 z-50 w-64 md:!w-60 md:!translate-x-0 md:!sticky md:!flex shrink-0 border-r border-slate-200 flex flex-col h-screen transition-transform duration-200">
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div class="flex items-center gap-2.5 min-w-0">
@@ -193,7 +204,7 @@ export const html = `<!DOCTYPE html>
     <div class="flex-1 flex flex-col min-w-0 w-full">
 
       <!-- Top bar -->
-      <header class="bg-white dark:bg-slate-900 border-b border-slate-200 sticky top-0 z-30">
+      <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
@@ -210,23 +221,37 @@ export const html = `<!DOCTYPE html>
           </button>
         </div>
 
-        <!-- Stat cards strip — visual igual à v1 (slate-100 chapado, sem accent bar) -->
+        <!-- Stat cards strip — visual v1 (slate-100), com ícone SVG sutil no canto -->
         <div class="px-4 sm:px-6 lg:px-8 pb-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-            <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100" x-text="status.active_mappings || 0"></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Produtos sincronizados</div>
+          <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xl sm:text-2xl font-bold text-slate-900" x-text="status.active_mappings || 0"></div>
+              <div class="text-xs text-slate-500 mt-0.5 truncate">Produtos sincronizados</div>
+            </div>
+            <span class="text-indigo-500 shrink-0" x-html="getIcon('stock')"></span>
           </div>
-          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-            <div class="text-xl sm:text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'" x-text="lowStockCount"></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque baixo / zerado</div>
+          <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xl sm:text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900'" x-text="lowStockCount"></div>
+              <div class="text-xs text-slate-500 mt-0.5 truncate">Estoque baixo / zerado</div>
+            </div>
+            <span class="shrink-0" :class="lowStockCount > 0 ? 'text-amber-500' : 'text-emerald-500'">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.732 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            </span>
           </div>
-          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-            <div class="text-xl sm:text-2xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'" x-text="status.unmapped_items || 0"></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">SKUs não pareados</div>
+          <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xl sm:text-2xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : 'text-slate-900'" x-text="status.unmapped_items || 0"></div>
+              <div class="text-xs text-slate-500 mt-0.5 truncate">SKUs não pareados</div>
+            </div>
+            <span class="shrink-0" :class="status.unmapped_items ? 'text-orange-500' : 'text-emerald-500'" x-html="getIcon('unmapped')"></span>
           </div>
-          <div class="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-            <div class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100" x-text="(status.last_run?.changes_detected ?? 0)"></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Mudanças (última execução)</div>
+          <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xl sm:text-2xl font-bold text-slate-900" x-text="(status.last_run?.changes_detected ?? 0)"></div>
+              <div class="text-xs text-slate-500 mt-0.5 truncate">Mudanças (última execução)</div>
+            </div>
+            <span class="text-emerald-500 shrink-0" x-html="getIcon('changes')"></span>
           </div>
         </div>
       </header>
