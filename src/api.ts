@@ -395,12 +395,35 @@ add('GET', '/api/products/master', async (req, env) => {
           dest.shopee_stores.push(s);
         }
       }
-      // Merge variações (dedup por sku+shopee_item_id+meli_var)
-      const seen = new Set(dest.variations.map((v: any) => `${normSku(v.sku)}|${v.shopee_item_id||''}|${v.shopee_model_id||''}|${v.meli_variation_id||''}`));
-      for (const v of a.variations) {
-        const k = `${normSku(v.sku)}|${v.shopee_item_id||''}|${v.shopee_model_id||''}|${v.meli_variation_id||''}`;
-        if (!seen.has(k)) { dest.variations.push(v); seen.add(k); }
+      // Merge variações: dedup por SKU normalizado, mantendo a melhor row.
+      // "Melhor" = pareada > não pareada > tem ML stock > tem SP stock.
+      // Quando SKU é vazio/curto, usa fallback (sku+shopee_item_id+meli_var) pra evitar fundir lixo.
+      const rowScore = (v: any) => (v.paired ? 100 : 0) + (v.meli_stock != null ? 10 : 0) + (v.shopee_stock != null ? 5 : 0) + (v.sales_total || 0);
+      const rowKey = (v: any) => {
+        const ns = normSku(v.sku);
+        return (ns && ns.length >= 3) ? ('sku:' + ns) : ('id:' + (v.shopee_item_id||'') + '|' + (v.shopee_model_id||'') + '|' + (v.meli_variation_id||''));
+      };
+      const byKey = new Map<string, any>();
+      for (const v of dest.variations) {
+        const k = rowKey(v);
+        const cur = byKey.get(k);
+        if (!cur || rowScore(v) > rowScore(cur)) byKey.set(k, v);
       }
+      for (const v of a.variations) {
+        const k = rowKey(v);
+        const cur = byKey.get(k);
+        if (!cur) byKey.set(k, v);
+        else if (rowScore(v) > rowScore(cur)) {
+          // substitui mantendo dados úteis do anterior (ex: se vencedor não tem meli_stock mas perdedor tinha, copia)
+          if (v.meli_stock == null && cur.meli_stock != null) v.meli_stock = cur.meli_stock;
+          if (v.shopee_stock == null && cur.shopee_stock != null) v.shopee_stock = cur.shopee_stock;
+          if (v.master_stock == null && cur.master_stock != null) v.master_stock = cur.master_stock;
+          if (!v.variation && cur.variation) v.variation = cur.variation;
+          if (!v.image && cur.image) v.image = cur.image;
+          byKey.set(k, v);
+        }
+      }
+      dest.variations = [...byKey.values()];
       for (const n of ((a as any).all_names || [])) (dest as any).all_names?.add?.(n);
       if (!dest.image && a.image) dest.image = a.image;
       if ((a.product_name || '').length > (dest.product_name || '').length) dest.product_name = a.product_name;
