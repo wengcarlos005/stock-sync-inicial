@@ -59,7 +59,20 @@ export const html = `<!DOCTYPE html>
   <div x-show="!token" class="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full border border-slate-100">
       <div class="flex items-center gap-3 mb-6">
-        <div class="brand-mark w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm p-1" x-html="getIcon('brand')"></div>
+        <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
+            <defs>
+              <linearGradient id="bra1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0c3a85"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
+              <linearGradient id="bra2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#2563eb"/></linearGradient>
+              <linearGradient id="bra3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
+            </defs>
+            <g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="32" cy="62" r="22" stroke="url(#bra1)"/>
+              <circle cx="68" cy="62" r="22" stroke="url(#bra2)"/>
+              <circle cx="50" cy="32" r="22" stroke="url(#bra3)"/>
+            </g>
+          </svg>
+        </div>
         <div>
           <h1 class="text-lg font-bold text-slate-900 leading-tight">UniHub</h1>
           <p class="text-[11px] text-slate-400 uppercase tracking-wide leading-tight">Sincronização Integrada</p>
@@ -106,7 +119,20 @@ export const html = `<!DOCTYPE html>
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="brand-mark w-10 h-10 rounded-lg bg-white border border-slate-200 shadow-sm shrink-0 p-1" x-html="getIcon('brand')"></div>
+          <div class="w-10 h-10 rounded-lg bg-white border border-slate-200 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="36" height="36">
+              <defs>
+                <linearGradient id="brb1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0c3a85"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
+                <linearGradient id="brb2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#2563eb"/></linearGradient>
+                <linearGradient id="brb3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
+              </defs>
+              <g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="32" cy="62" r="22" stroke="url(#brb1)"/>
+                <circle cx="68" cy="62" r="22" stroke="url(#brb2)"/>
+                <circle cx="50" cy="32" r="22" stroke="url(#brb3)"/>
+              </g>
+            </svg>
+          </div>
           <div class="min-w-0">
             <div class="text-[15px] font-bold leading-tight text-slate-900 truncate">UniHub</div>
             <div class="text-[10px] text-slate-400 leading-tight uppercase tracking-wide">Sincronização Integrada</div>
