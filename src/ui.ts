@@ -291,7 +291,11 @@ export const html = `<!DOCTYPE html>
                         <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
-                      <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
+                      <td class="px-3 py-2 font-mono text-xs">
+                        <span x-show="v.sku" x-text="v.sku"></span>
+                        <span x-show="!v.sku && cleanVariation(v.variation)" class="text-slate-500 italic font-sans" x-text="cleanVariation(v.variation)"></span>
+                        <span x-show="!v.sku && !cleanVariation(v.variation)" class="text-slate-300">(sem SKU)</span>
+                      </td>
                       <td class="px-3 py-2 text-center font-mono text-xs" :class="unitsClass(v.meli_stock)" x-text="v.meli_stock ?? '—'"></td>
                       <td class="px-3 py-2 text-center font-mono text-xs" :class="unitsClass(v.shopee_stock)" x-text="v.shopee_stock ?? '—'"></td>
                       <td class="px-3 py-2 text-center">
@@ -312,8 +316,10 @@ export const html = `<!DOCTYPE html>
                       </td>
                       <td class="px-3 py-2">
                         <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap">🟠 SP</span>
-                          <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap">🟡 ML</span>
+                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap cursor-help"
+                            :title="'Veio de: ' + (v.shopee_account_label || v.shopee_account_id || '(loja sem nome)') + ' — item ' + v.shopee_item_id + (v.shopee_model_id ? ' / model ' + v.shopee_model_id : '')">🟠 SP</span>
+                          <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap cursor-help"
+                            :title="'Veio de: Mercado Livre — item ' + v.meli_item_id + (v.meli_variation_id ? ' / var ' + v.meli_variation_id : '')">🟡 ML</span>
                           <span x-show="!v.shopee_item_id && !v.meli_item_id" class="text-[10px] text-slate-300">—</span>
                         </div>
                       </td>
@@ -428,7 +434,11 @@ export const html = `<!DOCTYPE html>
                         <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
                         <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
                       </td>
-                      <td class="px-3 py-2 font-mono text-xs" x-text="v.sku || '(sem SKU)'"></td>
+                      <td class="px-3 py-2 font-mono text-xs">
+                        <span x-show="v.sku" x-text="v.sku"></span>
+                        <span x-show="!v.sku && cleanVariation(v.variation)" class="text-slate-500 italic font-sans" x-text="cleanVariation(v.variation)"></span>
+                        <span x-show="!v.sku && !cleanVariation(v.variation)" class="text-slate-300">(sem SKU)</span>
+                      </td>
                       <td class="px-3 py-2 text-center font-mono text-xs text-emerald-700 font-semibold" x-text="v.sales_7d || '—'"></td>
                       <td class="px-3 py-2 text-center font-mono text-xs text-slate-700" x-text="v.sales_30d || '—'"></td>
                       <td class="px-3 py-2 text-center font-mono text-xs font-bold" x-text="v.sales_total || '—'"></td>
@@ -437,8 +447,10 @@ export const html = `<!DOCTYPE html>
                       </td>
                       <td class="px-3 py-2">
                         <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap">🟠 SP</span>
-                          <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap">🟡 ML</span>
+                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap cursor-help"
+                            :title="'Veio de: ' + (v.shopee_account_label || v.shopee_account_id || '(loja sem nome)') + ' — item ' + v.shopee_item_id + (v.shopee_model_id ? ' / model ' + v.shopee_model_id : '')">🟠 SP</span>
+                          <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap cursor-help"
+                            :title="'Veio de: Mercado Livre — item ' + v.meli_item_id + (v.meli_variation_id ? ' / var ' + v.meli_variation_id : '')">🟡 ML</span>
                           <span x-show="!v.shopee_item_id && !v.meli_item_id" class="text-[10px] text-slate-300">—</span>
                         </div>
                       </td>
