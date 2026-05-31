@@ -1692,13 +1692,19 @@ add('POST', '/api/variation/set-sku', async (req, env) => {
 
   // 2) Atualiza/cria registro local (mappings ou unmapped)
   const now = Date.now();
-  // Verifica se já existe mapping
-  const existingMap = await env.DB.prepare(
-    `SELECT sku FROM mappings WHERE
-      (meli_item_id IS ? AND (meli_variation_id IS ? OR (? IS NULL AND meli_variation_id IS NULL)))
-      OR (shopee_item_id IS ? AND (shopee_model_id IS ? OR (? IS NULL AND shopee_model_id IS NULL)))
-     LIMIT 1`
-  ).bind(meliItem, meliVar, meliVar, spItem, spModel, spModel).first<any>();
+  // Verifica se já existe mapping pra esses IDs específicos
+  // (NÃO pode usar OR com IS NULL — pegaria mapping aleatório de outro produto sem ML)
+  let existingMap: any = null;
+  if (meliItem) {
+    existingMap = await env.DB.prepare(
+      `SELECT * FROM mappings WHERE meli_item_id=? AND COALESCE(meli_variation_id,'')=COALESCE(?,'') LIMIT 1`
+    ).bind(meliItem, meliVar).first<any>();
+  }
+  if (!existingMap && spItem) {
+    existingMap = await env.DB.prepare(
+      `SELECT * FROM mappings WHERE shopee_item_id=? AND COALESCE(shopee_model_id,'')=COALESCE(?,'') LIMIT 1`
+    ).bind(spItem, spModel).first<any>();
+  }
 
   let action = 'none';
   let pairedSku: string | null = null;
