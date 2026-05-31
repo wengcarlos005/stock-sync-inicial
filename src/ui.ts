@@ -627,39 +627,43 @@ export const html = `<!DOCTYPE html>
 
       <!-- Movimentações -->
       <section x-show="tab === 'changes'" x-cloak>
-        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <!-- Desktop/tablet: tabela compacta com scroll horizontal interno -->
+        <div class="hidden md:block bg-white border border-slate-200 rounded-lg overflow-hidden">
           <div class="overflow-x-auto">
-          <table class="w-full text-sm min-w-[720px]">
+          <table class="w-full text-sm table-fixed">
+            <colgroup>
+              <col class="w-24" /><col /><col class="w-24" /><col class="w-28" /><col class="w-24" /><col class="w-44" />
+            </colgroup>
             <thead class="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <th class="text-left px-4 py-3">Quando</th>
-                <th class="text-left px-4 py-3">Produto / SKU</th>
-                <th class="text-left px-4 py-3">Origem</th>
-                <th class="text-left px-4 py-3">Tipo</th>
-                <th class="text-right px-4 py-3">Δ unidades</th>
-                <th class="text-left px-4 py-3">Estoque antes → depois</th>
+                <th class="text-left px-3 py-3">Quando</th>
+                <th class="text-left px-3 py-3">Produto / SKU</th>
+                <th class="text-left px-3 py-3">Origem</th>
+                <th class="text-left px-3 py-3">Tipo</th>
+                <th class="text-right px-3 py-3">Δ</th>
+                <th class="text-left px-3 py-3">Estoque</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <template x-for="c in changes" :key="c.id">
                 <tr :class="c.shadow ? 'bg-amber-50/50' : ''">
-                  <td class="px-4 py-3 text-xs text-slate-500" x-text="fmtRelative(c.ts)"></td>
-                  <td class="px-4 py-3">
-                    <div class="text-xs leading-tight" x-text="(c.product_name||'').slice(0,55) || c.sku"></div>
-                    <div class="text-[10px] text-slate-400 font-mono" x-text="c.sku"></div>
+                  <td class="px-3 py-3 text-xs text-slate-500" x-text="fmtRelative(c.ts)"></td>
+                  <td class="px-3 py-3">
+                    <div class="text-xs leading-tight truncate" :title="c.product_name||c.sku" x-text="(c.product_name||'').slice(0,80) || c.sku"></div>
+                    <div class="text-[10px] text-slate-400 font-mono truncate" x-text="c.sku"></div>
                   </td>
-                  <td class="px-4 py-3 text-xs">
+                  <td class="px-3 py-3 text-xs">
                     <span x-show="c.source==='meli'" class="text-amber-700">🟡 ML</span>
-                    <span x-show="c.source==='shopee'" class="text-orange-700">🛒 Shopee</span>
+                    <span x-show="c.source==='shopee'" class="text-orange-700">🛒 SP</span>
                     <span x-show="c.source==='manual'" class="text-purple-700">✋ Manual</span>
                   </td>
-                  <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded" :class="triggerClass(c.trigger)" x-text="triggerLabel(c.trigger)"></span></td>
-                  <td class="px-4 py-3 text-right font-mono font-bold" :class="c.delta < 0 ? 'text-red-600' : c.delta > 0 ? 'text-emerald-600' : ''" x-text="c.delta > 0 ? '+' + c.delta : c.delta"></td>
-                  <td class="px-4 py-3 text-xs font-mono text-slate-500">
+                  <td class="px-3 py-3"><span class="text-xs px-2 py-0.5 rounded whitespace-nowrap" :class="triggerClass(c.trigger)" x-text="triggerLabel(c.trigger)"></span></td>
+                  <td class="px-3 py-3 text-right font-mono font-bold" :class="c.delta < 0 ? 'text-red-600' : c.delta > 0 ? 'text-emerald-600' : ''" x-text="c.delta > 0 ? '+' + c.delta : c.delta"></td>
+                  <td class="px-3 py-3 text-[11px] font-mono text-slate-500">
                     <template x-if="c.meli_stock_before !== null || c.shopee_stock_before !== null">
                       <div>
                         <div x-show="c.meli_stock_before !== null">ML: <span x-text="c.meli_stock_before + ' → ' + c.meli_stock_after"></span></div>
-                        <div x-show="c.shopee_stock_before !== null">Shopee: <span x-text="c.shopee_stock_before + ' → ' + c.shopee_stock_after"></span></div>
+                        <div x-show="c.shopee_stock_before !== null">SP: <span x-text="c.shopee_stock_before + ' → ' + c.shopee_stock_after"></span></div>
                       </div>
                     </template>
                     <template x-if="c.meli_stock_before === null && c.shopee_stock_before === null">
@@ -674,6 +678,35 @@ export const html = `<!DOCTYPE html>
             </tbody>
           </table>
           </div>
+        </div>
+        <!-- Mobile: cards (uma movimentação por card, mais legível que tabela) -->
+        <div class="md:hidden space-y-2">
+          <template x-for="c in changes" :key="c.id">
+            <div class="bg-white border border-slate-200 rounded-lg p-3" :class="c.shadow ? 'bg-amber-50/50' : ''">
+              <div class="flex justify-between items-start gap-2 mb-1">
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium truncate" x-text="(c.product_name||'').slice(0,80) || c.sku"></div>
+                  <div class="text-[10px] text-slate-400 font-mono truncate" x-text="c.sku"></div>
+                </div>
+                <span class="font-mono font-bold text-sm shrink-0" :class="c.delta < 0 ? 'text-red-600' : c.delta > 0 ? 'text-emerald-600' : ''" x-text="c.delta > 0 ? '+' + c.delta : c.delta"></span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 items-center text-[10px]">
+                <span class="text-slate-400" x-text="fmtRelative(c.ts)"></span>
+                <span x-show="c.source==='meli'" class="text-amber-700">🟡 ML</span>
+                <span x-show="c.source==='shopee'" class="text-orange-700">🛒 SP</span>
+                <span x-show="c.source==='manual'" class="text-purple-700">✋ Manual</span>
+                <span class="px-1.5 py-0.5 rounded" :class="triggerClass(c.trigger)" x-text="triggerLabel(c.trigger)"></span>
+              </div>
+              <template x-if="c.meli_stock_before !== null || c.shopee_stock_before !== null">
+                <div class="mt-1.5 text-[11px] font-mono text-slate-500 border-t border-slate-100 pt-1.5">
+                  <span x-show="c.meli_stock_before !== null">ML <span x-text="c.meli_stock_before + '→' + c.meli_stock_after"></span></span>
+                  <span x-show="c.meli_stock_before !== null && c.shopee_stock_before !== null" class="mx-1.5 text-slate-300">·</span>
+                  <span x-show="c.shopee_stock_before !== null">SP <span x-text="c.shopee_stock_before + '→' + c.shopee_stock_after"></span></span>
+                </div>
+              </template>
+            </div>
+          </template>
+          <div x-show="changes.length === 0" class="text-center py-8 text-slate-400 bg-white border border-slate-200 rounded-lg">Nenhuma movimentação ainda.</div>
         </div>
       </section>
 
