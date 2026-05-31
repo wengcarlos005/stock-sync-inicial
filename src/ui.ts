@@ -275,9 +275,12 @@ export const html = `<!DOCTYPE html>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
                   </div>
                 </div>
-                <template x-if="anuncio.shopee_item_id">
-                  <button @click="refreshVariations(anuncio.shopee_item_id)" class="shrink-0 text-xs px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded font-medium" title="Busca os modelos atuais na Shopee, limpa variações fantasma e atualiza nomes">↻ Atualizar variações</button>
-                </template>
+                <div class="flex flex-col gap-1 shrink-0">
+                  <button @click="openBulkStock(anuncio)" class="text-xs px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded font-medium" title="Atualiza estoque de várias variações de uma vez (respeita filtros aplicados)">⚡ Atualizar em massa</button>
+                  <template x-if="anuncio.shopee_item_id">
+                    <button @click="refreshVariations(anuncio.shopee_item_id)" class="text-xs px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded font-medium" title="Busca os modelos atuais na Shopee, limpa variações fantasma e atualiza nomes">↻ Atualizar variações</button>
+                  </template>
+                </div>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
@@ -421,9 +424,12 @@ export const html = `<!DOCTYPE html>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
                   </div>
                 </div>
-                <template x-if="anuncio.shopee_item_id">
-                  <button @click="refreshVariations(anuncio.shopee_item_id)" class="shrink-0 text-xs px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded font-medium" title="Busca os modelos atuais na Shopee, limpa variações fantasma e atualiza nomes">↻ Atualizar variações</button>
-                </template>
+                <div class="flex flex-col gap-1 shrink-0">
+                  <button @click="openBulkStock(anuncio)" class="text-xs px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded font-medium" title="Atualiza estoque de várias variações de uma vez (respeita filtros aplicados)">⚡ Atualizar em massa</button>
+                  <template x-if="anuncio.shopee_item_id">
+                    <button @click="refreshVariations(anuncio.shopee_item_id)" class="text-xs px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded font-medium" title="Busca os modelos atuais na Shopee, limpa variações fantasma e atualiza nomes">↻ Atualizar variações</button>
+                  </template>
+                </div>
               </div>
               <table class="w-full text-sm">
                 <thead class="bg-white text-[11px] uppercase text-slate-400 border-b">
@@ -922,6 +928,26 @@ export const html = `<!DOCTYPE html>
       <div class="flex gap-2">
         <button onclick="window.__closeStock()" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Cancelar</button>
         <button id="sm-apply" onclick="window.__applyStock()" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">Aplicar nos 2 marketplaces</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk stock modal -->
+  <div id="bulk-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40" onclick="if(event.target===this)window.__closeBulk()" style="display:none">
+    <div class="bg-white rounded-xl shadow-2xl p-5 max-w-3xl w-full max-h-[90vh] flex flex-col">
+      <h3 class="font-semibold mb-1">Atualizar estoque em massa</h3>
+      <p id="bm-info" class="text-xs text-slate-500 mb-3"></p>
+      <div class="flex gap-2 items-center mb-3 p-3 bg-amber-50 border border-amber-200 rounded">
+        <span class="text-xs font-medium text-amber-800">Preencher tudo com:</span>
+        <input id="bm-fillall" type="number" min="0" placeholder="ex: 10" class="px-2 py-1 border border-slate-300 rounded text-sm w-24" />
+        <button onclick="window.__bulkFillAll()" class="text-xs px-3 py-1 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded font-medium">Aplicar nos inputs</button>
+        <span class="text-xs text-slate-500 ml-auto">Deixe em branco pra pular a variação</span>
+      </div>
+      <div id="bm-list" class="flex-1 overflow-y-auto border border-slate-200 rounded mb-3"></div>
+      <div id="bm-progress" class="text-xs text-slate-600 mb-2 hidden"></div>
+      <div class="flex gap-2">
+        <button onclick="window.__closeBulk()" class="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Cancelar</button>
+        <button id="bm-apply" onclick="window.__bulkApply()" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">Aplicar nas variações preenchidas</button>
       </div>
     </div>
   </div>
@@ -1534,6 +1560,111 @@ function app() {
       this.loading.cleanup = false;
       await this.loadAll();
       alert('Limpeza concluída: ' + (r?.meli_resolved||0) + ' ML + ' + (r?.shopee_resolved||0) + ' Shopee removidos dos não pareados.');
+    },
+
+    openBulkStock(anuncio) {
+      // Pega só variações desse anuncio respeitando filtro de loja atualmente aplicado
+      let vars = (anuncio.variations || []).slice();
+      if (this.accountFilter) {
+        const acc = this.accounts.find(a => String(a.external_id) === String(this.accountFilter));
+        if (acc) {
+          if (acc.marketplace === 'shopee') {
+            vars = vars.filter(v => {
+              const ss = v.shopee_stores || (v.shopee_account_id ? [{ account_id: v.shopee_account_id }] : []);
+              return ss.some(s => String(s.account_id) === String(this.accountFilter));
+            });
+          } else {
+            vars = vars.filter(v => !!v.meli_item_id);
+          }
+        }
+      }
+      // Filtros de estoque também aplicam
+      if (this.masterFilter === 'low_stock') {
+        vars = vars.filter(v => { const s = this.unifiedStock(v); return s != null && s < 3; });
+      }
+      if (this.masterFilter === 'out_of_stock') {
+        vars = vars.filter(v => this.unifiedStock(v) === 0);
+      }
+      if (this.masterFilter === 'paired') vars = vars.filter(v => v.paired);
+      if (this.masterFilter === 'unpaired') vars = vars.filter(v => !v.paired);
+
+      if (vars.length === 0) { alert('Nenhuma variação corresponde aos filtros atuais.'); return; }
+
+      const cleanVar = (s) => this.cleanVariation(s);
+      const rows = vars.map((v, i) => {
+        const realSku = v.sku || '';
+        const synth = !realSku ? (v.shopee_item_id ? 'SP_' + v.shopee_item_id + (v.shopee_model_id ? '_' + v.shopee_model_id : '') : (v.meli_item_id ? 'ML_' + v.meli_item_id + (v.meli_variation_id ? '_' + v.meli_variation_id : '') : '')) : '';
+        const skuToSend = realSku || synth;
+        const cur = v.master_stock != null ? v.master_stock : (v.meli_stock != null ? v.meli_stock : (v.shopee_stock != null ? v.shopee_stock : ''));
+        const meli = v.meli_stock != null ? v.meli_stock : '—';
+        const sp = v.shopee_stock != null ? v.shopee_stock : '—';
+        const storesBadge = (v.shopee_stores && v.shopee_stores.length > 1) ? ' <span class="text-[10px] px-1 bg-orange-200 text-orange-800 rounded font-medium">SP×' + v.shopee_stores.length + '</span>' : '';
+        return '<tr data-i="' + i + '" class="border-b last:border-0">' +
+          '<td class="px-2 py-1.5 text-xs">' + (cleanVar(v.variation) || '<span class="text-slate-300">—</span>') + storesBadge + '</td>' +
+          '<td class="px-2 py-1.5 font-mono text-[10px] text-slate-500">' + (realSku || '<span class="italic">' + synth + '</span>') + '</td>' +
+          '<td class="px-2 py-1.5 text-center text-xs text-slate-500">ML: ' + meli + ' / SP: ' + sp + '</td>' +
+          '<td class="px-2 py-1.5"><input type="number" min="0" data-sku="' + skuToSend + '" data-realsku="' + realSku + '" class="bm-row w-20 px-2 py-1 border border-slate-300 rounded text-sm" placeholder="' + cur + '" /></td>' +
+          '</tr>';
+      }).join('');
+
+      document.getElementById('bm-info').innerHTML = '<strong>' + (anuncio.product_name || '').slice(0, 80) + '</strong><br>' + vars.length + ' variação(ões) ' + (this.accountFilter ? '(filtro: ' + (this.accounts.find(a => String(a.external_id) === String(this.accountFilter))?.label || '?') + ')' : '(todos)') + ' — preencha só as que quer atualizar';
+      document.getElementById('bm-list').innerHTML =
+        '<table class="w-full text-sm"><thead class="bg-slate-50 text-[10px] uppercase text-slate-400 sticky top-0"><tr>' +
+        '<th class="text-left px-2 py-1.5">Variação</th><th class="text-left px-2 py-1.5">SKU</th><th class="text-center px-2 py-1.5">Atual</th><th class="text-left px-2 py-1.5">Novo</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table>';
+
+      const btn = document.getElementById('bm-apply');
+      btn.disabled = false; btn.textContent = 'Aplicar nas variações preenchidas';
+      document.getElementById('bm-progress').style.display = 'none';
+      document.getElementById('bm-progress').textContent = '';
+      document.getElementById('bulk-modal').style.display = 'flex';
+
+      const self = this;
+      window.__closeBulk = () => { document.getElementById('bulk-modal').style.display = 'none'; };
+      window.__bulkFillAll = () => {
+        const val = document.getElementById('bm-fillall').value;
+        if (val === '') return;
+        document.querySelectorAll('input.bm-row').forEach(i => { i.value = val; });
+      };
+      window.__bulkApply = async () => {
+        const inputs = Array.from(document.querySelectorAll('input.bm-row')).filter(i => i.value !== '' && !isNaN(Number(i.value)));
+        if (inputs.length === 0) { alert('Preencha pelo menos uma variação.'); return; }
+        if (!confirm('Atualizar estoque de ' + inputs.length + ' variação(ões) nas plataformas? Esta ação grava ao vivo.')) return;
+        btn.disabled = true; btn.textContent = 'Aplicando...';
+        const progress = document.getElementById('bm-progress');
+        progress.style.display = 'block';
+        let ok = 0, fail = 0;
+        const errs = [];
+        for (let idx = 0; idx < inputs.length; idx++) {
+          const inp = inputs[idx];
+          const sku = inp.dataset.sku;
+          const val = Number(inp.value);
+          progress.textContent = 'Atualizando ' + (idx + 1) + '/' + inputs.length + ' (' + sku + ')...';
+          const v = vars[Number(inp.closest('tr').dataset.i)];
+          try {
+            const r = await self.api('/api/products/' + encodeURIComponent(sku) + '/set-stock', {
+              method: 'POST', body: JSON.stringify({
+                stock: val,
+                shopee_item_id: v.shopee_item_id || null,
+                shopee_model_id: v.shopee_model_id || null,
+                shopee_account_id: v.shopee_account_id || null,
+                meli_item_id: v.meli_item_id || null,
+                meli_variation_id: v.meli_variation_id || null,
+                product_name: v.product_name || v.variation || ''
+              })
+            });
+            if (r?.error) { fail++; errs.push(sku + ': ' + r.error); }
+            else { ok++; inp.style.background = '#dcfce7'; }
+          } catch (e) {
+            fail++; errs.push(sku + ': ' + (e?.message || e));
+          }
+        }
+        progress.textContent = '✓ ' + ok + ' atualizadas, ✗ ' + fail + ' falhas.';
+        btn.disabled = false; btn.textContent = 'Fechar';
+        btn.onclick = () => window.__closeBulk();
+        if (errs.length) alert('Erros:\\n' + errs.slice(0, 10).join('\\n'));
+        await self.loadMaster();
+      };
     },
 
     openSetStock(p) {
