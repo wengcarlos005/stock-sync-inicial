@@ -52,12 +52,25 @@ export const html = `<!DOCTYPE html>
     /* Surfaces explícitas — não dependem do Tailwind dark: pra evitar inconsistência */
     .app-surface { background-color: #ffffff; }
     html.dark .app-surface { background-color: #1e293b; } /* slate-800 */
-    .stat-surface { background-color: #f1f5f9; } /* slate-100 */
+
+    /* Stat cards: light = indigo claro c/ número indigo (paleta azul). Dark = slate sutil */
+    .stat-surface { background-color: #eef2ff; } /* indigo-50 */
     html.dark .stat-surface { background-color: #273449; }
-    .stat-surface .text-slate-900 { color: #0f172a; }
-    html.dark .stat-surface .text-slate-900 { color: #f1f5f9; }
-    .stat-surface .text-slate-500 { color: #64748b; }
-    html.dark .stat-surface .text-slate-500 { color: #94a3b8; }
+    .stat-surface .stat-num { color: #4338ca; } /* indigo-700 */
+    html.dark .stat-surface .stat-num { color: #c7d2fe; } /* indigo-200 */
+    .stat-surface .stat-label { color: #6366f1; } /* indigo-500 */
+    html.dark .stat-surface .stat-label { color: #94a3b8; }
+
+    /* Nav count badges: paleta indigo em ambos os modos */
+    .nav-count { background-color: #e0e7ff; color: #4338ca; }
+    .nav-count-active { background-color: #4f46e5; color: #ffffff; }
+    html.dark .nav-count { background-color: rgba(99,102,241,.18); color: #c7d2fe; }
+    html.dark .nav-count-active { background-color: #6366f1; color: #ffffff; }
+
+    /* Dark mode: badges de variação ficam com contraste melhor (texto + bg) */
+    html.dark .bg-slate-100.text-slate-700 { background-color: #334155; color: #f1f5f9; }
+    /* Dark mode: rows hover/zebra mais suaves */
+    html.dark .hover\\:bg-slate-50:hover { background-color: rgba(99,102,241,.06); }
 
     /* ─────────────── DARK MODE: overrides minimalistas ───────────────
        Em vez de !important hardcoded, usamos selectors específicos pra
@@ -181,7 +194,7 @@ export const html = `<!DOCTYPE html>
               <span x-text="t.label"></span>
             </span>
             <span x-show="t.count !== undefined" x-text="t.count || 0"
-              :class="tab === t.id ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
+              :class="tab === t.id ? 'nav-count-active' : 'nav-count'"
               class="text-[10px] font-semibold px-1.5 py-0.5 rounded"></span>
           </button>
         </template>
@@ -221,19 +234,19 @@ export const html = `<!DOCTYPE html>
           </button>
         </div>
 
-        <!-- Stat cards strip — visual v1 (slate-100), com ícone SVG sutil no canto -->
-        <div class="px-4 sm:px-6 lg:px-8 pb-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <!-- Stat cards — só nas abas Estoque + Produtos, paleta indigo (azul) no light -->
+        <div x-show="tab === 'stock' || tab === 'products'" class="px-4 sm:px-6 lg:px-8 pb-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <div class="text-xl sm:text-2xl font-bold text-slate-900" x-text="status.active_mappings || 0"></div>
-              <div class="text-xs text-slate-500 mt-0.5 truncate">Produtos sincronizados</div>
+              <div class="text-xl sm:text-2xl font-bold stat-num" x-text="status.active_mappings || 0"></div>
+              <div class="text-xs stat-label mt-0.5 truncate font-medium">Produtos sincronizados</div>
             </div>
-            <span class="text-indigo-500 shrink-0" x-html="getIcon('stock')"></span>
+            <span class="shrink-0 stat-num" x-html="getIcon('stock')"></span>
           </div>
           <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <div class="text-xl sm:text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900'" x-text="lowStockCount"></div>
-              <div class="text-xs text-slate-500 mt-0.5 truncate">Estoque baixo / zerado</div>
+              <div class="text-xl sm:text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'stat-num'" x-text="lowStockCount"></div>
+              <div class="text-xs stat-label mt-0.5 truncate font-medium">Estoque baixo / zerado</div>
             </div>
             <span class="shrink-0" :class="lowStockCount > 0 ? 'text-amber-500' : 'text-emerald-500'">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.732 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
@@ -241,15 +254,15 @@ export const html = `<!DOCTYPE html>
           </div>
           <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <div class="text-xl sm:text-2xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : 'text-slate-900'" x-text="status.unmapped_items || 0"></div>
-              <div class="text-xs text-slate-500 mt-0.5 truncate">SKUs não pareados</div>
+              <div class="text-xl sm:text-2xl font-bold" :class="status.unmapped_items ? 'text-orange-600' : 'stat-num'" x-text="status.unmapped_items || 0"></div>
+              <div class="text-xs stat-label mt-0.5 truncate font-medium">SKUs não pareados</div>
             </div>
             <span class="shrink-0" :class="status.unmapped_items ? 'text-orange-500' : 'text-emerald-500'" x-html="getIcon('unmapped')"></span>
           </div>
           <div class="stat-surface rounded-lg p-3 sm:p-3.5 flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <div class="text-xl sm:text-2xl font-bold text-slate-900" x-text="(status.last_run?.changes_detected ?? 0)"></div>
-              <div class="text-xs text-slate-500 mt-0.5 truncate">Mudanças (última execução)</div>
+              <div class="text-xl sm:text-2xl font-bold stat-num" x-text="(status.last_run?.changes_detected ?? 0)"></div>
+              <div class="text-xs stat-label mt-0.5 truncate font-medium">Mudanças (última execução)</div>
             </div>
             <span class="text-emerald-500 shrink-0" x-html="getIcon('changes')"></span>
           </div>
