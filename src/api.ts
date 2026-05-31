@@ -326,9 +326,10 @@ add('GET', '/api/products/master', async (req, env) => {
       const a = ensureAnuncio(u.item_id, null, u.product_name || '', null, u.shopee_account_id);
       if (!a) continue;
       const sales = salesByShopeeVar.get(`${u.item_id}|${u.variation_id||''}`) || (u.sku ? salesBySku.get(u.sku) : null) || null;
+      const fromSuffix = extractSuffix(String(u.product_name || ''));
       a.variations.push({
         sku: u.sku || '',
-        variation: sales?.variation || null,
+        variation: sales?.variation || fromSuffix || null,
         image: sales?.image || null,
         meli_item_id: null,
         meli_variation_id: null,
@@ -346,9 +347,10 @@ add('GET', '/api/products/master', async (req, env) => {
       const a = ensureAnuncio(null, u.item_id, u.product_name || '', null);
       if (!a) continue;
       const sales = salesByMeliVar.get(`${u.item_id}|${u.variation_id||''}`) || (u.sku ? salesBySku.get(u.sku) : null) || null;
+      const fromSuffix = extractSuffix(String(u.product_name || ''));
       a.variations.push({
         sku: u.sku || '',
-        variation: sales?.variation || null,
+        variation: sales?.variation || fromSuffix || null,
         image: sales?.image || null,
         meli_item_id: u.item_id,
         meli_variation_id: u.variation_id || null,
@@ -1603,6 +1605,105 @@ add('POST', '/api/mappings/pair-variation', async (req, env) => {
     .bind(sp_item, sp_model, sp_model, ml_item, ml_var, ml_var).run();
 
   return json({ ok: true, sku });
+});
+
+// ============= Atualizar SKU de uma variação na própria plataforma =============
+// Body: { meli_item_id, meli_variation_id, shopee_item_id, shopee_model_id, shopee_account_id, sku }
+// Atualiza SKU no marketplace (ML ou Shopee — qualquer lado presente), refleta no DB,
+// e tenta auto-parear se já existe outro lado com mesmo SKU.
+add('POST', '/api/variation/set-sku', async (req, env) => {
+  const body = await req.json() as any;
+  const newSku = String(body.sku || '').trim();
+  if (!newSku) return json({ error: 'sku obrigatório' }, 400);
+
+  const meliItem = body.meli_item_id ? String(body.meli_item_id) : null;
+  const meliVar  = body.meli_variation_id ? String(body.meli_variation_id) : null;
+  const spItem   = body.shopee_item_id ? String(body.shopee_item_id) : null;
+  const spModel  = body.shopee_model_id ? String(body.shopee_model_id) : null;
+  const spAcc    = body.shopee_account_id ? String(body.shopee_account_id) : null;
+
+  if (!meliItem && !spItem) return json({ error: 'precisa pelo menos um lado (meli_item_id ou shopee_item_id)' }, 400);
+
+  const updates: Record<string, any> = {};
+  const errors: Record<string, string> = {};
+
+  // 1) Atualiza SKU no marketplace
+  if (meliItem) {
+    try {
+      const r = await mac.meliSetSku(env, meliItem, newSku, meliVar ? Number(meliVar) : undefined);
+      updates.meli = r ? 'ok' : 'sent';
+    } catch (e: any) {
+      errors.meli = e.message || String(e);
+    }
+  }
+  if (spItem) {
+    try {
+      const r = await mac.shopeeSetSku(env, Number(spItem), newSku, spModel ? Number(spModel) : undefined, spAcc || undefined);
+      updates.shopee = r ? 'ok' : 'sent';
+    } catch (e: any) {
+      errors.shopee = e.message || String(e);
+    }
+  }
+
+  // 2) Atualiza/cria registro local (mappings ou unmapped)
+  const now = Date.now();
+  // Verifica se já existe mapping
+  const existingMap = await env.DB.prepare(
+    `SELECT sku FROM mappings WHERE
+      (meli_item_id IS ? AND (meli_variation_id IS ? OR (? IS NULL AND meli_variation_id IS NULL)))
+      OR (shopee_item_id IS ? AND (shopee_model_id IS ? OR (? IS NULL AND shopee_model_id IS NULL)))
+     LIMIT 1`
+  ).bind(meliItem, meliVar, meliVar, spItem, spModel, spModel).first<any>();
+
+  let action = 'none';
+  let pairedSku: string | null = null;
+
+  if (existingMap) {
+    // Já tem mapping — atualiza o SKU
+    await env.DB.prepare(
+      `UPDATE mappings SET sku=?, updated_at=? WHERE sku=?`
+    ).bind(newSku, now, existingMap.sku).run().catch(() => {/* SKU pode já existir como outro mapping; ignora */});
+    action = 'mapping_updated';
+    pairedSku = newSku;
+  } else {
+    // Sem mapping. Procura unmapped do OUTRO lado com SKU igual → AUTO-PAIR
+    const oppositePlatform = meliItem ? 'shopee' : 'meli';
+    const oppositeRows = (await env.DB.prepare(
+      `SELECT * FROM unmapped WHERE resolved=0 AND platform=? AND LOWER(TRIM(COALESCE(sku,'')))=LOWER(?)`
+    ).bind(oppositePlatform, newSku).all()).results as any[];
+
+    if (oppositeRows.length === 1) {
+      const o = oppositeRows[0];
+      const m_item = meliItem || o.item_id;
+      const m_var  = meliItem ? meliVar : (o.variation_id || null);
+      const s_item = spItem || o.item_id;
+      const s_model = spItem ? spModel : (o.variation_id || null);
+      const s_acc = spItem ? spAcc : (o.shopee_account_id || null);
+      await env.DB.prepare(`
+        INSERT INTO mappings (sku, meli_item_id, meli_variation_id, shopee_item_id, shopee_model_id, shopee_account_id, product_name, active, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, NULL, 1, 'auto-pareado via set-sku', ?, ?)
+        ON CONFLICT(sku) DO UPDATE SET
+          meli_item_id=excluded.meli_item_id, meli_variation_id=excluded.meli_variation_id,
+          shopee_item_id=excluded.shopee_item_id, shopee_model_id=excluded.shopee_model_id,
+          shopee_account_id=COALESCE(excluded.shopee_account_id, mappings.shopee_account_id),
+          updated_at=excluded.updated_at
+      `).bind(newSku, m_item, m_var, s_item, s_model, s_acc, now, now).run();
+      await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE platform=? AND item_id=? AND (variation_id=? OR (? IS NULL AND variation_id IS NULL))`)
+        .bind(oppositePlatform, o.item_id, o.variation_id, o.variation_id).run();
+      action = 'auto_paired';
+      pairedSku = newSku;
+    } else {
+      // Sem match. Só cria/atualiza o unmapped do lado atualizado com novo SKU
+      const platform = meliItem ? 'meli' : 'shopee';
+      const itm = meliItem || spItem!;
+      const variation = meliItem ? meliVar : spModel;
+      await env.DB.prepare(`UPDATE unmapped SET sku=?, last_seen_at=? WHERE platform=? AND item_id=? AND (variation_id=? OR (? IS NULL AND variation_id IS NULL))`)
+        .bind(newSku, now, platform, itm, variation, variation).run();
+      action = oppositeRows.length > 1 ? 'multiple_candidates_no_pair' : 'sku_saved_no_match';
+    }
+  }
+
+  return json({ ok: Object.keys(errors).length === 0, updates, errors, action, sku: pairedSku });
 });
 
 add('POST', '/api/mappings/manual', async (req, env) => {

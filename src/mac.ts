@@ -163,6 +163,34 @@ export async function meliUpdateStock(env: MacEnv, itemId: string, qty: number, 
   return meliRaw(env, 'PUT', `/items/${itemId}`, { available_quantity: qty });
 }
 
+export async function meliSetSku(env: MacEnv, itemId: string, sku: string, variationId?: number): Promise<any> {
+  // Atualiza SKU via SELLER_SKU attribute + seller_custom_field (pra cobrir ambos os fields).
+  const attrs = [{ id: 'SELLER_SKU', value_name: sku }];
+  if (variationId) {
+    return meliRaw(env, 'PUT', `/items/${itemId}/variations/${variationId}`, {
+      attributes: attrs,
+      seller_custom_field: sku,
+    });
+  }
+  return meliRaw(env, 'PUT', `/items/${itemId}`, {
+    attributes: attrs,
+    seller_custom_field: sku,
+  });
+}
+
+export async function shopeeSetSku(
+  env: MacEnv,
+  itemId: number,
+  sku: string,
+  modelId?: number,
+  shopId?: string,
+): Promise<any> {
+  if (modelId) {
+    return call(env, 'shopee_update_model', withShop({ item_id: itemId, model: [{ model_id: modelId, model_sku: sku }] }, shopId));
+  }
+  return call(env, 'shopee_update_item', withShop({ item_id: itemId, item_sku: sku }, shopId));
+}
+
 export function getMeliSku(item: MeliItem): string | null {
   const attr = (item.attributes || []).find(a => a.id === 'SELLER_SKU');
   return attr?.value_name || null;

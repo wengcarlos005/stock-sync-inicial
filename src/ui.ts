@@ -456,7 +456,10 @@ export const html = `<!DOCTYPE html>
                       <td class="px-3 py-2 text-center font-mono text-xs text-slate-700" x-text="v.sales_30d || '—'"></td>
                       <td class="px-3 py-2 text-center font-mono text-xs font-bold" x-text="v.sales_total || '—'"></td>
                       <td class="px-3 py-2 text-center">
-                        <button @click="openPairFromProduct(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">Mapear</button>
+                        <div class="flex gap-1 justify-center flex-wrap">
+                          <button @click="editVariationSku(v, anuncio)" class="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded" title="Edita o SKU no marketplace e tenta auto-parear se já existe SKU igual no outro lado">✏ SKU</button>
+                          <button @click="openPairFromProduct(v, anuncio)" class="text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded">Mapear</button>
+                        </div>
                       </td>
                       <td class="px-3 py-2">
                         <div class="flex items-center justify-center gap-1.5 flex-nowrap">
@@ -1648,6 +1651,45 @@ function app() {
     setAccountFilter(id) {
       // Toggle: clicar de novo desmarca
       this.accountFilter = (this.accountFilter === id) ? '' : id;
+    },
+
+    async editVariationSku(v, anuncio) {
+      const cur = v.sku || '';
+      const side = v.meli_item_id && v.shopee_item_id ? 'ambos os lados (ML + Shopee)' : (v.meli_item_id ? 'Mercado Livre' : 'Shopee');
+      const meliLine = v.meli_item_id ? 'ML ' + v.meli_item_id + (v.meli_variation_id ? ' (var ' + v.meli_variation_id + ')' : '') : '';
+      const shopeeLine = v.shopee_item_id ? 'SP ' + v.shopee_item_id + (v.shopee_model_id ? ' (model ' + v.shopee_model_id + ')' : '') + (v.shopee_account_label ? ' — ' + v.shopee_account_label : '') : '';
+      const linhas = [meliLine, shopeeLine].filter(Boolean).join('\n      ');
+      const promptMsg = 'Editar SKU desta variação\n\nLoja: ' + linhas + '\n\nVai atualizar SKU em: ' + side + '\nDepois tenta auto-parear se já existir SKU igual no outro lado.\n\nSKU atual: ' + (cur || '(vazio)');
+      const novo = prompt(promptMsg, cur);
+      if (novo === null) return; // cancelado
+      const sku = novo.trim();
+      if (!sku) { alert('SKU vazio. Operação cancelada.'); return; }
+      if (sku === cur) { alert('SKU não mudou.'); return; }
+
+      try {
+        const r = await this.api('/api/variation/set-sku', {
+          method: 'POST',
+          body: JSON.stringify({
+            meli_item_id: v.meli_item_id || null,
+            meli_variation_id: v.meli_variation_id || null,
+            shopee_item_id: v.shopee_item_id || null,
+            shopee_model_id: v.shopee_model_id || null,
+            shopee_account_id: v.shopee_account_id || null,
+            sku,
+          }),
+        });
+        let msg = '';
+        if (r?.action === 'auto_paired') msg = '✅ SKU atualizado e AUTO-PAREADO com o outro lado (SKU=' + r.sku + ')!';
+        else if (r?.action === 'mapping_updated') msg = '✅ SKU atualizado no mapping existente.';
+        else if (r?.action === 'sku_saved_no_match') msg = '✅ SKU atualizado no marketplace, mas nenhum match encontrado no outro lado.';
+        else if (r?.action === 'multiple_candidates_no_pair') msg = '⚠ SKU atualizado, mas há +1 candidato com mesmo SKU no outro lado — pareia manualmente.';
+        else msg = 'Resposta: ' + JSON.stringify(r);
+        if (r?.errors && Object.keys(r.errors).length) msg += '\n\n⚠ Erros nas plataformas:\n' + Object.entries(r.errors).map(([k,e]) => k + ': ' + e).join('\n');
+        alert(msg);
+        await this.loadMaster();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      }
     },
 
     // Filtra masterItems por loja. Retorna anuncios com só as variações daquela conta.
