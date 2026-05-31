@@ -4,4 +4,3 @@ dist/
 *.log
 .env
 
-src/logo.ts
