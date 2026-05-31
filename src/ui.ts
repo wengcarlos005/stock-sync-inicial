@@ -195,24 +195,31 @@ export const html = `<!DOCTYPE html>
           <button @click="loadMaster()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
         </div>
         <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <div class="text-xs text-slate-500"><span x-text="masterItems.length"></span> anúncios · <span x-text="masterTotalVars"></span> variações</div>
+          <div class="text-xs text-slate-500">
+            <span x-text="displayedMaster().length"></span> anúncios
+            <span x-show="accountFilter" class="text-slate-400">(de <span x-text="masterItems.length"></span>)</span>
+            · <span x-text="displayedMaster().reduce((s,a)=>s+(a.variations?.length||0),0)"></span> variações
+          </div>
           <div class="flex items-center gap-1.5 flex-wrap text-[10px]">
-            <span class="text-slate-400 mr-1">Conectado:</span>
+            <span class="text-slate-400 mr-1">Filtrar por loja:</span>
+            <button @click="setAccountFilter('')" class="px-1.5 py-0.5 rounded font-medium border" :class="!accountFilter ? 'bg-slate-700 text-white border-slate-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'">Todas</button>
             <template x-for="acc in accounts" :key="acc.external_id">
-              <span class="px-1.5 py-0.5 rounded font-medium border"
-                :class="acc.marketplace==='meli' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-orange-50 border-orange-200 text-orange-700'"
-                :title="acc.external_id + (acc.is_active ? '' : ' (desconectado)')">
+              <button @click="setAccountFilter(acc.external_id)" class="px-1.5 py-0.5 rounded font-medium border cursor-pointer transition"
+                :class="String(accountFilter)===String(acc.external_id)
+                  ? (acc.marketplace==='meli' ? 'bg-yellow-400 border-yellow-500 text-yellow-900 ring-1 ring-yellow-500' : 'bg-orange-400 border-orange-500 text-orange-900 ring-1 ring-orange-500')
+                  : (acc.marketplace==='meli' ? 'bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100' : 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100')"
+                :title="(String(accountFilter)===String(acc.external_id) ? 'Filtro ativo — clica de novo pra limpar. ' : 'Clica pra filtrar só esta loja. ') + acc.external_id + (acc.is_active ? '' : ' (desconectado)')">
                 <span x-text="acc.marketplace==='meli' ? '🟡' : '🟠'"></span>
                 <span x-text="acc.label || acc.external_id"></span>
                 <span x-show="!acc.is_active" class="text-red-500">⚠</span>
-              </span>
+              </button>
             </template>
             <span x-show="!accounts.length" class="text-slate-400 italic">(nenhuma — vai em Config → Sincronizar com MAC)</span>
           </div>
         </div>
 
         <div class="space-y-3">
-          <template x-for="anuncio in masterItems" :key="anuncio.key">
+          <template x-for="anuncio in displayedMaster()" :key="anuncio.key">
             <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div class="flex items-start gap-3 p-3 bg-slate-50 border-b border-slate-200">
                 <template x-if="anuncio.image">
@@ -333,10 +340,12 @@ export const html = `<!DOCTYPE html>
               </table>
             </div>
           </template>
-          <div x-show="masterItems.length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
+          <div x-show="displayedMaster().length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
             <div class="text-2xl mb-2">📦</div>
-            <div>Nenhum produto encontrado.</div>
-            <div class="text-xs mt-1 text-slate-300">Rode o Discovery em Config pra varrer suas lojas.</div>
+            <div x-show="!accountFilter">Nenhum produto encontrado.</div>
+            <div x-show="accountFilter">Nenhum produto desta loja com os filtros atuais.</div>
+            <div class="text-xs mt-1 text-slate-300" x-show="!accountFilter">Rode o Discovery em Config pra varrer suas lojas.</div>
+            <button x-show="accountFilter" @click="setAccountFilter('')" class="mt-2 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Limpar filtro de loja</button>
           </div>
         </div>
       </section>
@@ -939,6 +948,7 @@ function app() {
     masterTotalVars: 0,
     masterSearch: '',
     masterFilter: 'all',
+    accountFilter: '', // '' = todas. Ou external_id da conta (meli ou shopee)
     changes: [],
     unmapped: [],
     runs: [],
@@ -1633,6 +1643,34 @@ function app() {
       this.masterFilter = f;
       console.log('[setMasterFilter]', f);
       this.loadMaster();
+    },
+
+    setAccountFilter(id) {
+      // Toggle: clicar de novo desmarca
+      this.accountFilter = (this.accountFilter === id) ? '' : id;
+    },
+
+    // Filtra masterItems por loja. Retorna anuncios com só as variações daquela conta.
+    // Para Shopee: variação precisa ter shopee_stores incluindo esse account_id.
+    // Para ML: anuncio inteiro precisa ter meli_item_id e variação ter meli_item_id.
+    displayedMaster() {
+      if (!this.accountFilter) return this.masterItems;
+      const acc = this.accounts.find(a => String(a.external_id) === String(this.accountFilter));
+      if (!acc) return this.masterItems;
+      const isShopee = acc.marketplace === 'shopee';
+      const targetId = String(this.accountFilter);
+      const out = [];
+      for (const a of this.masterItems) {
+        const vars = (a.variations || []).filter(v => {
+          if (isShopee) {
+            const stores = v.shopee_stores || (v.shopee_account_id ? [{ account_id: v.shopee_account_id }] : []);
+            return stores.some(s => String(s.account_id) === targetId);
+          }
+          return !!v.meli_item_id; // ML: só 1 conta, qualquer var com ML serve
+        });
+        if (vars.length) out.push({ ...a, variations: vars });
+      }
+      return out;
     },
 
     async fixMeliVariationIds() {
