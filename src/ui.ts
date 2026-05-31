@@ -1658,8 +1658,8 @@ function app() {
       const side = v.meli_item_id && v.shopee_item_id ? 'ambos os lados (ML + Shopee)' : (v.meli_item_id ? 'Mercado Livre' : 'Shopee');
       const meliLine = v.meli_item_id ? 'ML ' + v.meli_item_id + (v.meli_variation_id ? ' (var ' + v.meli_variation_id + ')' : '') : '';
       const shopeeLine = v.shopee_item_id ? 'SP ' + v.shopee_item_id + (v.shopee_model_id ? ' (model ' + v.shopee_model_id + ')' : '') + (v.shopee_account_label ? ' — ' + v.shopee_account_label : '') : '';
-      const linhas = [meliLine, shopeeLine].filter(Boolean).join('\n      ');
-      const promptMsg = 'Editar SKU desta variação\n\nLoja: ' + linhas + '\n\nVai atualizar SKU em: ' + side + '\nDepois tenta auto-parear se já existir SKU igual no outro lado.\n\nSKU atual: ' + (cur || '(vazio)');
+      const linhas = [meliLine, shopeeLine].filter(Boolean).join('\\n      ');
+      const promptMsg = 'Editar SKU desta variação\\n\\nLoja: ' + linhas + '\\n\\nVai atualizar SKU em: ' + side + '\\nDepois tenta auto-parear se já existir SKU igual no outro lado.\\n\\nSKU atual: ' + (cur || '(vazio)');
       const novo = prompt(promptMsg, cur);
       if (novo === null) return; // cancelado
       const sku = novo.trim();
@@ -1684,7 +1684,7 @@ function app() {
         else if (r?.action === 'sku_saved_no_match') msg = '✅ SKU atualizado no marketplace, mas nenhum match encontrado no outro lado.';
         else if (r?.action === 'multiple_candidates_no_pair') msg = '⚠ SKU atualizado, mas há +1 candidato com mesmo SKU no outro lado — pareia manualmente.';
         else msg = 'Resposta: ' + JSON.stringify(r);
-        if (r?.errors && Object.keys(r.errors).length) msg += '\n\n⚠ Erros nas plataformas:\n' + Object.entries(r.errors).map(([k,e]) => k + ': ' + e).join('\n');
+        if (r?.errors && Object.keys(r.errors).length) msg += '\\n\\n⚠ Erros nas plataformas:\\n' + Object.entries(r.errors).map(([k,e]) => k + ': ' + e).join('\\n');
         alert(msg);
         await this.loadMaster();
       } catch (e) {
