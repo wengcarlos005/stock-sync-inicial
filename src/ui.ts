@@ -145,8 +145,7 @@ export const html = `<!DOCTYPE html>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
           </button>
           <div class="min-w-0 flex-1">
-            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold hidden sm:block">Painel</div>
-            <h1 class="text-[15px] sm:text-[17px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'UniHub'"></h1>
+            <h1 class="text-[16px] sm:text-[18px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'UniHub'"></h1>
           </div>
           <button @click="runSync()" :disabled="loading.sync"
             class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0">
@@ -621,7 +620,8 @@ export const html = `<!DOCTYPE html>
       <!-- Movimentações -->
       <section x-show="tab === 'changes'" x-cloak>
         <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <table class="w-full text-sm">
+          <div class="overflow-x-auto">
+          <table class="w-full text-sm min-w-[720px]">
             <thead class="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th class="text-left px-4 py-3">Quando</th>
@@ -665,6 +665,7 @@ export const html = `<!DOCTYPE html>
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
       </section>
 
