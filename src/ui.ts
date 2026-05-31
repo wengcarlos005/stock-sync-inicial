@@ -7,83 +7,156 @@ export const html = `<!DOCTYPE html>
   <title>Stock Sync — ML ↔ Shopee</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     [x-cloak] { display: none !important; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+    html, body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    body { background: #f7f8fb; }
+    /* Sidebar nav active state */
+    .nav-item { transition: all .15s ease; }
+    .nav-item:hover { background: rgba(99,102,241,.06); color: #4338ca; }
+    .nav-item.active { background: linear-gradient(90deg, rgba(99,102,241,.12), rgba(99,102,241,.02)); color: #4f46e5; font-weight: 600; box-shadow: inset 3px 0 0 #4f46e5; }
+    /* Card lift */
+    .stat-card { transition: transform .15s ease, box-shadow .15s ease; }
+    .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.06); }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    ::-webkit-scrollbar-track { background: transparent; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
+<body class="text-slate-800 min-h-screen">
 
 <div x-data="app()" x-init="init()" x-cloak>
 
   <!-- Login overlay -->
-  <div x-show="!token" class="fixed inset-0 bg-slate-900/70 backdrop-blur flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full">
-      <h1 class="text-xl font-bold mb-1">Stock Sync</h1>
-      <p class="text-sm text-slate-500 mb-6">Entre com seu admin token</p>
+  <div x-show="!token" class="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full border border-slate-100">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-xl font-bold shadow-md">S</div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">Stock Sync</h1>
+          <p class="text-[11px] text-slate-400 uppercase tracking-wide leading-tight">ML ↔ Shopee · multi-loja</p>
+        </div>
+      </div>
+      <p class="text-sm text-slate-500 mb-5">Entre com seu admin token para continuar.</p>
       <form @submit.prevent="login()">
-        <input x-model="loginInput" type="password" placeholder="Admin token"
-          class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" autofocus />
-        <p x-show="loginError" x-text="loginError" class="text-red-600 text-sm mt-2"></p>
-        <button class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg transition">Entrar</button>
+        <label class="text-xs font-medium text-slate-600 mb-1.5 block">Admin token</label>
+        <input x-model="loginInput" type="password" placeholder="••••••••"
+          class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none text-sm" autofocus />
+        <p x-show="loginError" x-text="loginError" class="text-red-600 text-xs mt-2"></p>
+        <button class="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition text-sm shadow-sm">Entrar</button>
       </form>
     </div>
   </div>
 
-  <!-- Main layout -->
-  <div x-show="token">
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200">
-      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <h1 class="text-xl font-bold">📦 Stock Sync</h1>
-          <span x-show="status.shadow_mode" class="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded">MODO SOMBRA</span>
-          <span x-show="!status.shadow_mode" class="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded">AO VIVO</span>
+  <!-- Main layout: sidebar + content -->
+  <div x-show="token" class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-screen">
+      <!-- Brand -->
+      <div class="px-5 py-5 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-lg font-bold shadow-sm">S</div>
+          <div>
+            <div class="text-[15px] font-bold leading-tight text-slate-900">Stock Sync</div>
+            <div class="text-[10px] text-slate-400 leading-tight uppercase tracking-wide">ML ↔ Shopee</div>
+          </div>
         </div>
-        <div class="flex items-center gap-3 text-sm">
-          <span class="text-slate-500" x-text="lastRunText"></span>
-          <button @click="runSync()" :disabled="loading.sync" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded">
-            <span x-show="!loading.sync">↻ Sincronizar agora</span>
-            <span x-show="loading.sync">Sincronizando...</span>
-          </button>
-          <button @click="logout()" class="text-slate-400 hover:text-slate-600 text-sm">sair</button>
+        <div class="mt-3 flex items-center gap-1.5">
+          <span x-show="!status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> AO VIVO
+          </span>
+          <span x-show="status.shadow_mode" class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> MODO SOMBRA
+          </span>
         </div>
       </div>
 
-      <!-- Stat cards -->
-      <div class="max-w-7xl mx-auto px-6 pb-4 grid grid-cols-4 gap-4">
-        <div class="bg-slate-100 rounded-lg p-3">
-          <div class="text-2xl font-bold" x-text="status.active_mappings || 0"></div>
-          <div class="text-xs text-slate-500">Produtos sincronizados</div>
-        </div>
-        <div class="bg-slate-100 rounded-lg p-3">
-          <div class="text-2xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : ''" x-text="lowStockCount"></div>
-          <div class="text-xs text-slate-500">Estoque baixo / zerado</div>
-        </div>
-        <div class="bg-slate-100 rounded-lg p-3">
-          <div class="text-2xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : ''" x-text="status.unmapped_items || 0"></div>
-          <div class="text-xs text-slate-500">SKUs não pareados</div>
-        </div>
-        <div class="bg-slate-100 rounded-lg p-3">
-          <div class="text-2xl font-bold" x-text="(status.last_run?.changes_detected ?? 0)"></div>
-          <div class="text-xs text-slate-500">Mudanças (última execução)</div>
-        </div>
-      </div>
-
-      <!-- Tabs -->
-      <nav class="max-w-7xl mx-auto px-6 border-b border-slate-200 flex gap-1">
+      <!-- Nav -->
+      <nav class="flex-1 px-2 py-3 overflow-y-auto">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 mb-1.5">Operação</div>
         <template x-for="t in tabs" :key="t.id">
-          <button @click="tab = t.id" :class="tab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'"
-            class="px-4 py-3 border-b-2 text-sm font-medium transition">
-            <span x-text="t.label"></span>
-            <span x-show="t.count !== undefined" x-text="'(' + (t.count || 0) + ')'" class="ml-1 text-xs text-slate-400"></span>
+          <button @click="tab = t.id"
+            :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600'"
+            class="w-full text-left px-3 py-2 mb-0.5 rounded-r-md text-sm flex items-center justify-between">
+            <span class="flex items-center gap-2">
+              <span x-text="t.icon" class="text-base w-5 text-center"></span>
+              <span x-text="t.label"></span>
+            </span>
+            <span x-show="t.count !== undefined" x-text="t.count || 0"
+              :class="tab === t.id ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'"
+              class="text-[10px] font-semibold px-1.5 py-0.5 rounded"></span>
           </button>
         </template>
       </nav>
-    </header>
 
-    <!-- Tab content -->
-    <main class="max-w-7xl mx-auto px-6 py-6">
+      <!-- Footer -->
+      <div class="px-3 py-3 border-t border-slate-100">
+        <div class="text-[10px] text-slate-400 px-2 mb-1.5" x-text="lastRunText"></div>
+        <button @click="logout()" class="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 rounded">↪ Sair</button>
+      </div>
+    </aside>
+
+    <!-- Content area -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Top bar -->
+      <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="px-8 py-3.5 flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Painel</div>
+            <h1 class="text-[17px] font-bold text-slate-900 leading-tight" x-text="(tabs.find(t=>t.id===tab)?.label) || 'Stock Sync'"></h1>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="runSync()" :disabled="loading.sync"
+              class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+              <span x-show="!loading.sync">↻</span>
+              <span x-show="loading.sync" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span x-text="loading.sync ? 'Sincronizando...' : 'Sincronizar agora'"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Stat cards strip -->
+        <div class="px-8 pb-4 grid grid-cols-4 gap-3">
+          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Produtos sync</span>
+              <span class="text-base">📦</span>
+            </div>
+            <div class="text-xl font-bold text-slate-900" x-text="status.active_mappings || 0"></div>
+          </div>
+          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Estoque baixo</span>
+              <span class="text-base">⚠️</span>
+            </div>
+            <div class="text-xl font-bold" :class="lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900'" x-text="lowStockCount"></div>
+          </div>
+          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Não pareados</span>
+              <span class="text-base">🔗</span>
+            </div>
+            <div class="text-xl font-bold" :class="status.unmapped_items ? 'text-amber-600' : 'text-slate-900'" x-text="status.unmapped_items || 0"></div>
+          </div>
+          <div class="stat-card bg-white border border-slate-200 rounded-lg p-3.5">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Mudanças última</span>
+              <span class="text-base">📊</span>
+            </div>
+            <div class="text-xl font-bold text-slate-900" x-text="(status.last_run?.changes_detected ?? 0)"></div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Tab content -->
+      <main class="flex-1 px-8 py-6 overflow-x-hidden">
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
@@ -846,6 +919,7 @@ export const html = `<!DOCTYPE html>
       </section>
 
     </main>
+    </div>
   </div>
 
   <!-- Pair modal (vanilla DOM, sem dependencia Alpine reativo) -->
@@ -962,12 +1036,12 @@ function app() {
     loginError: '',
     tab: 'stock',
     tabs: [
-      { id: 'orders', label: '🛒 Pedidos' },
-      { id: 'stock', label: '📦 Estoque' },
-      { id: 'products', label: '📊 Produtos' },
-      { id: 'changes', label: '📜 Movimentações' },
-      { id: 'unmapped', label: '❓ Não pareados' },
-      { id: 'config', label: '⚙️ Config' },
+      { id: 'orders',   label: 'Pedidos',       icon: '🛒' },
+      { id: 'stock',    label: 'Estoque',       icon: '📦' },
+      { id: 'products', label: 'Produtos',      icon: '📊' },
+      { id: 'changes',  label: 'Movimentações', icon: '📜' },
+      { id: 'unmapped', label: 'Não pareados',  icon: '🔗' },
+      { id: 'config',   label: 'Configurações', icon: '⚙️' },
     ],
     status: {},
     products: [],
