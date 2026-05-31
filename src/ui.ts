@@ -194,7 +194,22 @@ export const html = `<!DOCTYPE html>
           </div>
           <button @click="loadMaster()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
         </div>
-        <div class="text-xs text-slate-500 mb-3"><span x-text="masterItems.length"></span> anúncios · <span x-text="masterTotalVars"></span> variações</div>
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div class="text-xs text-slate-500"><span x-text="masterItems.length"></span> anúncios · <span x-text="masterTotalVars"></span> variações</div>
+          <div class="flex items-center gap-1.5 flex-wrap text-[10px]">
+            <span class="text-slate-400 mr-1">Conectado:</span>
+            <template x-for="acc in accounts" :key="acc.external_id">
+              <span class="px-1.5 py-0.5 rounded font-medium border"
+                :class="acc.marketplace==='meli' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-orange-50 border-orange-200 text-orange-700'"
+                :title="acc.external_id + (acc.is_active ? '' : ' (desconectado)')">
+                <span x-text="acc.marketplace==='meli' ? '🟡' : '🟠'"></span>
+                <span x-text="acc.label || acc.external_id"></span>
+                <span x-show="!acc.is_active" class="text-red-500">⚠</span>
+              </span>
+            </template>
+            <span x-show="!accounts.length" class="text-slate-400 italic">(nenhuma — vai em Config → Sincronizar com MAC)</span>
+          </div>
+        </div>
 
         <div class="space-y-3">
           <template x-for="anuncio in masterItems" :key="anuncio.key">
@@ -209,9 +224,42 @@ export const html = `<!DOCTYPE html>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
                   <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
-                    <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
-                    <span x-show="anuncio.shopee_account_label" class="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-200 text-orange-700 rounded font-medium" x-text="'🏬 ' + anuncio.shopee_account_label"></span>
-                    <span x-show="anuncio.meli_item_id">🟡 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
+                    <template x-if="anuncio.shopee_item_id">
+                      <div x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
+                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium inline-flex items-center gap-1" :title="'SP: ' + anuncio.shopee_item_id + (anuncio.shopee_account_label ? ' — ' + anuncio.shopee_account_label : '')">
+                          🟠 SP <span x-show="anuncio.shopee_account_label" x-text="'· ' + anuncio.shopee_account_label" class="font-normal"></span>
+                        </button>
+                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[220px]">
+                          <div class="font-semibold mb-1 text-slate-600 px-1">Lojas Shopee conectadas</div>
+                          <template x-for="acc in accounts.filter(a=>a.marketplace==='shopee')" :key="acc.external_id">
+                            <div class="flex items-center gap-1.5 py-0.5 px-1 rounded" :class="String(acc.external_id) === String(anuncio.shopee_account_id) ? 'bg-orange-50 font-semibold text-orange-700' : 'text-slate-500'">
+                              <span x-text="String(acc.external_id) === String(anuncio.shopee_account_id) ? '●' : '○'"></span>
+                              <span x-text="acc.label || acc.external_id"></span>
+                            </div>
+                          </template>
+                          <div x-show="!accounts.filter(a=>a.marketplace==='shopee').length" class="text-slate-400 px-1">(nenhuma loja carregada)</div>
+                          <div class="border-t mt-1 pt-1 px-1 font-mono text-[10px] text-slate-400" x-text="'item: ' + anuncio.shopee_item_id"></div>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="anuncio.meli_item_id">
+                      <div x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
+                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded font-medium inline-flex items-center gap-1" :title="'ML: ' + anuncio.meli_item_id">
+                          🟡 ML
+                        </button>
+                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[220px]">
+                          <div class="font-semibold mb-1 text-slate-600 px-1">Conta Mercado Livre</div>
+                          <template x-for="acc in accounts.filter(a=>a.marketplace==='meli')" :key="acc.external_id">
+                            <div class="flex items-center gap-1.5 py-0.5 px-1 rounded bg-yellow-50 font-semibold text-yellow-800">
+                              <span>●</span>
+                              <span x-text="acc.label || acc.external_id"></span>
+                            </div>
+                          </template>
+                          <div x-show="!accounts.filter(a=>a.marketplace==='meli').length" class="text-slate-400 px-1">(nenhuma conta ML carregada)</div>
+                          <div class="border-t mt-1 pt-1 px-1 font-mono text-[10px] text-slate-400" x-text="'item: ' + anuncio.meli_item_id"></div>
+                        </div>
+                      </div>
+                    </template>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
                   </div>
                 </div>
@@ -305,9 +353,42 @@ export const html = `<!DOCTYPE html>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm leading-snug" x-text="(anuncio.product_name||'Sem nome').slice(0,120)"></div>
                   <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
-                    <span x-show="anuncio.shopee_item_id">🟠 SP: <span class="font-mono" x-text="anuncio.shopee_item_id"></span></span>
-                    <span x-show="anuncio.shopee_account_label" class="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-200 text-orange-700 rounded font-medium" x-text="'🏬 ' + anuncio.shopee_account_label"></span>
-                    <span x-show="anuncio.meli_item_id">🟡 ML: <span class="font-mono" x-text="anuncio.meli_item_id"></span></span>
+                    <template x-if="anuncio.shopee_item_id">
+                      <div x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
+                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium inline-flex items-center gap-1" :title="'SP: ' + anuncio.shopee_item_id + (anuncio.shopee_account_label ? ' — ' + anuncio.shopee_account_label : '')">
+                          🟠 SP <span x-show="anuncio.shopee_account_label" x-text="'· ' + anuncio.shopee_account_label" class="font-normal"></span>
+                        </button>
+                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[220px]">
+                          <div class="font-semibold mb-1 text-slate-600 px-1">Lojas Shopee conectadas</div>
+                          <template x-for="acc in accounts.filter(a=>a.marketplace==='shopee')" :key="acc.external_id">
+                            <div class="flex items-center gap-1.5 py-0.5 px-1 rounded" :class="String(acc.external_id) === String(anuncio.shopee_account_id) ? 'bg-orange-50 font-semibold text-orange-700' : 'text-slate-500'">
+                              <span x-text="String(acc.external_id) === String(anuncio.shopee_account_id) ? '●' : '○'"></span>
+                              <span x-text="acc.label || acc.external_id"></span>
+                            </div>
+                          </template>
+                          <div x-show="!accounts.filter(a=>a.marketplace==='shopee').length" class="text-slate-400 px-1">(nenhuma loja carregada)</div>
+                          <div class="border-t mt-1 pt-1 px-1 font-mono text-[10px] text-slate-400" x-text="'item: ' + anuncio.shopee_item_id"></div>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="anuncio.meli_item_id">
+                      <div x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
+                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded font-medium inline-flex items-center gap-1" :title="'ML: ' + anuncio.meli_item_id">
+                          🟡 ML
+                        </button>
+                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[220px]">
+                          <div class="font-semibold mb-1 text-slate-600 px-1">Conta Mercado Livre</div>
+                          <template x-for="acc in accounts.filter(a=>a.marketplace==='meli')" :key="acc.external_id">
+                            <div class="flex items-center gap-1.5 py-0.5 px-1 rounded bg-yellow-50 font-semibold text-yellow-800">
+                              <span>●</span>
+                              <span x-text="acc.label || acc.external_id"></span>
+                            </div>
+                          </template>
+                          <div x-show="!accounts.filter(a=>a.marketplace==='meli').length" class="text-slate-400 px-1">(nenhuma conta ML carregada)</div>
+                          <div class="border-t mt-1 pt-1 px-1 font-mono text-[10px] text-slate-400" x-text="'item: ' + anuncio.meli_item_id"></div>
+                        </div>
+                      </div>
+                    </template>
                     <span>· <span x-text="anuncio.variations.length"></span> variações</span>
                   </div>
                 </div>
