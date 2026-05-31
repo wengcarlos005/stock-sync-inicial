@@ -20,31 +20,31 @@ interface SyncStats {
 }
 
 export async function runSync(env: SyncEnv, trigger: 'cron' | 'manual' = 'cron'): Promise<SyncStats> {
-  // SEGURANÇA: cron sync é SEMPRE shadow (só lê + atualiza state interno, nunca escreve em loja).
-  // Isso protege contra:
-  //   - Glitches transientes da API zerando estoque (ex: ML/Shopee retornando 0 momentaneamente)
-  //   - Propagação incorreta durante deploys (re-leitura com dado parcial)
-  //   - Bugs em refatoração escrevendo em loja sem o usuário pedir
-  // Stocks só são escritos em loja quando:
-  //   - Usuário clica "Atualizar" numa variação (endpoint set-stock)
-  //   - Usuário clica "Sincronizar agora" (trigger='manual', respeita SHADOW_MODE env)
-  const shadow = trigger === 'cron' ? true : (env.SHADOW_MODE === 'true');
-  const runId = await db.startRun(env.DB, trigger, shadow);
+  // POLÍTICA DE ESCRITA NA LOJA:
+  //   - syncOrders (vendas confirmadas): SEMPRE propaga estoque (cron OU manual)
+  //     → seguro porque só roda quando tem evento `order.created` real
+  //   - syncStockBatch (poll/reconciliação): SÓ propaga em sync manual
+  //     → no cron fica shadow pra evitar zeradas por glitch da API/timeout/race
+  //   - set-stock endpoint (botão Atualizar): SEMPRE propaga (ação explícita do usuário)
+  const shadowEnv = env.SHADOW_MODE === 'true';
+  const ordersShadow = shadowEnv;                            // sempre respeita env
+  const pollShadow = trigger === 'cron' ? true : shadowEnv;  // cron força shadow no poll
+  const runId = await db.startRun(env.DB, trigger, pollShadow);
   const stats: SyncStats = { polled: 0, detected: 0, applied: 0, errors: 0, notes: '' };
   const errs: string[] = [];
 
   try {
-    // ── FASE 1: Pedidos (vendas) ──────────────────────────────
-    await syncOrders(env, stats, errs, shadow);
+    // ── FASE 1: Pedidos (vendas) ── propaga estoque por venda confirmada
+    await syncOrders(env, stats, errs, ordersShadow);
 
-    // ── FASE 2: Mini batch de stock (reposições manuais) ──────
+    // ── FASE 2: Poll/reconciliação ── shadow no cron, live no manual
     const batchSize = Math.min(5, Number(env.POLL_BATCH_SIZE || 5));
-    await syncStockBatch(env, stats, errs, shadow, batchSize);
+    await syncStockBatch(env, stats, errs, pollShadow, batchSize);
 
   } finally {
     stats.notes = errs.slice(0, 5).join(' | ');
-    if (trigger === 'cron' && stats.applied > 0) {
-      stats.notes = `[shadow cron] ${stats.applied} mudanças detectadas (não propagadas) | ${stats.notes}`;
+    if (trigger === 'cron' && pollShadow) {
+      stats.notes = `[cron: poll-shadow, orders-live] ${stats.notes}`;
     }
     await db.finishRun(env.DB, runId, stats);
   }
