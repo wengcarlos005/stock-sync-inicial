@@ -316,8 +316,12 @@ export const html = `<!DOCTYPE html>
                       </td>
                       <td class="px-3 py-2">
                         <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap cursor-help"
-                            :title="'Veio de: ' + (v.shopee_account_label || v.shopee_account_id || '(loja sem nome)') + ' — item ' + v.shopee_item_id + (v.shopee_model_id ? ' / model ' + v.shopee_model_id : '')">🟠 SP</span>
+                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap cursor-help inline-flex items-center gap-1"
+                            :class="(v.shopee_stores?.length||1) > 1 ? 'bg-orange-200 text-orange-700 ring-1 ring-orange-300' : 'bg-orange-100 text-orange-700'"
+                            :title="(v.shopee_stores?.length||1) > 1 ? ('Em ' + v.shopee_stores.length + ' lojas: ' + v.shopee_stores.map(s => (s.account_label || s.account_id || '?') + ' (item ' + s.item_id + ')').join(' | ')) : ('Veio de: ' + (v.shopee_account_label || v.shopee_account_id || '(loja sem nome)') + ' — item ' + v.shopee_item_id + (v.shopee_model_id ? ' / model ' + v.shopee_model_id : ''))">
+                            🟠 SP
+                            <span x-show="(v.shopee_stores?.length||1) > 1" class="bg-orange-700 text-white rounded-full px-1 text-[9px]" x-text="v.shopee_stores.length"></span>
+                          </span>
                           <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap cursor-help"
                             :title="'Veio de: Mercado Livre — item ' + v.meli_item_id + (v.meli_variation_id ? ' / var ' + v.meli_variation_id : '')">🟡 ML</span>
                           <span x-show="!v.shopee_item_id && !v.meli_item_id" class="text-[10px] text-slate-300">—</span>
@@ -447,8 +451,12 @@ export const html = `<!DOCTYPE html>
                       </td>
                       <td class="px-3 py-2">
                         <div class="flex items-center justify-center gap-1.5 flex-nowrap">
-                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium whitespace-nowrap cursor-help"
-                            :title="'Veio de: ' + (v.shopee_account_label || v.shopee_account_id || '(loja sem nome)') + ' — item ' + v.shopee_item_id + (v.shopee_model_id ? ' / model ' + v.shopee_model_id : '')">🟠 SP</span>
+                          <span x-show="v.shopee_item_id" class="text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap cursor-help inline-flex items-center gap-1"
+                            :class="(v.shopee_stores?.length||1) > 1 ? 'bg-orange-200 text-orange-700 ring-1 ring-orange-300' : 'bg-orange-100 text-orange-700'"
+                            :title="(v.shopee_stores?.length||1) > 1 ? ('Em ' + v.shopee_stores.length + ' lojas: ' + v.shopee_stores.map(s => (s.account_label || s.account_id || '?') + ' (item ' + s.item_id + ')').join(' | ')) : ('Veio de: ' + (v.shopee_account_label || v.shopee_account_id || '(loja sem nome)') + ' — item ' + v.shopee_item_id + (v.shopee_model_id ? ' / model ' + v.shopee_model_id : ''))">
+                            🟠 SP
+                            <span x-show="(v.shopee_stores?.length||1) > 1" class="bg-orange-700 text-white rounded-full px-1 text-[9px]" x-text="v.shopee_stores.length"></span>
+                          </span>
                           <span x-show="v.meli_item_id" class="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium whitespace-nowrap cursor-help"
                             :title="'Veio de: Mercado Livre — item ' + v.meli_item_id + (v.meli_variation_id ? ' / var ' + v.meli_variation_id : '')">🟡 ML</span>
                           <span x-show="!v.shopee_item_id && !v.meli_item_id" class="text-[10px] text-slate-300">—</span>

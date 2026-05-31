@@ -402,29 +402,47 @@ add('GET', '/api/products/master', async (req, env) => {
       // Merge variações: dedup por SKU normalizado, mantendo a melhor row.
       // "Melhor" = pareada > não pareada > tem ML stock > tem SP stock.
       // Quando SKU é vazio/curto, usa fallback (sku+shopee_item_id+meli_var) pra evitar fundir lixo.
+      // Acumula shopee_stores em CADA variação — pra UI mostrar contador "2" no badge SP per row.
       const rowScore = (v: any) => (v.paired ? 100 : 0) + (v.meli_stock != null ? 10 : 0) + (v.shopee_stock != null ? 5 : 0) + (v.sales_total || 0);
       const rowKey = (v: any) => {
         const ns = normSku(v.sku);
         return (ns && ns.length >= 3) ? ('sku:' + ns) : ('id:' + (v.shopee_item_id||'') + '|' + (v.shopee_model_id||'') + '|' + (v.meli_variation_id||''));
       };
+      const addStore = (winner: any, loser: any) => {
+        if (!winner.shopee_stores) winner.shopee_stores = [];
+        for (const cand of [winner, loser]) {
+          if (cand.shopee_item_id && !winner.shopee_stores.some((s: any) => String(s.item_id) === String(cand.shopee_item_id) && String(s.model_id||'') === String(cand.shopee_model_id||''))) {
+            winner.shopee_stores.push({
+              item_id: cand.shopee_item_id,
+              model_id: cand.shopee_model_id || null,
+              account_id: cand.shopee_account_id || null,
+              account_label: cand.shopee_account_label || null,
+            });
+          }
+        }
+      };
       const byKey = new Map<string, any>();
       for (const v of dest.variations) {
         const k = rowKey(v);
         const cur = byKey.get(k);
-        if (!cur || rowScore(v) > rowScore(cur)) byKey.set(k, v);
+        if (!cur) { addStore(v, v); byKey.set(k, v); }
+        else if (rowScore(v) > rowScore(cur)) { addStore(v, cur); byKey.set(k, v); }
+        else { addStore(cur, v); }
       }
       for (const v of a.variations) {
         const k = rowKey(v);
         const cur = byKey.get(k);
-        if (!cur) byKey.set(k, v);
+        if (!cur) { addStore(v, v); byKey.set(k, v); }
         else if (rowScore(v) > rowScore(cur)) {
-          // substitui mantendo dados úteis do anterior (ex: se vencedor não tem meli_stock mas perdedor tinha, copia)
           if (v.meli_stock == null && cur.meli_stock != null) v.meli_stock = cur.meli_stock;
           if (v.shopee_stock == null && cur.shopee_stock != null) v.shopee_stock = cur.shopee_stock;
           if (v.master_stock == null && cur.master_stock != null) v.master_stock = cur.master_stock;
           if (!v.variation && cur.variation) v.variation = cur.variation;
           if (!v.image && cur.image) v.image = cur.image;
+          addStore(v, cur);
           byKey.set(k, v);
+        } else {
+          addStore(cur, v);
         }
       }
       dest.variations = [...byKey.values()];
@@ -437,6 +455,20 @@ add('GET', '/api/products/master', async (req, env) => {
   }
   anuncios.clear();
   for (const [k, a] of mergedAnuncios) anuncios.set(k, a);
+
+  // Garante que TODA variação tenha shopee_stores (mesmo anúncio sem merge): 1 entrada com a loja própria
+  for (const a of anuncios.values()) {
+    for (const v of a.variations) {
+      if (!v.shopee_stores && v.shopee_item_id) {
+        v.shopee_stores = [{
+          item_id: v.shopee_item_id,
+          model_id: v.shopee_model_id || null,
+          account_id: v.shopee_account_id || null,
+          account_label: v.shopee_account_label || null,
+        }];
+      }
+    }
+  }
 
   // ── 5. Filtros e busca (nível do anúncio) ──────────────────
   let list = [...anuncios.values()];
