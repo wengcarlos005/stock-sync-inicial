@@ -152,6 +152,7 @@ async function main() {
   console.log(`  ${shopeeAccounts.length} conta(s) Shopee: ${shopeeAccounts.join(', ')}`);
 
   let debugShopeeDumped = 0;
+  let totalShopeeItemsAllAccounts = 0; // pra log final somando todas contas
   for (const shopId of shopeeAccounts) {
     console.log(`\nVarrendo Shopee${shopId ? ` [${shopId}]` : ''}...`);
     let shopeeIds = [], offset = 0;
@@ -165,6 +166,7 @@ async function main() {
       if (shopeeIds.length > 5000) break;
     }
     console.log(`  ${shopeeIds.length} items`);
+    totalShopeeItemsAllAccounts += shopeeIds.length;
 
     for (let i = 0; i < shopeeIds.length; i++) {
       const id = shopeeIds[i];
@@ -514,7 +516,7 @@ async function main() {
   }
 
   console.log(`\n✅ Discovery concluído:`);
-  console.log(`   Shopee: ${shopeeIds.length} items | ML: ${meliIds.length} items`);
+  console.log(`   Shopee: ${totalShopeeItemsAllAccounts} items (em ${shopeeAccounts.length} conta(s)) | ML: ${meliIds.length} items`);
   console.log(`   ✔ Total pareados: ${mapped}  (erros: ${mapErrors})`);
   console.log(`     S5 SKU=ML var/item ID: ${strategyStats.s5}`);
   console.log(`     S1 SKU exato:          ${strategyStats.s1}`);
