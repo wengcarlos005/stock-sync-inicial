@@ -359,6 +359,58 @@ add('GET', '/api/products/master', async (req, env) => {
     }
   }
 
+  // ── 4.5. Merge anúncios que compartilham SKU (mesmo produto em 2+ lojas Shopee) ──
+  // Ex: Geek Aura SP item 111 + Magic Aura SP item 222, ambos com SKU TET-BLK-001
+  //     → vira 1 card com badge SP mostrando 2 lojas
+  const normSku = (s: any) => (String(s ?? '')).trim().toLowerCase();
+  const skuToKey = new Map<string, string>();
+  const parent = new Map<string, string>();
+  for (const a of anuncios.values()) parent.set(a.key, a.key);
+  const find = (k: string): string => { const p = parent.get(k); if (!p || p === k) return p || k; const r = find(p); parent.set(k, r); return r; };
+  const union = (x: string, y: string) => { const rx = find(x), ry = find(y); if (rx !== ry) parent.set(rx, ry); };
+  for (const a of anuncios.values()) {
+    for (const v of a.variations) {
+      const ns = normSku(v.sku);
+      if (!ns || ns.length < 3) continue; // ignora SKUs vazios/curtos pra evitar falso match
+      if (skuToKey.has(ns)) union(a.key, skuToKey.get(ns)!);
+      else skuToKey.set(ns, a.key);
+    }
+  }
+  const mergedAnuncios = new Map<string, any>();
+  for (const a of anuncios.values()) {
+    const root = find(a.key);
+    const initStore = a.shopee_item_id ? [{
+      item_id: a.shopee_item_id,
+      account_id: (a as any).shopee_account_id || null,
+      account_label: (a as any).shopee_account_label || null,
+    }] : [];
+    if (root === a.key) {
+      mergedAnuncios.set(root, { ...a, shopee_stores: initStore });
+    } else {
+      const dest = mergedAnuncios.get(root);
+      if (!dest) { mergedAnuncios.set(root, { ...a, shopee_stores: initStore }); continue; }
+      // Adiciona loja Shopee extra (se não já presente)
+      for (const s of initStore) {
+        if (!dest.shopee_stores.some((x: any) => String(x.item_id) === String(s.item_id))) {
+          dest.shopee_stores.push(s);
+        }
+      }
+      // Merge variações (dedup por sku+shopee_item_id+meli_var)
+      const seen = new Set(dest.variations.map((v: any) => `${normSku(v.sku)}|${v.shopee_item_id||''}|${v.shopee_model_id||''}|${v.meli_variation_id||''}`));
+      for (const v of a.variations) {
+        const k = `${normSku(v.sku)}|${v.shopee_item_id||''}|${v.shopee_model_id||''}|${v.meli_variation_id||''}`;
+        if (!seen.has(k)) { dest.variations.push(v); seen.add(k); }
+      }
+      for (const n of ((a as any).all_names || [])) (dest as any).all_names?.add?.(n);
+      if (!dest.image && a.image) dest.image = a.image;
+      if ((a.product_name || '').length > (dest.product_name || '').length) dest.product_name = a.product_name;
+      if (!dest.meli_item_id && a.meli_item_id) dest.meli_item_id = a.meli_item_id;
+      dest.fully_paired = dest.fully_paired && a.fully_paired;
+    }
+  }
+  anuncios.clear();
+  for (const [k, a] of mergedAnuncios) anuncios.set(k, a);
+
   // ── 5. Filtros e busca (nível do anúncio) ──────────────────
   let list = [...anuncios.values()];
   if (filter === 'paired')   list = list.filter(a => a.fully_paired);

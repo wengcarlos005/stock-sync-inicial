@@ -226,19 +226,24 @@ export const html = `<!DOCTYPE html>
                   <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <template x-if="anuncio.shopee_item_id">
                       <div x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
-                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium inline-flex items-center gap-1" :title="'SP: ' + anuncio.shopee_item_id + (anuncio.shopee_account_label ? ' — ' + anuncio.shopee_account_label : '')">
-                          🟠 SP <span x-show="anuncio.shopee_account_label" x-text="'· ' + anuncio.shopee_account_label" class="font-normal"></span>
+                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 hover:bg-orange-200 text-orange-700 rounded font-medium inline-flex items-center gap-1"
+                          :class="(anuncio.shopee_stores?.length||1) > 1 ? 'bg-orange-200 ring-1 ring-orange-300' : 'bg-orange-100'"
+                          :title="'SP em ' + (anuncio.shopee_stores?.length||1) + ' loja(s)'">
+                          🟠 SP
+                          <span x-show="(anuncio.shopee_stores?.length||1) > 1" class="bg-orange-700 text-white rounded-full px-1 text-[9px]" x-text="anuncio.shopee_stores.length"></span>
+                          <span x-show="(anuncio.shopee_stores?.length||1) === 1 && anuncio.shopee_account_label" x-text="'· ' + anuncio.shopee_account_label" class="font-normal"></span>
                         </button>
-                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[220px]">
-                          <div class="font-semibold mb-1 text-slate-600 px-1">Lojas Shopee conectadas</div>
-                          <template x-for="acc in accounts.filter(a=>a.marketplace==='shopee')" :key="acc.external_id">
-                            <div class="flex items-center gap-1.5 py-0.5 px-1 rounded" :class="String(acc.external_id) === String(anuncio.shopee_account_id) ? 'bg-orange-50 font-semibold text-orange-700' : 'text-slate-500'">
-                              <span x-text="String(acc.external_id) === String(anuncio.shopee_account_id) ? '●' : '○'"></span>
-                              <span x-text="acc.label || acc.external_id"></span>
+                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[260px]">
+                          <div class="font-semibold mb-1 text-slate-600 px-1" x-text="'Lojas Shopee com este produto (' + (anuncio.shopee_stores?.length||1) + ')'"></div>
+                          <template x-for="s in (anuncio.shopee_stores && anuncio.shopee_stores.length ? anuncio.shopee_stores : [{item_id: anuncio.shopee_item_id, account_label: anuncio.shopee_account_label, account_id: anuncio.shopee_account_id}])" :key="s.item_id">
+                            <div class="py-1 px-1.5 rounded mb-0.5 bg-orange-50 text-orange-700">
+                              <div class="font-semibold flex items-center gap-1.5">
+                                <span>●</span>
+                                <span x-text="s.account_label || s.account_id || '(sem nome)'"></span>
+                              </div>
+                              <div class="font-mono text-[10px] text-slate-500 ml-4" x-text="'item: ' + s.item_id"></div>
                             </div>
                           </template>
-                          <div x-show="!accounts.filter(a=>a.marketplace==='shopee').length" class="text-slate-400 px-1">(nenhuma loja carregada)</div>
-                          <div class="border-t mt-1 pt-1 px-1 font-mono text-[10px] text-slate-400" x-text="'item: ' + anuncio.shopee_item_id"></div>
                         </div>
                       </div>
                     </template>
@@ -355,19 +360,24 @@ export const html = `<!DOCTYPE html>
                   <div class="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <template x-if="anuncio.shopee_item_id">
                       <div x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
-                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded font-medium inline-flex items-center gap-1" :title="'SP: ' + anuncio.shopee_item_id + (anuncio.shopee_account_label ? ' — ' + anuncio.shopee_account_label : '')">
-                          🟠 SP <span x-show="anuncio.shopee_account_label" x-text="'· ' + anuncio.shopee_account_label" class="font-normal"></span>
+                        <button @click="open=!open" class="text-[10px] px-1.5 py-0.5 hover:bg-orange-200 text-orange-700 rounded font-medium inline-flex items-center gap-1"
+                          :class="(anuncio.shopee_stores?.length||1) > 1 ? 'bg-orange-200 ring-1 ring-orange-300' : 'bg-orange-100'"
+                          :title="'SP em ' + (anuncio.shopee_stores?.length||1) + ' loja(s)'">
+                          🟠 SP
+                          <span x-show="(anuncio.shopee_stores?.length||1) > 1" class="bg-orange-700 text-white rounded-full px-1 text-[9px]" x-text="anuncio.shopee_stores.length"></span>
+                          <span x-show="(anuncio.shopee_stores?.length||1) === 1 && anuncio.shopee_account_label" x-text="'· ' + anuncio.shopee_account_label" class="font-normal"></span>
                         </button>
-                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[220px]">
-                          <div class="font-semibold mb-1 text-slate-600 px-1">Lojas Shopee conectadas</div>
-                          <template x-for="acc in accounts.filter(a=>a.marketplace==='shopee')" :key="acc.external_id">
-                            <div class="flex items-center gap-1.5 py-0.5 px-1 rounded" :class="String(acc.external_id) === String(anuncio.shopee_account_id) ? 'bg-orange-50 font-semibold text-orange-700' : 'text-slate-500'">
-                              <span x-text="String(acc.external_id) === String(anuncio.shopee_account_id) ? '●' : '○'"></span>
-                              <span x-text="acc.label || acc.external_id"></span>
+                        <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded shadow-lg p-2 text-xs min-w-[260px]">
+                          <div class="font-semibold mb-1 text-slate-600 px-1" x-text="'Lojas Shopee com este produto (' + (anuncio.shopee_stores?.length||1) + ')'"></div>
+                          <template x-for="s in (anuncio.shopee_stores && anuncio.shopee_stores.length ? anuncio.shopee_stores : [{item_id: anuncio.shopee_item_id, account_label: anuncio.shopee_account_label, account_id: anuncio.shopee_account_id}])" :key="s.item_id">
+                            <div class="py-1 px-1.5 rounded mb-0.5 bg-orange-50 text-orange-700">
+                              <div class="font-semibold flex items-center gap-1.5">
+                                <span>●</span>
+                                <span x-text="s.account_label || s.account_id || '(sem nome)'"></span>
+                              </div>
+                              <div class="font-mono text-[10px] text-slate-500 ml-4" x-text="'item: ' + s.item_id"></div>
                             </div>
                           </template>
-                          <div x-show="!accounts.filter(a=>a.marketplace==='shopee').length" class="text-slate-400 px-1">(nenhuma loja carregada)</div>
-                          <div class="border-t mt-1 pt-1 px-1 font-mono text-[10px] text-slate-400" x-text="'item: ' + anuncio.shopee_item_id"></div>
                         </div>
                       </div>
                     </template>
