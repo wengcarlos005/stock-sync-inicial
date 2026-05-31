@@ -100,7 +100,18 @@ export async function getMappingByShopeeId(db: D1Database, itemId: string, model
   }
   const r = await db.prepare(`SELECT * FROM mappings WHERE shopee_item_id=? AND (shopee_model_id IS NULL OR shopee_model_id='' OR shopee_model_id='0') AND active=1 LIMIT 1`)
     .bind(itemId).first<Mapping>();
-  return r ?? null;
+  if (r) return r;
+  // Fallback: procura nas lojas extras (mapping de outra loja que tem este shopee_item no extra_shopee_stores)
+  const candidates = (await db.prepare(`SELECT * FROM mappings WHERE active=1 AND extra_shopee_stores LIKE ? LIMIT 10`)
+    .bind('%' + itemId + '%').all()).results as any[];
+  for (const c of candidates) {
+    try {
+      const extras = c.extra_shopee_stores ? JSON.parse(c.extra_shopee_stores) : [];
+      const match = extras.find((e: any) => String(e.item_id) === String(itemId) && (!modelId || modelId === '0' || String(e.model_id||'') === String(modelId)));
+      if (match) return c as Mapping;
+    } catch {}
+  }
+  return null;
 }
 
 export async function getActiveMappings(db: D1Database, limit = 1000): Promise<Mapping[]> {

@@ -147,12 +147,27 @@ async function applyOrderItem(
     try {
       if (order.platform === 'meli' && mapping.shopee_item_id) {
         await mac.shopeeUpdateStock(env, Number(mapping.shopee_item_id), newStock,
-          mapping.shopee_model_id ? Number(mapping.shopee_model_id) : undefined);
+          mapping.shopee_model_id ? Number(mapping.shopee_model_id) : undefined,
+          (mapping as any).shopee_account_id || undefined);
         propagatedTo = 'shopee';
       } else if (order.platform === 'shopee' && mapping.meli_item_id) {
         await mac.meliUpdateStock(env, mapping.meli_item_id, newStock,
           mapping.meli_variation_id ? Number(mapping.meli_variation_id) : undefined);
         propagatedTo = 'meli';
+      }
+      // Propaga também pras lojas Shopee extras que compartilham o SKU
+      const extrasRaw = (mapping as any).extra_shopee_stores;
+      if (extrasRaw) {
+        let extras: any[] = [];
+        try { extras = JSON.parse(extrasRaw); } catch {}
+        for (const ex of extras) {
+          try {
+            await mac.shopeeUpdateStock(env, Number(ex.item_id), newStock,
+              ex.model_id ? Number(ex.model_id) : undefined, ex.account_id || undefined);
+          } catch (e: any) {
+            errs.push(`extra shopee ${ex.account_id||ex.item_id}: ${e.message}`);
+          }
+        }
       }
       stats.applied++;
     } catch (e: any) {

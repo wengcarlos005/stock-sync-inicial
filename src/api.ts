@@ -125,6 +125,7 @@ add('GET', '/api/products/master', async (req, env) => {
   const paired = (await env.DB.prepare(`
     SELECT m.sku, m.product_name, m.image_url, m.active,
            m.meli_item_id, m.meli_variation_id, m.shopee_item_id, m.shopee_model_id, m.shopee_account_id,
+           m.extra_shopee_stores,
            s.master_stock, s.meli_stock, s.shopee_stock
     FROM mappings m
     LEFT JOIN state s ON s.sku = m.sku
@@ -299,6 +300,26 @@ add('GET', '/api/products/master', async (req, env) => {
     const fromMappingName = extractSuffix(String(m.product_name || ''));
     const preferredVariation = shopeeSales?.variation || skuSales?.variation || meliSales?.variation || fromUnmapped || fromMappingName || null;
     const meta = skuSales || sales;
+    // Parse extra_shopee_stores (lojas Shopee adicionais que compartilham este SKU)
+    const extras: any[] = m.extra_shopee_stores ? (() => { try { return JSON.parse(m.extra_shopee_stores); } catch { return []; } })() : [];
+    const shopee_stores: any[] = [];
+    if (m.shopee_item_id) {
+      shopee_stores.push({
+        item_id: m.shopee_item_id,
+        model_id: m.shopee_model_id || null,
+        account_id: m.shopee_account_id || null,
+        account_label: m.shopee_account_id ? (accountLabels.get(m.shopee_account_id) || m.shopee_account_id) : null,
+      });
+    }
+    for (const ex of extras) {
+      if (shopee_stores.some(s => String(s.item_id) === String(ex.item_id) && String(s.model_id||'') === String(ex.model_id||''))) continue;
+      shopee_stores.push({
+        item_id: ex.item_id,
+        model_id: ex.model_id || null,
+        account_id: ex.account_id || null,
+        account_label: ex.account_id ? (accountLabels.get(ex.account_id) || ex.account_id) : null,
+      });
+    }
     a.variations.push({
       sku: m.sku,
       variation: preferredVariation,
@@ -309,6 +330,7 @@ add('GET', '/api/products/master', async (req, env) => {
       shopee_model_id: m.shopee_model_id || null,
       shopee_account_id: m.shopee_account_id || null,
       shopee_account_label: m.shopee_account_id ? (accountLabels.get(m.shopee_account_id) || m.shopee_account_id) : null,
+      shopee_stores, // primary + extras já populados (pra UI mostrar contador "2" quando >1)
       paired: !!(m.meli_item_id && m.shopee_item_id),
       meli_stock: m.meli_stock ?? null,
       shopee_stock: m.shopee_stock ?? null,
@@ -1252,6 +1274,25 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
         errors.push({ platform: 'shopee', error: cleanApiError(e.message, 'shopee') });
       }
     }
+    // Extras: outras lojas Shopee que compartilham este SKU
+    if (map.extra_shopee_stores) {
+      let extras: any[] = [];
+      try { extras = JSON.parse(map.extra_shopee_stores); } catch {}
+      for (const ex of extras) {
+        try {
+          await mac.shopeeUpdateStock(
+            env,
+            Number(ex.item_id),
+            body.stock,
+            ex.model_id ? Number(ex.model_id) : undefined,
+            ex.account_id || undefined,
+          );
+          propagated.push('shopee:' + (ex.account_id || ex.item_id));
+        } catch (e: any) {
+          errors.push({ platform: 'shopee_extra:' + (ex.account_id || ex.item_id), error: cleanApiError(e.message, 'shopee') });
+        }
+      }
+    }
     if (propagated.length === 0 && errors.length > 0) {
       return json({ error: 'Falhou em todas as plataformas', details: errors }, 500);
     }
@@ -1663,12 +1704,35 @@ add('POST', '/api/variation/set-sku', async (req, env) => {
   let pairedSku: string | null = null;
 
   if (existingMap) {
-    // Já tem mapping — atualiza o SKU
-    await env.DB.prepare(
-      `UPDATE mappings SET sku=?, updated_at=? WHERE sku=?`
-    ).bind(newSku, now, existingMap.sku).run().catch(() => {/* SKU pode já existir como outro mapping; ignora */});
-    action = 'mapping_updated';
-    pairedSku = newSku;
+    // Já tem mapping — tenta renomear sku
+    const targetExists = await env.DB.prepare(`SELECT sku FROM mappings WHERE sku=? AND sku!=?`).bind(newSku, existingMap.sku).first<any>();
+    if (targetExists) {
+      // CONFLITO: outro mapping já usa o newSku. Mescla o synth dentro do existente como extra_shopee_store.
+      // Mantém o mapping principal (que tem pareamento ML), e adiciona Magic Aura como loja extra.
+      if (spItem) {
+        const target = await env.DB.prepare(`SELECT * FROM mappings WHERE sku=?`).bind(newSku).first<any>();
+        const extras: any[] = target?.extra_shopee_stores ? JSON.parse(target.extra_shopee_stores) : [];
+        // Não duplica se já está no principal
+        const isPrimary = String(target?.shopee_item_id||'') === spItem && String(target?.shopee_model_id||'') === String(spModel||'');
+        if (!isPrimary && !extras.some(e => String(e.item_id) === spItem && String(e.model_id||'') === String(spModel||''))) {
+          extras.push({ item_id: spItem, model_id: spModel, account_id: spAcc });
+          await env.DB.prepare(`UPDATE mappings SET extra_shopee_stores=?, updated_at=? WHERE sku=?`).bind(JSON.stringify(extras), now, newSku).run();
+        }
+      }
+      // Remove o synth mapping (Magic agora vive como extra dentro do mapping principal)
+      await env.DB.prepare(`DELETE FROM mappings WHERE sku=?`).bind(existingMap.sku).run();
+      // Marca unmapped da Magic como resolvido
+      if (spItem) {
+        await env.DB.prepare(`UPDATE unmapped SET resolved=1, sku=?, last_seen_at=? WHERE platform='shopee' AND item_id=? AND (variation_id=? OR (? IS NULL AND variation_id IS NULL))`)
+          .bind(newSku, now, spItem, spModel, spModel).run();
+      }
+      action = 'merged_into_existing_sku';
+      pairedSku = newSku;
+    } else {
+      await env.DB.prepare(`UPDATE mappings SET sku=?, updated_at=? WHERE sku=?`).bind(newSku, now, existingMap.sku).run();
+      action = 'mapping_updated';
+      pairedSku = newSku;
+    }
   } else {
     // Sem mapping. Procura unmapped do OUTRO lado com SKU igual → AUTO-PAIR
     const oppositePlatform = meliItem ? 'shopee' : 'meli';
@@ -3364,6 +3428,8 @@ add('POST', '/api/accounts/migrate-columns', async (_req, env) => {
     { table: 'mappings', col: 'shopee_account_id', type: 'TEXT' },
     { table: 'unmapped', col: 'shopee_account_id', type: 'TEXT' },
     { table: 'orders',   col: 'shopee_account_id', type: 'TEXT' },
+    // extra_shopee_stores: JSON com [{item_id, model_id, account_id}] pras outras lojas Shopee que compartilham o mesmo SKU
+    { table: 'mappings', col: 'extra_shopee_stores', type: 'TEXT' },
   ];
   for (const c of cols) {
     try {
