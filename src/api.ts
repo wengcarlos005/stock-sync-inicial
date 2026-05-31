@@ -1719,6 +1719,9 @@ add('POST', '/api/variation/set-sku', async (req, env) => {
           await env.DB.prepare(`UPDATE mappings SET extra_shopee_stores=?, updated_at=? WHERE sku=?`).bind(JSON.stringify(extras), now, newSku).run();
         }
       }
+      // Antes de deletar: re-atribui changes que apontam pro synth (FK RESTRICT)
+      await env.DB.prepare(`UPDATE changes SET sku=? WHERE sku=?`).bind(newSku, existingMap.sku).run();
+      // state tem ON DELETE CASCADE, então deleta junto com o mapping
       // Remove o synth mapping (Magic agora vive como extra dentro do mapping principal)
       await env.DB.prepare(`DELETE FROM mappings WHERE sku=?`).bind(existingMap.sku).run();
       // Marca unmapped da Magic como resolvido
