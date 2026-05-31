@@ -20,7 +20,15 @@ interface SyncStats {
 }
 
 export async function runSync(env: SyncEnv, trigger: 'cron' | 'manual' = 'cron'): Promise<SyncStats> {
-  const shadow = env.SHADOW_MODE === 'true';
+  // SEGURANÇA: cron sync é SEMPRE shadow (só lê + atualiza state interno, nunca escreve em loja).
+  // Isso protege contra:
+  //   - Glitches transientes da API zerando estoque (ex: ML/Shopee retornando 0 momentaneamente)
+  //   - Propagação incorreta durante deploys (re-leitura com dado parcial)
+  //   - Bugs em refatoração escrevendo em loja sem o usuário pedir
+  // Stocks só são escritos em loja quando:
+  //   - Usuário clica "Atualizar" numa variação (endpoint set-stock)
+  //   - Usuário clica "Sincronizar agora" (trigger='manual', respeita SHADOW_MODE env)
+  const shadow = trigger === 'cron' ? true : (env.SHADOW_MODE === 'true');
   const runId = await db.startRun(env.DB, trigger, shadow);
   const stats: SyncStats = { polled: 0, detected: 0, applied: 0, errors: 0, notes: '' };
   const errs: string[] = [];
@@ -35,6 +43,9 @@ export async function runSync(env: SyncEnv, trigger: 'cron' | 'manual' = 'cron')
 
   } finally {
     stats.notes = errs.slice(0, 5).join(' | ');
+    if (trigger === 'cron' && stats.applied > 0) {
+      stats.notes = `[shadow cron] ${stats.applied} mudanças detectadas (não propagadas) | ${stats.notes}`;
+    }
     await db.finishRun(env.DB, runId, stats);
   }
 

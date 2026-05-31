@@ -1580,9 +1580,13 @@ add('POST', '/api/refresh-variations/:item_id', async (_req, env, params) => {
   if (!itemId) return json({ error: 'invalid item_id' }, 400);
 
   // Descobre qual Shopee account é dono desse item (via mapping ou unmapped)
+  // SQLite exige LIMIT só DEPOIS do UNION inteiro, não em cada SELECT
   const accountRow = await env.DB.prepare(
-    `SELECT shopee_account_id FROM mappings WHERE shopee_item_id=? AND shopee_account_id IS NOT NULL LIMIT 1
-     UNION SELECT shopee_account_id FROM unmapped WHERE platform='shopee' AND item_id=? AND shopee_account_id IS NOT NULL LIMIT 1`
+    `SELECT shopee_account_id FROM (
+       SELECT shopee_account_id FROM mappings WHERE shopee_item_id=? AND shopee_account_id IS NOT NULL
+       UNION
+       SELECT shopee_account_id FROM unmapped WHERE platform='shopee' AND item_id=? AND shopee_account_id IS NOT NULL
+     ) LIMIT 1`
   ).bind(String(itemId), String(itemId)).first<any>();
   const shopId = accountRow?.shopee_account_id || undefined;
 
