@@ -4,15 +4,15 @@ export const html = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stock Sync — ML ↔ Shopee</title>
+  <title>UniHub — ML ↔ Shopee</title>
   <meta name="theme-color" content="#4f46e5" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Stock Sync" />
+  <meta name="apple-mobile-web-app-title" content="UniHub" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%234f46e5'/><text x='90' y='130' text-anchor='middle' font-size='110' font-family='Inter,Arial' font-weight='800' fill='white'>S</text></svg>" />
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><text x='32' y='46' text-anchor='middle' font-size='40' font-family='Inter,Arial' font-weight='800' fill='white'>S</text></svg>" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%234f46e5'/><text x='90' y='130' text-anchor='middle' font-size='110' font-family='Inter,Arial' font-weight='800' fill='white'>U</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><text x='32' y='46' text-anchor='middle' font-size='40' font-family='Inter,Arial' font-weight='800' fill='white'>U</text></svg>" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,9 +52,9 @@ export const html = `<!DOCTYPE html>
   <div x-show="!token" class="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full border border-slate-100">
       <div class="flex items-center gap-3 mb-6">
-        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-xl font-bold shadow-md">S</div>
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-xl font-bold shadow-md">U</div>
         <div>
-          <h1 class="text-lg font-bold text-slate-900 leading-tight">Stock Sync</h1>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">UniHub</h1>
           <p class="text-[11px] text-slate-400 uppercase tracking-wide leading-tight">ML ↔ Shopee · multi-loja</p>
         </div>
       </div>
@@ -98,9 +98,9 @@ export const html = `<!DOCTYPE html>
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-lg font-bold shadow-sm shrink-0">S</div>
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-lg font-bold shadow-sm shrink-0">U</div>
           <div class="min-w-0">
-            <div class="text-[15px] font-bold leading-tight text-slate-900 truncate">Stock Sync</div>
+            <div class="text-[15px] font-bold leading-tight text-slate-900 truncate">UniHub</div>
             <div class="text-[10px] text-slate-400 leading-tight uppercase tracking-wide">ML ↔ Shopee</div>
           </div>
         </div>
@@ -146,7 +146,7 @@ export const html = `<!DOCTYPE html>
           </button>
           <div class="min-w-0 flex-1">
             <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold hidden sm:block">Painel</div>
-            <h1 class="text-[15px] sm:text-[17px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'Stock Sync'"></h1>
+            <h1 class="text-[15px] sm:text-[17px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'UniHub'"></h1>
           </div>
           <button @click="runSync()" :disabled="loading.sync"
             class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0">
