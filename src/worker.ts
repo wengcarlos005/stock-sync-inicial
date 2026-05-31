@@ -2,6 +2,7 @@
 import { runSync, SyncEnv } from './sync';
 import { handleApi } from './api';
 import { html } from './ui';
+import { LOGO_PNG_B64 } from './logo';
 
 export interface Env extends SyncEnv {
   DB: D1Database;
@@ -28,9 +29,19 @@ export default {
       return new Response('OK', { status: 200 });
     }
 
+    // Logo PNG (embutido em base64 no bundle)
+    if (url.pathname === '/logo.png') {
+      const bin = Uint8Array.from(atob(LOGO_PNG_B64), c => c.charCodeAt(0));
+      return new Response(bin, {
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=86400, immutable',
+        },
+      });
+    }
+
     // PWA manifest (instalável no celular)
     if (url.pathname === '/manifest.webmanifest') {
-      const ringsSvg = (sz: number) => `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' width='${sz}' height='${sz}'><rect width='100' height='100' rx='22' fill='white'/><g fill='none' stroke-width='7' stroke-linecap='round'><circle cx='36' cy='60' r='22' stroke='%231e3a8a'/><circle cx='64' cy='60' r='22' stroke='%232563eb'/><circle cx='50' cy='36' r='22' stroke='%2360a5fa'/></g></svg>`;
       const manifest = {
         name: 'UniHub — Sincronização Integrada',
         short_name: 'UniHub',
@@ -42,8 +53,7 @@ export default {
         background_color: '#ffffff',
         theme_color: '#2563eb',
         icons: [
-          { src: ringsSvg(192), sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
-          { src: ringsSvg(512), sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: '/logo.png', sizes: '640x349', type: 'image/png', purpose: 'any' },
         ],
       };
       return new Response(JSON.stringify(manifest), { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });

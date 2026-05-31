@@ -11,8 +11,8 @@ export const html = `<!DOCTYPE html>
   <meta name="apple-mobile-web-app-title" content="UniHub" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='white'/><g fill='none' stroke-width='7' stroke-linecap='round'><circle cx='36' cy='60' r='22' stroke='%231e3a8a'/><circle cx='64' cy='60' r='22' stroke='%232563eb'/><circle cx='50' cy='36' r='22' stroke='%2360a5fa'/></g></svg>" />
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='white'/><g fill='none' stroke-width='7' stroke-linecap='round'><circle cx='36' cy='60' r='22' stroke='%231e3a8a'/><circle cx='64' cy='60' r='22' stroke='%232563eb'/><circle cx='50' cy='36' r='22' stroke='%2360a5fa'/></g></svg>" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <link rel="icon" type="image/png" href="/logo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,25 +58,8 @@ export const html = `<!DOCTYPE html>
   <!-- Login overlay -->
   <div x-show="!token" class="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full border border-slate-100">
-      <div class="flex items-center gap-3 mb-6">
-        <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
-            <defs>
-              <linearGradient id="bra1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0c3a85"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
-              <linearGradient id="bra2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#2563eb"/></linearGradient>
-              <linearGradient id="bra3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
-            </defs>
-            <g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="32" cy="62" r="22" stroke="url(#bra1)"/>
-              <circle cx="68" cy="62" r="22" stroke="url(#bra2)"/>
-              <circle cx="50" cy="32" r="22" stroke="url(#bra3)"/>
-            </g>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-lg font-bold text-slate-900 leading-tight">UniHub</h1>
-          <p class="text-[11px] text-slate-400 uppercase tracking-wide leading-tight">Sincronização Integrada</p>
-        </div>
+      <div class="mb-6">
+        <img src="/logo.png" alt="UniHub — Sincronização Integrada" class="h-16 w-auto mx-auto" />
       </div>
       <p class="text-sm text-slate-500 mb-5">Entre com seu admin token para continuar.</p>
       <form @submit.prevent="login()">
@@ -118,25 +101,8 @@ export const html = `<!DOCTYPE html>
       class="app-surface top-0 left-0 z-50 w-64 md:!w-60 md:!translate-x-0 md:!sticky md:!flex shrink-0 border-r border-slate-200 flex flex-col h-screen transition-transform duration-200">
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-10 h-10 rounded-lg bg-white border border-slate-200 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="36" height="36">
-              <defs>
-                <linearGradient id="brb1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0c3a85"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
-                <linearGradient id="brb2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#2563eb"/></linearGradient>
-                <linearGradient id="brb3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
-              </defs>
-              <g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="32" cy="62" r="22" stroke="url(#brb1)"/>
-                <circle cx="68" cy="62" r="22" stroke="url(#brb2)"/>
-                <circle cx="50" cy="32" r="22" stroke="url(#brb3)"/>
-              </g>
-            </svg>
-          </div>
-          <div class="min-w-0">
-            <div class="text-[15px] font-bold leading-tight text-slate-900 truncate">UniHub</div>
-            <div class="text-[10px] text-slate-400 leading-tight uppercase tracking-wide">Sincronização Integrada</div>
-          </div>
+        <div class="min-w-0 flex-1">
+          <img src="/logo.png" alt="UniHub — Sincronização Integrada" class="h-10 w-auto" />
         </div>
         <button @click="sidebarOpen = false" class="md:hidden text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar menu">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
