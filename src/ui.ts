@@ -36,7 +36,9 @@ export const html = `<!DOCTYPE html>
     /* Surfaces: sidebar + topbar */
     .app-surface { background-color: #ffffff; }
     /* Topbar sticky com sombra mais clara quando "stuck" pra separar do conteúdo */
-    header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); }
+    header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); background-color: #ffffff !important; }
+    /* Body sem scroll horizontal — garante que conteúdo não empurra a página */
+    html, body { overflow-x: hidden; max-width: 100vw; }
     /* Brand logo container */
     .brand-mark { display: flex; align-items: center; justify-content: center; }
     .brand-mark svg { display: block; width: 100%; height: 100%; }
@@ -144,7 +146,7 @@ export const html = `<!DOCTYPE html>
     </aside>
 
     <!-- Content area -->
-    <div class="flex-1 flex flex-col min-w-0 w-full">
+    <div class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
 
       <!-- Top bar -->
       <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
