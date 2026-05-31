@@ -244,13 +244,18 @@ async function syncStockBatch(env: SyncEnv, stats: SyncStats, errs: string[], sh
         }
       }
 
-      await db.logChange(env.DB, {
-        sku: map.sku, source, trigger: triggerKind,
-        meli_before: prev.meli_stock, meli_after: meliStockNow,
-        shopee_before: prev.shopee_stock, shopee_after: shopeeStockNow,
-        delta: (newValue ?? 0) - (prev.master_stock ?? 0),
-        propagated_to: propagatedTo, shadow, error: errorMsg,
-      });
+      // Em shadow (cron poll) NÃO loga: a movimentação não foi causada por nada real,
+      // é só detecção. Logar pollui a UI de Movimentações com falsos eventos.
+      // O usuário só quer ver mudanças que REALMENTE moveram estoque (sales + manual).
+      if (!shadow) {
+        await db.logChange(env.DB, {
+          sku: map.sku, source, trigger: triggerKind,
+          meli_before: prev.meli_stock, meli_after: meliStockNow,
+          shopee_before: prev.shopee_stock, shopee_after: shopeeStockNow,
+          delta: (newValue ?? 0) - (prev.master_stock ?? 0),
+          propagated_to: propagatedTo, shadow, error: errorMsg,
+        });
+      }
 
       await db.upsertState(env.DB, map.sku,
         shadow ? meliStockNow : newValue,
