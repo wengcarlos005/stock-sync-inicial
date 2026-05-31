@@ -1692,27 +1692,29 @@ function app() {
       }
     },
 
-    // Filtra masterItems por loja. Retorna anuncios com só as variações daquela conta.
-    // Para Shopee: variação precisa ter shopee_stores incluindo esse account_id.
-    // Para ML: anuncio inteiro precisa ter meli_item_id e variação ter meli_item_id.
+    // Filtra masterItems por loja em NÍVEL DE ANÚNCIO:
+    // se o anúncio existe nessa loja (qualquer variação dele), aparece COM TODAS as variações.
+    // Pra não esconder variações exclusivas de outra loja (ex: Dragão só na Geek).
     displayedMaster() {
       if (!this.accountFilter) return this.masterItems;
       const acc = this.accounts.find(a => String(a.external_id) === String(this.accountFilter));
       if (!acc) return this.masterItems;
       const isShopee = acc.marketplace === 'shopee';
       const targetId = String(this.accountFilter);
-      const out = [];
-      for (const a of this.masterItems) {
-        const vars = (a.variations || []).filter(v => {
-          if (isShopee) {
-            const stores = v.shopee_stores || (v.shopee_account_id ? [{ account_id: v.shopee_account_id }] : []);
-            return stores.some(s => String(s.account_id) === targetId);
-          }
-          return !!v.meli_item_id; // ML: só 1 conta, qualquer var com ML serve
-        });
-        if (vars.length) out.push({ ...a, variations: vars });
-      }
-      return out;
+      return this.masterItems.filter(a => {
+        if (isShopee) {
+          // Anúncio tem loja se shopee_stores no header inclui, OU qualquer variação tem.
+          const headerStores = a.shopee_stores || [];
+          if (headerStores.some(s => String(s.account_id) === targetId)) return true;
+          return (a.variations || []).some(v => {
+            const vs = v.shopee_stores || (v.shopee_account_id ? [{ account_id: v.shopee_account_id }] : []);
+            return vs.some(s => String(s.account_id) === targetId);
+          });
+        }
+        // ML: anuncio tem ML se header.meli_item_id ou qualquer var tem
+        if (a.meli_item_id) return true;
+        return (a.variations || []).some(v => !!v.meli_item_id);
+      });
     },
 
     async fixMeliVariationIds() {
