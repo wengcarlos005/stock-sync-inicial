@@ -448,6 +448,75 @@ export async function buildShopeeDraftFromShopee(env: MigEnv, shopeeItemId: stri
 }
 
 // ────────────────────────────────────────────────────────────
+// Preencher variações faltantes num anúncio que JÁ existe
+// ────────────────────────────────────────────────────────────
+// ML: adiciona variações ao item existente via POST /items/:id/variations
+export async function fillMissingVariationsMeli(env: MigEnv, meliItemId: string, missing: { name: string; sku?: string; qty?: number }[]): Promise<any> {
+  const item: any = await mac.meliGetItem(env, meliItemId);
+  if (!item) throw new Error('Item ML não encontrado: ' + meliItemId);
+  const existing = item.variations || [];
+  // Descobre o(s) atributo(s) de variação usados (ex: CHARACTER_VERSION, COLOR)
+  const sampleCombos = existing[0]?.attribute_combinations || [];
+  if (!sampleCombos.length) {
+    throw new Error('Anúncio ML não tem variações existentes — não dá pra inferir o eixo. Use "Migrar anúncio" pra recriar.');
+  }
+  const axisIds = sampleCombos.map((c: any) => c.id); // normalmente 1 (CHARACTER_VERSION)
+  const basePrice = item.price || existing[0]?.price || 0;
+  const picIds = (item.pictures || []).map((p: any) => p.id).filter(Boolean);
+
+  const results: any[] = [];
+  for (const mv of missing) {
+    try {
+      // monta attribute_combinations: usa o nome da variação no 1º eixo
+      const combos = axisIds.map((id: string, i: number) => ({ id, value_name: i === 0 ? mv.name : (sampleCombos[i]?.value_name || mv.name) }));
+      const body: any = {
+        attribute_combinations: combos,
+        available_quantity: mv.qty ?? 0,
+        price: basePrice,
+      };
+      if (mv.sku) body.seller_custom_field = mv.sku, body.attributes = [{ id: 'SELLER_SKU', value_name: mv.sku }];
+      if (picIds.length) body.picture_ids = picIds.slice(0, 1);
+      const res = await mac.meliRaw(env, 'POST', `/items/${meliItemId}/variations`, body);
+      const newVarId = res?.id || res?.variations?.slice(-1)?.[0]?.id;
+      results.push({ name: mv.name, ok: true, variation_id: newVarId });
+      // pareia no mapping se tiver sku
+      if (mv.sku) {
+        const now = Date.now();
+        await env.DB.prepare(`UPDATE mappings SET meli_item_id=?, meli_variation_id=?, updated_at=? WHERE sku=?`)
+          .bind(meliItemId, newVarId ? String(newVarId) : null, now, mv.sku).run().catch(() => {});
+      }
+    } catch (e: any) {
+      results.push({ name: mv.name, ok: false, error: String(e.message).slice(0, 200) });
+    }
+  }
+  return { ok: results.every(r => r.ok), results };
+}
+
+// Shopee: adiciona models faltantes a um item existente na loja destino
+export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: string, targetShopId: string, sourceItemId: string, sourceShopId: string | undefined, missingSkus: string[]): Promise<any> {
+  // Lê tier + models da origem (que tem as variações) e do destino
+  const src = await mac.shopeeGetModelsFull(env, Number(sourceItemId), sourceShopId);
+  const results: any[] = [];
+  for (const sku of missingSkus) {
+    try {
+      const m = src.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
+      if (!m) { results.push({ sku, ok: false, error: 'modelo origem não encontrado' }); continue; }
+      const model = {
+        tier_index: m.tier_index,
+        model_sku: m.model_sku || '',
+        original_price: m.price_info?.[0]?.original_price ?? m.price_info?.[0]?.current_price ?? 0,
+        normal_stock: m.stock_info_v2?.summary_info?.total_available_stock ?? 0,
+      };
+      const res = await mac.call(env, 'shopee_add_model', { shopId: targetShopId, item_id: Number(targetItemId), model_list: [model] });
+      results.push({ sku, ok: !!res, raw: res?.response ? 'ok' : res });
+    } catch (e: any) {
+      results.push({ sku, ok: false, error: String(e.message).slice(0, 200) });
+    }
+  }
+  return { ok: results.every(r => r.ok), results };
+}
+
+// ────────────────────────────────────────────────────────────
 // Salvar / ler rascunhos
 // ────────────────────────────────────────────────────────────
 export async function saveDraft(env: MigEnv, c: { source_platform: string; source_item_id: string; source_account_id: string | null; target_platform: string; target_shop_id?: string | null; product_name: string; image_url: string | null; }, result: DraftResult): Promise<number> {

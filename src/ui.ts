@@ -899,8 +899,23 @@ export const html = `<!DOCTYPE html>
                     </template>
                   </tbody>
                 </table>
-                <div class="px-3 py-2 text-[11px] text-slate-400 bg-slate-50 border-t border-slate-100">
-                  ✓ presente · ✗ falta nessa loja. Use "Migrar anúncio" pra criar o anúncio completo numa loja onde ele não existe.
+                <div class="px-3 py-2.5 bg-slate-50 border-t border-slate-100 flex flex-wrap gap-2 items-center">
+                  <span class="text-[11px] text-slate-400 mr-1">✓ presente · ✗ falta.</span>
+                  <!-- ML: adicionar variações faltantes (anúncio já existe no ML) -->
+                  <template x-if="a.meli_item_id && storeMissing(a,'meli').length">
+                    <button @click="fillVariations(a,'meli')" :disabled="loading.migPublish"
+                      class="text-xs px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded font-medium"
+                      x-text="'➕ Adicionar ' + storeMissing(a,'meli').length + ' no ML'"></button>
+                  </template>
+                  <!-- Cada Shopee onde o anúncio existe mas faltam variações -->
+                  <template x-for="acc in (accounts||[]).filter(x=>x.marketplace==='shopee')" :key="acc.external_id">
+                    <template x-if="(a.shopee_stores||[]).some(s=>String(s.account_id)===String(acc.external_id)) && storeMissing(a,'shopee',acc).length">
+                      <button @click="fillVariations(a,'shopee',acc)" :disabled="loading.migPublish"
+                        class="text-xs px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded font-medium"
+                        x-text="'➕ Adicionar ' + storeMissing(a,'shopee',acc).length + ' em ' + (acc.label||acc.external_id)"></button>
+                    </template>
+                  </template>
+                  <span x-show="migFillMsg[a.key]" class="text-[11px]" :class="migFillOk[a.key] ? 'text-emerald-700' : 'text-red-600'" x-text="migFillMsg[a.key]"></span>
                 </div>
               </div>
             </div>
@@ -1384,6 +1399,8 @@ function app() {
     migModal: null,
     migPublishMsg: '',
     migPublishOk: false,
+    migFillMsg: {},
+    migFillOk: {},
     unmapped: [],
     runs: [],
     productSearch: '',
@@ -2224,6 +2241,60 @@ function app() {
           || (a.variations || []).some(v => (v.sku || '').toLowerCase().includes(q)));
       }
       return list;
+    },
+    // Variações faltantes numa loja específica (kind='meli' ou 'shopee'+acc)
+    storeMissing(a, kind, acc) {
+      const out = [];
+      for (const v of (a.variations || [])) {
+        let present;
+        if (kind === 'meli') present = !!v.meli_item_id;
+        else present = (v.shopee_stores || []).some(s => String(s.account_id) === String(acc.external_id));
+        if (!present) {
+          out.push({
+            name: this.cleanVariation(v.variation) || v.sku || '(sem nome)',
+            sku: v.sku || '',
+            qty: v.master_stock ?? v.shopee_stock ?? v.meli_stock ?? 0,
+          });
+        }
+      }
+      return out;
+    },
+    async fillVariations(a, kind, acc) {
+      const missing = this.storeMissing(a, kind, acc);
+      if (!missing.length) return;
+      const storeLabel = kind === 'meli' ? 'Mercado Livre' : (acc.label || acc.external_id);
+      if (!confirm('Adicionar ' + missing.length + ' variação(ões) faltante(s) ao anúncio em ' + storeLabel + '?\\n\\n' + missing.map(m => '• ' + m.name).join('\\n'))) return;
+      this.loading.migPublish = true;
+      this.migFillMsg[a.key] = '';
+      try {
+        let body;
+        if (kind === 'meli') {
+          body = { target: 'meli', target_item_id: a.meli_item_id, variations: missing };
+        } else {
+          const targetStore = (a.shopee_stores || []).find(s => String(s.account_id) === String(acc.external_id));
+          // origem: qualquer loja shopee que tenha a 1ª variação faltante
+          const firstVar = (a.variations || []).find(v => v.sku === missing[0].sku);
+          const srcStore = (firstVar?.shopee_stores || [])[0];
+          body = {
+            target: acc.external_id, target_item_id: targetStore?.item_id,
+            source_item_id: srcStore?.item_id, source_shop_id: srcStore?.account_id,
+            variations: missing,
+          };
+        }
+        const r = await this.api('/api/migration/fill-variations', { method: 'POST', body: JSON.stringify(body) });
+        const okN = (r?.results || []).filter(x => x.ok).length;
+        const failN = (r?.results || []).filter(x => !x.ok).length;
+        this.migFillOk[a.key] = r?.ok;
+        this.migFillMsg[a.key] = '✓ ' + okN + ' adicionada(s)' + (failN ? ' · ✗ ' + failN + ' falhou' : '');
+        if (failN) {
+          const errs = (r.results || []).filter(x => !x.ok).map(x => (x.name || x.sku) + ': ' + x.error).join('\\n');
+          alert('Algumas falharam:\\n' + errs);
+        }
+        await this.loadMaster();
+      } catch (e) {
+        this.migFillOk[a.key] = false;
+        this.migFillMsg[a.key] = '✗ ' + (e?.message || e);
+      } finally { this.loading.migPublish = false; }
     },
     // Quantas variações faltam em ALGUMA loja conectada
     migIncompleteCount(a) {

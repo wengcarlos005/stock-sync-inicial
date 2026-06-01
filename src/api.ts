@@ -3865,6 +3865,21 @@ add('DELETE', '/api/migration/draft/:id', async (_req, env, params) => {
   return json({ ok: true });
 });
 
+// Preenche variações faltantes num anúncio que já existe na loja destino
+// body: { target:'meli'|<shopId>, target_item_id, source_item_id?, source_shop_id?, variations:[{name,sku,qty}] }
+add('POST', '/api/migration/fill-variations', async (req, env) => {
+  const b = await req.json() as any;
+  if (b.target === 'meli') {
+    const r = await migration.fillMissingVariationsMeli(env, String(b.target_item_id), b.variations || []);
+    return json(r);
+  } else {
+    const skus = (b.variations || []).map((v: any) => v.sku).filter(Boolean);
+    if (!skus.length) return json({ ok: false, error: 'variações sem SKU não podem ser copiadas na Shopee' });
+    const r = await migration.fillMissingVariationsShopee(env, String(b.target_item_id), String(b.target), String(b.source_item_id), b.source_shop_id || undefined, skus);
+    return json(r);
+  }
+});
+
 // ============= Router entry =============
 export async function handleApi(req: Request, env: Env): Promise<Response | null> {
   const url = new URL(req.url);
