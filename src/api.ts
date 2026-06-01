@@ -3808,19 +3808,23 @@ add('GET', '/api/migration/candidates', async (_req, env) => {
 add('POST', '/api/migration/draft', async (req, env) => {
   await migration.ensureMigrationTable(env);
   const body = await req.json() as any;
-  const { source_platform, source_item_id, source_account_id, product_name, image_url } = body;
+  const { source_platform, source_item_id, source_account_id, product_name, image_url, target_shop_id } = body;
+  // target_platform vem da UI; fallback: shopee→meli, meli→shopee
+  const target_platform: string = body.target_platform || (source_platform === 'shopee' ? 'meli' : 'shopee');
+
   let result;
-  let target_platform: string;
-  if (source_platform === 'shopee') {
-    target_platform = 'meli';
+  if (target_platform === 'meli') {
     result = await migration.buildMeliDraftFromShopee(env, String(source_item_id), source_account_id || undefined);
+  } else if (source_platform === 'meli') {
+    result = await migration.buildShopeeDraftFromMeli(env, String(source_item_id), target_shop_id || undefined);
   } else {
-    target_platform = 'shopee';
-    result = await migration.buildShopeeDraftFromMeli(env, String(source_item_id), body.target_shop_id || undefined);
+    // shopee → shopee (cópia entre lojas)
+    result = await migration.buildShopeeDraftFromShopee(env, String(source_item_id), source_account_id || undefined, target_shop_id || undefined);
   }
   const id = await migration.saveDraft(env, {
     source_platform, source_item_id: String(source_item_id), source_account_id: source_account_id || null,
-    target_platform, product_name: product_name || result.source_summary?.name || '', image_url: image_url || null,
+    target_platform, target_shop_id: target_shop_id || null,
+    product_name: product_name || result.source_summary?.name || '', image_url: image_url || null,
   }, result);
   return json({ id, ...result });
 });

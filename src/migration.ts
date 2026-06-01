@@ -37,6 +37,7 @@ export async function ensureMigrationTable(env: MigEnv): Promise<void> {
       source_item_id TEXT NOT NULL,
       source_account_id TEXT,
       target_platform TEXT NOT NULL,
+      target_shop_id TEXT,
       product_name TEXT,
       image_url TEXT,
       draft_json TEXT,
@@ -47,9 +48,11 @@ export async function ensureMigrationTable(env: MigEnv): Promise<void> {
       error TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      UNIQUE(source_platform, source_item_id, target_platform)
+      UNIQUE(source_platform, source_item_id, target_platform, target_shop_id)
     )
   `).run();
+  // Migração leve: adiciona target_shop_id se a tabela já existia sem ela
+  await env.DB.prepare(`ALTER TABLE migration_drafts ADD COLUMN target_shop_id TEXT`).run().catch(() => {});
 }
 
 // ────────────────────────────────────────────────────────────
@@ -393,24 +396,79 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
 }
 
 // ────────────────────────────────────────────────────────────
+// FASE 2c — Cópia Shopee → outra loja Shopee (mesmo formato)
+// ────────────────────────────────────────────────────────────
+export async function buildShopeeDraftFromShopee(env: MigEnv, shopeeItemId: string, sourceShopId?: string, _targetShopId?: string): Promise<DraftResult> {
+  const validation: DraftResult['validation'] = [];
+  const item: any = await mac.shopeeGetItem(env, Number(shopeeItemId), sourceShopId);
+  if (!item) throw new Error('Item Shopee origem não encontrado: ' + shopeeItemId);
+  const { models, tierVariation } = await mac.shopeeGetModelsFull(env, Number(shopeeItemId), sourceShopId);
+
+  const name = truncate(fixMojibake(item.item_name || ''), 120);
+  const picUrls: string[] = (item.image?.image_url_list || []).slice(0, 9);
+  if (!picUrls.length) validation.push({ field: 'pictures', level: 'error', message: 'Sem fotos na origem.' });
+
+  let price = 0, qty = 0;
+  for (const m of models) {
+    const p = m.price_info?.[0]?.current_price ?? m.price_info?.[0]?.original_price ?? 0;
+    if (p > 0 && (price === 0 || p < price)) price = p;
+    qty += m.stock_info_v2?.summary_info?.total_available_stock ?? 0;
+  }
+  if (!price) { price = (item as any).price_info?.[0]?.current_price || 0; }
+
+  let variationPlan: any = null;
+  if (item.has_model && models.length) {
+    variationPlan = { supported: tierVariation.length === 1, models: models.map((m: any) => ({
+      name: mac.buildShopeeModelName(m, tierVariation), sku: m.model_sku || '',
+      price: m.price_info?.[0]?.current_price ?? price, stock: m.stock_info_v2?.summary_info?.total_available_stock ?? 0,
+    })) };
+    validation.push({ field: 'variations', level: 'warn', message: `${models.length} variações — cópia de variações ainda em desenvolvimento.` });
+  }
+
+  const draft = {
+    item_name: name,
+    category_id: item.category_id,
+    category_suggestions: [item.category_id],
+    description: fixMojibake(item.description || ''),
+    original_price: price,
+    stock: qty,
+    weight: item.weight || 0.5,
+    dimension: item.dimension || { package_length: 20, package_width: 15, package_height: 10 },
+    condition: item.condition || 'NEW',
+    brand: item.brand || { brand_id: 0, original_brand_name: 'NoBrand' },
+    pictures: picUrls,
+    variation_plan: variationPlan,
+    source_sku: item.item_sku || '',
+  };
+  return {
+    draft, validation,
+    photos: picUrls.map(u => ({ source: u, status: 'pending_upload' })),
+    source_summary: { platform: 'shopee', item_id: shopeeItemId, name: fixMojibake(item.item_name || ''), price, qty, photos: picUrls.length, variations: models.length },
+  };
+}
+
+// ────────────────────────────────────────────────────────────
 // Salvar / ler rascunhos
 // ────────────────────────────────────────────────────────────
-export async function saveDraft(env: MigEnv, c: { source_platform: string; source_item_id: string; source_account_id: string | null; target_platform: string; product_name: string; image_url: string | null; }, result: DraftResult): Promise<number> {
+export async function saveDraft(env: MigEnv, c: { source_platform: string; source_item_id: string; source_account_id: string | null; target_platform: string; target_shop_id?: string | null; product_name: string; image_url: string | null; }, result: DraftResult): Promise<number> {
   const now = Date.now();
+  const tshop = c.target_shop_id || '';
+  // Upsert manual (não depende do UNIQUE exato): apaga rascunho equivalente não-publicado e reinsere
+  await env.DB.prepare(
+    `DELETE FROM migration_drafts WHERE source_platform=? AND source_item_id=? AND target_platform=? AND COALESCE(target_shop_id,'')=? AND status!='published'`
+  ).bind(c.source_platform, c.source_item_id, c.target_platform, tshop).run();
   await env.DB.prepare(`
-    INSERT INTO migration_drafts (source_platform, source_item_id, source_account_id, target_platform, product_name, image_url, draft_json, photos_json, validation_json, status, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(source_platform, source_item_id, target_platform) DO UPDATE SET
-      draft_json=excluded.draft_json, photos_json=excluded.photos_json, validation_json=excluded.validation_json,
-      product_name=excluded.product_name, status='needs_review', updated_at=excluded.updated_at
+    INSERT INTO migration_drafts (source_platform, source_item_id, source_account_id, target_platform, target_shop_id, product_name, image_url, draft_json, photos_json, validation_json, status, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).bind(
-    c.source_platform, c.source_item_id, c.source_account_id, c.target_platform,
+    c.source_platform, c.source_item_id, c.source_account_id, c.target_platform, c.target_shop_id || null,
     c.product_name, c.image_url,
     JSON.stringify(result.draft), JSON.stringify(result.photos), JSON.stringify(result.validation),
     'needs_review', now, now,
   ).run();
-  const row = await env.DB.prepare(`SELECT id FROM migration_drafts WHERE source_platform=? AND source_item_id=? AND target_platform=?`)
-    .bind(c.source_platform, c.source_item_id, c.target_platform).first<any>();
+  const row = await env.DB.prepare(
+    `SELECT id FROM migration_drafts WHERE source_platform=? AND source_item_id=? AND target_platform=? AND COALESCE(target_shop_id,'')=? ORDER BY id DESC LIMIT 1`
+  ).bind(c.source_platform, c.source_item_id, c.target_platform, tshop).first<any>();
   return row?.id;
 }
 
@@ -460,16 +518,18 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
       publishedId = res?.id || res?.data?.id;
       if (!publishedId) throw new Error('ML create_item não retornou id: ' + JSON.stringify(res).slice(0, 300));
     } else {
-      // shopee_create_item — fotos precisam ser uploaded primeiro
+      // shopee_create_item — roteia pra LOJA DESTINO (target_shop_id)
+      const targetShop = row.target_shop_id || undefined;
       const imageIds: string[] = [];
       for (const url of (draft.pictures || []).slice(0, 9)) {
         try {
-          const up = await mac.call(env, 'shopee_upload_image', { image_url: url, shopId: row.source_account_id || undefined });
+          const up = await mac.call(env, 'shopee_upload_image', { image_url: url, shopId: targetShop });
           const id = up?.response?.image_info?.image_id || up?.image_id;
           if (id) imageIds.push(id);
         } catch {}
       }
       const payload: any = {
+        shopId: targetShop,
         item_name: draft.item_name,
         category_id: draft.category_id,
         description: draft.description,
@@ -488,14 +548,30 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
 
     // Sucesso: cria mapping pareando origem ↔ destino e resolve unmapped
     const sku = draft.source_sku || `MIG_${row.source_item_id}_${publishedId}`;
-    const isShopeeSource = row.source_platform === 'shopee';
-    const shopeeItem = isShopeeSource ? row.source_item_id : publishedId;
-    const meliItem = isShopeeSource ? publishedId : row.source_item_id;
+    let meliItem: string | null = null, shopeeItem: string | null = null, shopeeAcc: string | null = null;
+    if (row.target_platform === 'meli') {
+      // shopee (origem) → ML (novo)
+      meliItem = publishedId;
+      shopeeItem = row.source_item_id;
+      shopeeAcc = row.source_account_id || null;
+    } else if (row.source_platform === 'meli') {
+      // ML (origem) → Shopee (novo na loja destino)
+      meliItem = row.source_item_id;
+      shopeeItem = publishedId;
+      shopeeAcc = row.target_shop_id || null;
+    } else {
+      // shopee → shopee (cópia pra outra loja): novo anúncio Shopee standalone
+      shopeeItem = publishedId;
+      shopeeAcc = row.target_shop_id || null;
+    }
     await env.DB.prepare(`
       INSERT INTO mappings (sku, meli_item_id, shopee_item_id, shopee_account_id, product_name, active, notes, created_at, updated_at)
       VALUES (?,?,?,?,?,1,'migração automática',?,?)
-      ON CONFLICT(sku) DO UPDATE SET meli_item_id=excluded.meli_item_id, shopee_item_id=excluded.shopee_item_id, updated_at=excluded.updated_at
-    `).bind(sku, meliItem, shopeeItem, row.source_account_id || null, row.product_name || null, now, now).run().catch(() => {});
+      ON CONFLICT(sku) DO UPDATE SET
+        meli_item_id=COALESCE(excluded.meli_item_id, mappings.meli_item_id),
+        shopee_item_id=COALESCE(excluded.shopee_item_id, mappings.shopee_item_id),
+        updated_at=excluded.updated_at
+    `).bind(sku + (row.target_platform === 'shopee' && row.source_platform === 'shopee' ? '_' + (row.target_shop_id || 'sp') : ''), meliItem, shopeeItem, shopeeAcc, row.product_name || null, now, now).run().catch(() => {});
     await env.DB.prepare(`UPDATE unmapped SET resolved=1 WHERE platform=? AND item_id=?`).bind(row.source_platform, row.source_item_id).run().catch(() => {});
 
     await env.DB.prepare(`UPDATE migration_drafts SET status='published', published_item_id=?, updated_at=? WHERE id=?`).bind(publishedId, now, draftId).run();

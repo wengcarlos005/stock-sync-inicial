@@ -818,47 +818,53 @@ export const html = `<!DOCTYPE html>
       <!-- Migração de Anúncios -->
       <section x-show="tab === 'migration'" x-cloak>
         <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 text-sm text-indigo-800">
-          Produtos que existem em <strong>apenas um marketplace</strong>. Gere um rascunho adaptado pro outro lado, revise, e publique — o anúncio novo já entra pareado no sync de estoque.
+          Todos os seus anúncios. Clique <strong>Migrar</strong> e escolha a loja de destino — o sistema adapta o formato (categoria, atributos, fotos), você revisa e publica. O anúncio novo já entra pareado no sync de estoque.
         </div>
         <div class="flex flex-wrap gap-3 mb-4 items-center">
-          <input x-model="migSearch" placeholder="Buscar candidato por nome ou ID..." class="flex-1 min-w-[240px] px-4 py-2 border border-slate-300 rounded-lg text-sm" />
+          <input x-model="migSearch" placeholder="Buscar anúncio por nome ou SKU..." class="flex-1 min-w-[240px] px-4 py-2 border border-slate-300 rounded-lg text-sm" />
           <div class="flex bg-slate-100 p-1 rounded-lg gap-1">
             <button @click="migFilter='all'" :class="migFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">Todos</button>
-            <button @click="migFilter='shopee'" :class="migFilter==='shopee' ? 'bg-orange-500 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">🟠 Só Shopee → ML</button>
-            <button @click="migFilter='meli'" :class="migFilter==='meli' ? 'bg-amber-500 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">🟡 Só ML → Shopee</button>
+            <button @click="migFilter='incomplete'" :class="migFilter==='incomplete' ? 'bg-amber-500 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">⚠ Falta em alguma loja</button>
           </div>
-          <button @click="loadMigration()" :disabled="loading.migration" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">
-            <span x-show="!loading.migration">↻ Atualizar</span><span x-show="loading.migration">Carregando...</span>
-          </button>
+          <button @click="loadMaster()" :disabled="loading.migration" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">↻ Atualizar</button>
         </div>
-        <div class="text-xs text-slate-500 mb-3"><span x-text="filteredMigration().length"></span> candidatos</div>
+        <div class="text-xs text-slate-500 mb-3"><span x-text="migrationList().length"></span> anúncios</div>
 
         <div class="space-y-2">
-          <template x-for="c in filteredMigration()" :key="c.source_platform + c.source_item_id">
+          <template x-for="a in migrationList()" :key="a.key">
             <div class="bg-white border border-slate-200 rounded-lg p-3 flex items-center gap-3">
-              <span class="text-xs px-2 py-0.5 rounded shrink-0 font-medium" :class="c.source_platform==='shopee' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-800'" x-text="c.source_platform==='shopee' ? '🟠 SP' : '🟡 ML'"></span>
+              <template x-if="a.image"><img :src="a.image" class="w-11 h-11 rounded object-cover border border-slate-200 shrink-0" loading="lazy" /></template>
+              <template x-if="!a.image"><div class="w-11 h-11 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300 shrink-0">📦</div></template>
               <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium truncate" x-text="c.product_name || '(sem nome)'"></div>
-                <div class="text-[11px] text-slate-400 font-mono">
-                  <span x-text="c.source_item_id"></span>
-                  <span x-show="c.source_account_label" x-text="' · ' + c.source_account_label"></span>
-                  <span x-text="' · ' + c.variation_count + ' variação(ões)'"></span>
+                <div class="text-sm font-medium truncate" x-text="(a.product_name||'(sem nome)').slice(0,90)"></div>
+                <div class="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-1.5 items-center">
+                  <span x-show="a.shopee_item_id" class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" x-text="'🟠 ' + (a.shopee_account_label || 'Shopee')"></span>
+                  <span x-show="a.meli_item_id" class="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded">🟡 ML</span>
+                  <span x-text="(a.variations?.length||0) + ' variação(ões)'"></span>
                 </div>
               </div>
-              <span class="text-[11px] text-slate-400 shrink-0" x-text="c.source_platform==='shopee' ? '→ Mercado Livre' : '→ Shopee'"></span>
-              <template x-if="c.draft_status === 'published'">
-                <span class="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 rounded shrink-0">✓ publicado</span>
-              </template>
-              <template x-if="c.draft_status !== 'published'">
-                <button @click="startMigration(c)" :disabled="loading.migDraft"
-                  class="shrink-0 text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded font-medium"
-                  x-text="c.draft_status ? 'Revisar rascunho' : (c.source_platform==='shopee' ? 'Migrar pro ML' : 'Migrar pra Shopee')"></button>
-              </template>
+              <!-- Dropdown de destinos -->
+              <div x-data="{open:false}" @click.outside="open=false" class="relative shrink-0">
+                <button @click="open=!open" :disabled="migrationTargets(a).length===0"
+                  class="text-xs px-3 py-1.5 rounded font-medium inline-flex items-center gap-1"
+                  :class="migrationTargets(a).length ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'">
+                  <span x-text="migrationTargets(a).length ? 'Migrar' : 'Em todas as lojas ✓'"></span>
+                  <svg x-show="migrationTargets(a).length" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+                <div x-show="open" x-transition.opacity class="absolute right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[200px]">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-400 px-3 py-1">Migrar para:</div>
+                  <template x-for="t in migrationTargets(a)" :key="t.label">
+                    <button @click="open=false; startMigration(t)" class="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">
+                      <span x-text="t.icon"></span><span x-text="t.label"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
             </div>
           </template>
-          <div x-show="filteredMigration().length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
-            <div class="text-2xl mb-2">🎉</div>
-            <div>Nenhum candidato — tudo já está nos dois marketplaces!</div>
+          <div x-show="migrationList().length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
+            <div class="text-2xl mb-2">📦</div>
+            <div>Nenhum anúncio carregado. Rode o Discovery em Configurações.</div>
           </div>
         </div>
       </section>
@@ -1174,7 +1180,7 @@ export const html = `<!DOCTYPE html>
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div>
           <h3 class="font-semibold">Revisar migração</h3>
-          <p class="text-xs text-slate-500" x-text="migModal ? (migModal.source_platform==='shopee' ? '🟠 Shopee → 🟡 Mercado Livre' : '🟡 Mercado Livre → 🟠 Shopee') : ''"></p>
+          <p class="text-xs text-slate-500" x-text="migModal ? ((migModal.source_platform==='shopee'?'🟠 Shopee':'🟡 ML') + ' → ' + (migModal.target_platform==='meli'?'🟡 Mercado Livre':'🟠 ' + (migModal.target_label||'Shopee'))) : ''"></p>
         </div>
         <button @click="migModal=null" class="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
       </div>
@@ -2162,40 +2168,69 @@ function app() {
     },
 
     // ───────── Migração de Anúncios ─────────
-    async loadMigration() {
-      this.loading.migration = true;
-      try {
-        const d = await this.api('/api/migration/candidates');
-        this.migCandidates = d?.items || [];
-        const t = this.tabs.find(t => t.id === 'migration');
-        if (t) t.count = this.migCandidates.filter(c => c.draft_status !== 'published').length;
-      } finally { this.loading.migration = false; }
-    },
-    filteredMigration() {
-      let list = this.migCandidates;
-      if (this.migFilter !== 'all') list = list.filter(c => c.source_platform === this.migFilter);
+    // Usa a lista de anúncios (masterItems) já carregada. Mostra todos.
+    migrationList() {
+      let list = this.masterItems || [];
+      if (this.migFilter === 'incomplete') {
+        list = list.filter(a => this.migrationTargets(a).length > 0);
+      }
       const q = (this.migSearch || '').trim().toLowerCase();
-      if (q) list = list.filter(c => (c.product_name || '').toLowerCase().includes(q) || String(c.source_item_id).includes(q));
+      if (q) {
+        list = list.filter(a => (a.product_name || '').toLowerCase().includes(q)
+          || (a.variations || []).some(v => (v.sku || '').toLowerCase().includes(q)));
+      }
       return list;
     },
-    async startMigration(c) {
+    // Destinos possíveis pra migrar um anúncio (lojas onde ele NÃO está)
+    migrationTargets(a) {
+      const targets = [];
+      const shopeeStores = (a.shopee_stores || []).map(s => String(s.account_id));
+      // 1) Migrar pro ML (se não tem ML e tem origem Shopee)
+      if (!a.meli_item_id && a.shopee_item_id) {
+        targets.push({
+          icon: '🟡', label: 'Mercado Livre',
+          source_platform: 'shopee', source_item_id: String(a.shopee_item_id),
+          source_account_id: a.shopee_account_id || null, target_platform: 'meli',
+          product_name: a.product_name || '',
+        });
+      }
+      // 2) Migrar pra cada loja Shopee conectada onde o produto ainda não existe
+      const shopeeAccounts = (this.accounts || []).filter(acc => acc.marketplace === 'shopee');
+      for (const acc of shopeeAccounts) {
+        if (shopeeStores.includes(String(acc.external_id))) continue; // já está nessa loja
+        // origem preferida: ML (se existir) senão a Shopee atual
+        const src = a.meli_item_id
+          ? { source_platform: 'meli', source_item_id: String(a.meli_item_id), source_account_id: null }
+          : (a.shopee_item_id ? { source_platform: 'shopee', source_item_id: String(a.shopee_item_id), source_account_id: a.shopee_account_id || null } : null);
+        if (!src) continue;
+        targets.push({
+          icon: '🟠', label: acc.label || acc.external_id,
+          ...src, target_platform: 'shopee', target_shop_id: String(acc.external_id),
+          product_name: a.product_name || '',
+        });
+      }
+      return targets;
+    },
+    async startMigration(t) {
       this.loading.migDraft = true;
       this.migPublishMsg = '';
       try {
         const r = await this.api('/api/migration/draft', {
           method: 'POST',
           body: JSON.stringify({
-            source_platform: c.source_platform,
-            source_item_id: c.source_item_id,
-            source_account_id: c.source_account_id,
-            product_name: c.product_name,
+            source_platform: t.source_platform,
+            source_item_id: t.source_item_id,
+            source_account_id: t.source_account_id,
+            target_shop_id: t.target_shop_id || null,
+            product_name: t.product_name,
           }),
         });
         if (r?.error) { alert('Erro ao gerar rascunho: ' + r.error); return; }
         this.migModal = {
           id: r.id,
-          source_platform: c.source_platform,
-          target_platform: c.source_platform === 'shopee' ? 'meli' : 'shopee',
+          source_platform: t.source_platform,
+          target_platform: t.target_platform,
+          target_label: t.label,
           draft: r.draft,
           validation: r.validation || [],
           photos: r.photos || [],
