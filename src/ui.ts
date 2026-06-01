@@ -154,8 +154,19 @@ export const html = `<!DOCTYPE html>
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
           </button>
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 shrink-0">
             <h1 class="text-[16px] sm:text-[18px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'UniHub'"></h1>
+          </div>
+          <!-- Barra de busca global: filtra produtos/SKUs/variações; navega pra Estoque -->
+          <div class="flex-1 min-w-0 relative">
+            <div class="relative">
+              <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+              </span>
+              <input x-model="globalSearch" @input.debounce.250ms="runGlobalSearch()" @keydown.enter="runGlobalSearch(true)" @keydown.escape="globalSearch=''"
+                type="search" placeholder="Buscar SKU, produto, variação..."
+                class="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-indigo-400" />
+            </div>
           </div>
           <button @click="runSync()" :disabled="loading.sync"
             class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0">
@@ -1126,6 +1137,7 @@ function app() {
       { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
     sidebarOpen: false,
+    globalSearch: '',
     status: {},
     products: [],
     salesStats: [],
@@ -1942,6 +1954,23 @@ function app() {
       this.masterFilter = f;
       console.log('[setMasterFilter]', f);
       this.loadMaster();
+    },
+
+    // Busca global: sincroniza com a busca da aba ativa e navega pra Estoque
+    runGlobalSearch(forceNav) {
+      const q = (this.globalSearch || '').trim();
+      // Se estamos em Estoque ou Produtos, só atualiza a busca local da aba ativa
+      if (this.tab === 'stock' || this.tab === 'products') {
+        this.masterSearch = q;
+        this.loadMaster();
+        return;
+      }
+      // Em outras abas: se forceNav (Enter) ou tem texto, navega pra Estoque
+      if (q || forceNav) {
+        this.tab = 'stock';
+        this.masterSearch = q;
+        this.loadMaster();
+      }
     },
 
     setAccountFilter(id) {
