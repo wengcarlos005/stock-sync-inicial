@@ -39,12 +39,13 @@ export const html = `<!DOCTYPE html>
     header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); background-color: #ffffff !important; }
     /* Body sem scroll horizontal — garante que conteúdo não empurra a página */
     html, body { overflow-x: hidden; max-width: 100vw; }
-    /* Garantia explícita: content area é COLUNA com header em cima e main embaixo, full width.
-       Evita qualquer flex-row herdado que tava posicionando lado a lado. */
+    /* Garantia explícita: content area é COLUNA com header em cima e main embaixo, full width. */
     .content-wrap { display: flex !important; flex-direction: column !important; width: 100% !important; min-width: 0; }
-    .content-wrap > header { width: 100% !important; display: block !important; }
-    .content-wrap > main { width: 100% !important; display: block !important; flex: 1 1 auto; }
-    .content-wrap > main > section { display: block !important; width: 100% !important; }
+    .content-wrap > header { width: 100% !important; display: block; }
+    .content-wrap > main { width: 100% !important; display: block; flex: 1 1 auto; }
+    /* Sections: SOMENTE largura forçada. NÃO forçar display — senão sobrescreve x-show do Alpine
+       e todas as abas renderizam simultaneamente. */
+    .content-wrap > main > section { width: 100%; }
     /* Brand logo container */
     .brand-mark { display: flex; align-items: center; justify-content: center; }
     .brand-mark svg { display: block; width: 100%; height: 100%; }
