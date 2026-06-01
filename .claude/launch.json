@@ -1,6 +1,0 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    { "name": "ui-test", "runtimeExecutable": "node", "runtimeArgs": ["test-server.cjs"], "port": 8123 }
-  ]
-}
