@@ -39,6 +39,12 @@ export const html = `<!DOCTYPE html>
     header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); background-color: #ffffff !important; }
     /* Body sem scroll horizontal — garante que conteúdo não empurra a página */
     html, body { overflow-x: hidden; max-width: 100vw; }
+    /* Garantia explícita: content area é COLUNA com header em cima e main embaixo, full width.
+       Evita qualquer flex-row herdado que tava posicionando lado a lado. */
+    .content-wrap { display: flex !important; flex-direction: column !important; width: 100% !important; min-width: 0; }
+    .content-wrap > header { width: 100% !important; display: block !important; }
+    .content-wrap > main { width: 100% !important; display: block !important; flex: 1 1 auto; }
+    .content-wrap > main > section { display: block !important; width: 100% !important; }
     /* Brand logo container */
     .brand-mark { display: flex; align-items: center; justify-content: center; }
     .brand-mark svg { display: block; width: 100%; height: 100%; }
@@ -146,7 +152,7 @@ export const html = `<!DOCTYPE html>
     </aside>
 
     <!-- Content area -->
-    <div class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
+    <div class="content-wrap flex-1 min-w-0 overflow-x-hidden">
 
       <!-- Top bar -->
       <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
