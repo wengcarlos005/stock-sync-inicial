@@ -154,19 +154,8 @@ export const html = `<!DOCTYPE html>
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
           </button>
-          <div class="min-w-0 shrink-0">
+          <div class="min-w-0 flex-1">
             <h1 class="text-[16px] sm:text-[18px] font-bold text-slate-900 leading-tight truncate" x-text="(tabs.find(t=>t.id===tab)?.label) || 'UniHub'"></h1>
-          </div>
-          <!-- Barra de busca global: filtra produtos/SKUs/variações; navega pra Estoque -->
-          <div class="flex-1 min-w-0 relative">
-            <div class="relative">
-              <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
-              </span>
-              <input x-model="globalSearch" @input.debounce.250ms="runGlobalSearch()" @keydown.enter="runGlobalSearch(true)" @keydown.escape="globalSearch=''"
-                type="search" placeholder="Buscar SKU, produto, variação..."
-                class="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-indigo-400" />
-            </div>
           </div>
           <button @click="runSync()" :disabled="loading.sync"
             class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0">
@@ -640,6 +629,17 @@ export const html = `<!DOCTYPE html>
 
       <!-- Movimentações -->
       <section x-show="tab === 'changes'" x-cloak>
+        <!-- Barra de busca: filtra por SKU/produto/origem -->
+        <div class="mb-4 relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          </span>
+          <input x-model="changesSearch" type="search" placeholder="Buscar por SKU, produto, origem (ML/SP/manual)..."
+            class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-indigo-400 bg-white" />
+          <span x-show="changesSearch" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+            <span x-text="filteredChanges().length"></span> de <span x-text="changes.length"></span>
+          </span>
+        </div>
         <!-- Desktop/tablet: tabela compacta com scroll horizontal interno -->
         <div class="hidden md:block bg-white border border-slate-200 rounded-lg overflow-hidden">
           <div class="overflow-x-auto">
@@ -658,7 +658,7 @@ export const html = `<!DOCTYPE html>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <template x-for="c in changes" :key="c.id">
+              <template x-for="c in filteredChanges()" :key="c.id">
                 <tr :class="c.shadow ? 'bg-amber-50/50' : ''">
                   <td class="px-3 py-3 text-xs text-slate-500" x-text="fmtRelative(c.ts)"></td>
                   <td class="px-3 py-3">
@@ -685,8 +685,8 @@ export const html = `<!DOCTYPE html>
                   </td>
                 </tr>
               </template>
-              <tr x-show="changes.length === 0">
-                <td colspan="6" class="text-center py-8 text-slate-400">Nenhuma movimentação ainda. Use "Reconstruir Movimentações" na aba Config.</td>
+              <tr x-show="filteredChanges().length === 0">
+                <td colspan="6" class="text-center py-8 text-slate-400" x-text="changesSearch ? 'Nenhuma movimentação bate com a busca.' : 'Nenhuma movimentação ainda. Use \\'Reconstruir Movimentações\\' na aba Config.'"></td>
               </tr>
             </tbody>
           </table>
@@ -694,7 +694,7 @@ export const html = `<!DOCTYPE html>
         </div>
         <!-- Mobile: cards (uma movimentação por card, mais legível que tabela) -->
         <div class="md:hidden space-y-2">
-          <template x-for="c in changes" :key="c.id">
+          <template x-for="c in filteredChanges()" :key="c.id">
             <div class="bg-white border border-slate-200 rounded-lg p-3" :class="c.shadow ? 'bg-amber-50/50' : ''">
               <div class="flex justify-between items-start gap-2 mb-1">
                 <div class="min-w-0 flex-1">
@@ -719,7 +719,7 @@ export const html = `<!DOCTYPE html>
               </template>
             </div>
           </template>
-          <div x-show="changes.length === 0" class="text-center py-8 text-slate-400 bg-white border border-slate-200 rounded-lg">Nenhuma movimentação ainda.</div>
+          <div x-show="filteredChanges().length === 0" class="text-center py-8 text-slate-400 bg-white border border-slate-200 rounded-lg" x-text="changesSearch ? 'Nenhuma movimentação bate com a busca.' : 'Nenhuma movimentação ainda.'"></div>
         </div>
       </section>
 
@@ -1137,7 +1137,6 @@ function app() {
       { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
     sidebarOpen: false,
-    globalSearch: '',
     status: {},
     products: [],
     salesStats: [],
@@ -1148,6 +1147,7 @@ function app() {
     masterFilter: 'all',
     accountFilter: '', // '' = todas. Ou external_id da conta (meli ou shopee)
     changes: [],
+    changesSearch: '',
     unmapped: [],
     runs: [],
     productSearch: '',
@@ -1956,21 +1956,16 @@ function app() {
       this.loadMaster();
     },
 
-    // Busca global: sincroniza com a busca da aba ativa e navega pra Estoque
-    runGlobalSearch(forceNav) {
-      const q = (this.globalSearch || '').trim();
-      // Se estamos em Estoque ou Produtos, só atualiza a busca local da aba ativa
-      if (this.tab === 'stock' || this.tab === 'products') {
-        this.masterSearch = q;
-        this.loadMaster();
-        return;
-      }
-      // Em outras abas: se forceNav (Enter) ou tem texto, navega pra Estoque
-      if (q || forceNav) {
-        this.tab = 'stock';
-        this.masterSearch = q;
-        this.loadMaster();
-      }
+    // Filtra movimentações por SKU, produto, origem (ml/shopee/manual)
+    filteredChanges() {
+      const q = (this.changesSearch || '').trim().toLowerCase();
+      if (!q) return this.changes;
+      return this.changes.filter(c => {
+        const sku = (c.sku || '').toLowerCase();
+        const name = (c.product_name || '').toLowerCase();
+        const source = (c.source || '').toLowerCase();
+        return sku.includes(q) || name.includes(q) || source.includes(q);
+      });
     },
 
     setAccountFilter(id) {
