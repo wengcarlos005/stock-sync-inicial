@@ -3794,6 +3794,73 @@ add('GET', '/api/orders', async (req, env) => {
 // ============= Toggle shadow mode (requires re-deploy to persist via vars) =============
 // Note: vars in wrangler.toml don't change at runtime. Documented in UI as "edit wrangler.toml + deploy".
 
+// ============= Migração de anúncios (Shopee ↔ ML) =============
+import * as migration from './migration';
+
+// Lista candidatos a migração (existe num lado, falta no outro)
+add('GET', '/api/migration/candidates', async (_req, env) => {
+  await migration.ensureMigrationTable(env);
+  const items = await migration.findCandidates(env);
+  return json({ items, total: items.length });
+});
+
+// Gera (ou regenera) rascunho adaptado pra um candidato
+add('POST', '/api/migration/draft', async (req, env) => {
+  await migration.ensureMigrationTable(env);
+  const body = await req.json() as any;
+  const { source_platform, source_item_id, source_account_id, product_name, image_url } = body;
+  let result;
+  let target_platform: string;
+  if (source_platform === 'shopee') {
+    target_platform = 'meli';
+    result = await migration.buildMeliDraftFromShopee(env, String(source_item_id), source_account_id || undefined);
+  } else {
+    target_platform = 'shopee';
+    result = await migration.buildShopeeDraftFromMeli(env, String(source_item_id), body.target_shop_id || undefined);
+  }
+  const id = await migration.saveDraft(env, {
+    source_platform, source_item_id: String(source_item_id), source_account_id: source_account_id || null,
+    target_platform, product_name: product_name || result.source_summary?.name || '', image_url: image_url || null,
+  }, result);
+  return json({ id, ...result });
+});
+
+// Lê um rascunho salvo
+add('GET', '/api/migration/draft/:id', async (_req, env, params) => {
+  const row = await env.DB.prepare(`SELECT * FROM migration_drafts WHERE id=?`).bind(params.id).first<any>();
+  if (!row) return json({ error: 'rascunho não encontrado' }, 404);
+  return json({
+    ...row,
+    draft: JSON.parse(row.draft_json || '{}'),
+    photos: JSON.parse(row.photos_json || '[]'),
+    validation: JSON.parse(row.validation_json || '[]'),
+  });
+});
+
+// Atualiza campos do rascunho (edição manual na revisão)
+add('PUT', '/api/migration/draft/:id', async (req, env, params) => {
+  const body = await req.json() as any;
+  const row = await env.DB.prepare(`SELECT draft_json FROM migration_drafts WHERE id=?`).bind(params.id).first<any>();
+  if (!row) return json({ error: 'não encontrado' }, 404);
+  const merged = { ...JSON.parse(row.draft_json || '{}'), ...(body.draft || {}) };
+  await env.DB.prepare(`UPDATE migration_drafts SET draft_json=?, updated_at=? WHERE id=?`)
+    .bind(JSON.stringify(merged), Date.now(), params.id).run();
+  return json({ ok: true, draft: merged });
+});
+
+// Publica o rascunho no marketplace destino
+add('POST', '/api/migration/publish/:id', async (req, env, params) => {
+  const body = await req.json().catch(() => ({})) as any;
+  const r = await migration.publishDraft(env, Number(params.id), body);
+  return json(r);
+});
+
+// Descarta um rascunho
+add('DELETE', '/api/migration/draft/:id', async (_req, env, params) => {
+  await env.DB.prepare(`DELETE FROM migration_drafts WHERE id=?`).bind(params.id).run();
+  return json({ ok: true });
+});
+
 // ============= Router entry =============
 export async function handleApi(req: Request, env: Env): Promise<Response | null> {
   const url = new URL(req.url);

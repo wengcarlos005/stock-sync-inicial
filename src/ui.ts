@@ -89,6 +89,7 @@ export const html = `<!DOCTYPE html>
   <template id="ico-changes"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></template>
   <template id="ico-unmapped"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg></template>
   <template id="ico-config"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></template>
+  <template id="ico-migration"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg></template>
   <template id="ico-sync"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg></template>
   <template id="ico-logout"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/></svg></template>
   <template id="ico-menu"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg></template>
@@ -814,6 +815,54 @@ export const html = `<!DOCTYPE html>
         </div>
       </section>
 
+      <!-- Migração de Anúncios -->
+      <section x-show="tab === 'migration'" x-cloak>
+        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 text-sm text-indigo-800">
+          Produtos que existem em <strong>apenas um marketplace</strong>. Gere um rascunho adaptado pro outro lado, revise, e publique — o anúncio novo já entra pareado no sync de estoque.
+        </div>
+        <div class="flex flex-wrap gap-3 mb-4 items-center">
+          <input x-model="migSearch" placeholder="Buscar candidato por nome ou ID..." class="flex-1 min-w-[240px] px-4 py-2 border border-slate-300 rounded-lg text-sm" />
+          <div class="flex bg-slate-100 p-1 rounded-lg gap-1">
+            <button @click="migFilter='all'" :class="migFilter==='all' ? 'bg-indigo-600 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">Todos</button>
+            <button @click="migFilter='shopee'" :class="migFilter==='shopee' ? 'bg-orange-500 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">🟠 Só Shopee → ML</button>
+            <button @click="migFilter='meli'" :class="migFilter==='meli' ? 'bg-amber-500 text-white' : 'text-slate-600'" class="text-xs px-3 py-1.5 rounded">🟡 Só ML → Shopee</button>
+          </div>
+          <button @click="loadMigration()" :disabled="loading.migration" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">
+            <span x-show="!loading.migration">↻ Atualizar</span><span x-show="loading.migration">Carregando...</span>
+          </button>
+        </div>
+        <div class="text-xs text-slate-500 mb-3"><span x-text="filteredMigration().length"></span> candidatos</div>
+
+        <div class="space-y-2">
+          <template x-for="c in filteredMigration()" :key="c.source_platform + c.source_item_id">
+            <div class="bg-white border border-slate-200 rounded-lg p-3 flex items-center gap-3">
+              <span class="text-xs px-2 py-0.5 rounded shrink-0 font-medium" :class="c.source_platform==='shopee' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-800'" x-text="c.source_platform==='shopee' ? '🟠 SP' : '🟡 ML'"></span>
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-medium truncate" x-text="c.product_name || '(sem nome)'"></div>
+                <div class="text-[11px] text-slate-400 font-mono">
+                  <span x-text="c.source_item_id"></span>
+                  <span x-show="c.source_account_label" x-text="' · ' + c.source_account_label"></span>
+                  <span x-text="' · ' + c.variation_count + ' variação(ões)'"></span>
+                </div>
+              </div>
+              <span class="text-[11px] text-slate-400 shrink-0" x-text="c.source_platform==='shopee' ? '→ Mercado Livre' : '→ Shopee'"></span>
+              <template x-if="c.draft_status === 'published'">
+                <span class="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 rounded shrink-0">✓ publicado</span>
+              </template>
+              <template x-if="c.draft_status !== 'published'">
+                <button @click="startMigration(c)" :disabled="loading.migDraft"
+                  class="shrink-0 text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded font-medium"
+                  x-text="c.draft_status ? 'Revisar rascunho' : (c.source_platform==='shopee' ? 'Migrar pro ML' : 'Migrar pra Shopee')"></button>
+              </template>
+            </div>
+          </template>
+          <div x-show="filteredMigration().length === 0" class="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-lg">
+            <div class="text-2xl mb-2">🎉</div>
+            <div>Nenhum candidato — tudo já está nos dois marketplaces!</div>
+          </div>
+        </div>
+      </section>
+
       <!-- Config -->
       <section x-show="tab === 'config'" x-cloak>
         <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-6 space-y-6">
@@ -1119,6 +1168,136 @@ export const html = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Migração: modal de revisão -->
+  <div x-show="migModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-40 p-4" @click.self="migModal=null" style="display:none">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[92vh]">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold">Revisar migração</h3>
+          <p class="text-xs text-slate-500" x-text="migModal ? (migModal.source_platform==='shopee' ? '🟠 Shopee → 🟡 Mercado Livre' : '🟡 Mercado Livre → 🟠 Shopee') : ''"></p>
+        </div>
+        <button @click="migModal=null" class="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-5 space-y-4" x-show="migModal && migModal.draft">
+        <!-- Validação -->
+        <template x-if="migModal && migModal.validation && migModal.validation.length">
+          <div class="space-y-1">
+            <template x-for="(v,vi) in migModal.validation" :key="vi">
+              <div class="text-xs px-3 py-1.5 rounded flex items-start gap-2" :class="v.level==='error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
+                <span x-text="v.level==='error' ? '⛔' : '⚠️'"></span>
+                <span x-text="v.message"></span>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Origem ↔ Destino -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Origem (read-only) -->
+          <div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div class="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-2">Origem</div>
+            <div class="space-y-1.5 text-sm">
+              <div><span class="text-slate-400 text-xs">Nome:</span><br><span x-text="migModal?.source_summary?.name"></span></div>
+              <div><span class="text-slate-400 text-xs">Preço:</span> <span x-text="'R$ ' + (migModal?.source_summary?.price||0)"></span></div>
+              <div><span class="text-slate-400 text-xs">Estoque:</span> <span x-text="migModal?.source_summary?.qty||0"></span></div>
+              <div><span class="text-slate-400 text-xs">Fotos:</span> <span x-text="migModal?.source_summary?.photos||0"></span></div>
+              <div><span class="text-slate-400 text-xs">Variações:</span> <span x-text="migModal?.source_summary?.variations||0"></span></div>
+            </div>
+          </div>
+
+          <!-- Destino (editável) -->
+          <div class="border border-indigo-200 rounded-lg p-3">
+            <div class="text-[10px] uppercase tracking-wide text-indigo-500 font-semibold mb-2">Destino (rascunho — edite o que precisar)</div>
+            <div class="space-y-2 text-sm">
+              <!-- ML draft -->
+              <template x-if="migModal && migModal.target_platform==='meli'">
+                <div class="space-y-2">
+                  <label class="block">
+                    <span class="text-xs text-slate-500">Título (máx 60) <span x-text="'· ' + (migModal.draft.title?.length||0) + '/60'" :class="(migModal.draft.title?.length||0)>60 ? 'text-red-600' : 'text-slate-400'"></span></span>
+                    <input x-model="migModal.draft.title" maxlength="60" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" />
+                  </label>
+                  <label class="block">
+                    <span class="text-xs text-slate-500">Categoria ML</span>
+                    <select x-model="migModal.draft.category_id" class="w-full px-2 py-1 border border-slate-300 rounded text-sm bg-white">
+                      <template x-for="cs in (migModal.draft.category_suggestions||[])" :key="cs.category_id">
+                        <option :value="cs.category_id" x-text="cs.category_id + ' — ' + cs.category_name"></option>
+                      </template>
+                    </select>
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block"><span class="text-xs text-slate-500">Preço R$</span>
+                      <input type="number" step="0.01" x-model.number="migModal.draft.price" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                    <label class="block"><span class="text-xs text-slate-500">Estoque</span>
+                      <input type="number" x-model.number="migModal.draft.available_quantity" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                  </div>
+                  <!-- Atributos editáveis -->
+                  <div>
+                    <span class="text-xs text-slate-500">Atributos</span>
+                    <div class="space-y-1 mt-1 max-h-40 overflow-y-auto">
+                      <template x-for="(a,ai) in migModal.draft.attributes" :key="ai">
+                        <div class="flex gap-1.5 items-center">
+                          <span class="text-[10px] font-mono text-slate-400 w-32 shrink-0 truncate" x-text="a.id"></span>
+                          <input x-model="a.value_name" class="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs" />
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <!-- Shopee draft -->
+              <template x-if="migModal && migModal.target_platform==='shopee'">
+                <div class="space-y-2">
+                  <label class="block"><span class="text-xs text-slate-500">Nome (máx 120)</span>
+                    <input x-model="migModal.draft.item_name" maxlength="120" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                  <label class="block"><span class="text-xs text-slate-500">Categoria Shopee</span>
+                    <select x-model="migModal.draft.category_id" class="w-full px-2 py-1 border border-slate-300 rounded text-sm bg-white">
+                      <template x-for="cs in (migModal.draft.category_suggestions||[])" :key="cs">
+                        <option :value="cs" x-text="cs"></option>
+                      </template>
+                    </select></label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block"><span class="text-xs text-slate-500">Preço R$</span>
+                      <input type="number" step="0.01" x-model.number="migModal.draft.original_price" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                    <label class="block"><span class="text-xs text-slate-500">Estoque</span>
+                      <input type="number" x-model.number="migModal.draft.stock" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block"><span class="text-xs text-slate-500">Peso (kg)</span>
+                      <input type="number" step="0.01" x-model.number="migModal.draft.weight" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                    <label class="block"><span class="text-xs text-slate-500">Marca</span>
+                      <input x-model="migModal.draft.brand.original_brand_name" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Fotos preview -->
+              <div>
+                <span class="text-xs text-slate-500" x-text="'Fotos (' + (migModal?.photos?.length||0) + ')'"></span>
+                <div class="flex gap-1 mt-1 flex-wrap">
+                  <template x-for="(p,pi) in (migModal?.photos||[])" :key="pi">
+                    <img :src="p.source" class="w-12 h-12 object-cover rounded border border-slate-200" loading="lazy" />
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-4 border-t border-slate-200 flex gap-2 items-center">
+        <span x-show="migPublishMsg" class="text-xs flex-1" :class="migPublishOk ? 'text-emerald-700' : 'text-red-600'" x-text="migPublishMsg"></span>
+        <span x-show="!migPublishMsg" class="flex-1 text-xs text-slate-400" x-text="(migModal?.validation||[]).some(v=>v.level==='error') ? '⛔ Resolva os erros antes de publicar' : '✓ Pronto pra publicar'"></span>
+        <button @click="migModal=null" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Fechar</button>
+        <button @click="publishMigration()" :disabled="loading.migPublish || (migModal?.validation||[]).some(v=>v.level==='error')"
+          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-medium rounded text-sm">
+          <span x-show="!loading.migPublish" x-text="migModal?.target_platform==='meli' ? 'Publicar no ML' : 'Publicar na Shopee'"></span>
+          <span x-show="loading.migPublish">Publicando...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -1134,6 +1313,7 @@ function app() {
       { id: 'products', label: 'Produtos',      icon: 'products' },
       { id: 'changes',  label: 'Movimentações', icon: 'changes' },
       { id: 'unmapped', label: 'Não pareados',  icon: 'unmapped' },
+      { id: 'migration',label: 'Migração de Anúncios', icon: 'migration' },
       { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
     sidebarOpen: false,
@@ -1148,11 +1328,17 @@ function app() {
     accountFilter: '', // '' = todas. Ou external_id da conta (meli ou shopee)
     changes: [],
     changesSearch: '',
+    migCandidates: [],
+    migSearch: '',
+    migFilter: 'all',
+    migModal: null,
+    migPublishMsg: '',
+    migPublishOk: false,
     unmapped: [],
     runs: [],
     productSearch: '',
     productFilter: 'all',
-    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false, refreshAll: false, reprocessMl: false, matchSku: false, fixMlVar: false, superPair: false, acctSync: false, acctBackfill: false },
+    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false, refreshAll: false, reprocessMl: false, matchSku: false, fixMlVar: false, superPair: false, acctSync: false, acctBackfill: false, migration: false, migDraft: false, migPublish: false },
     refreshAllResult: null,
     reprocessMlResult: null,
     matchSkuResult: null,
@@ -1199,6 +1385,8 @@ function app() {
       if (!this.token) return;
       await this.loadAll();
       this.pollTimer = setInterval(() => this.loadStatus(), 30000);
+      // Lazy-load candidatos de migração ao abrir a aba pela 1ª vez
+      this.$watch('tab', (t) => { if (t === 'migration' && !this.migCandidates.length) this.loadMigration(); });
     },
 
     async login() {
@@ -1971,6 +2159,81 @@ function app() {
     setAccountFilter(id) {
       // Toggle: clicar de novo desmarca
       this.accountFilter = (this.accountFilter === id) ? '' : id;
+    },
+
+    // ───────── Migração de Anúncios ─────────
+    async loadMigration() {
+      this.loading.migration = true;
+      try {
+        const d = await this.api('/api/migration/candidates');
+        this.migCandidates = d?.items || [];
+        const t = this.tabs.find(t => t.id === 'migration');
+        if (t) t.count = this.migCandidates.filter(c => c.draft_status !== 'published').length;
+      } finally { this.loading.migration = false; }
+    },
+    filteredMigration() {
+      let list = this.migCandidates;
+      if (this.migFilter !== 'all') list = list.filter(c => c.source_platform === this.migFilter);
+      const q = (this.migSearch || '').trim().toLowerCase();
+      if (q) list = list.filter(c => (c.product_name || '').toLowerCase().includes(q) || String(c.source_item_id).includes(q));
+      return list;
+    },
+    async startMigration(c) {
+      this.loading.migDraft = true;
+      this.migPublishMsg = '';
+      try {
+        const r = await this.api('/api/migration/draft', {
+          method: 'POST',
+          body: JSON.stringify({
+            source_platform: c.source_platform,
+            source_item_id: c.source_item_id,
+            source_account_id: c.source_account_id,
+            product_name: c.product_name,
+          }),
+        });
+        if (r?.error) { alert('Erro ao gerar rascunho: ' + r.error); return; }
+        this.migModal = {
+          id: r.id,
+          source_platform: c.source_platform,
+          target_platform: c.source_platform === 'shopee' ? 'meli' : 'shopee',
+          draft: r.draft,
+          validation: r.validation || [],
+          photos: r.photos || [],
+          source_summary: r.source_summary || {},
+        };
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally { this.loading.migDraft = false; }
+    },
+    async publishMigration() {
+      if (!this.migModal) return;
+      if (!confirm('Publicar este anúncio no marketplace destino? Esta ação cria o anúncio ao vivo.')) return;
+      this.loading.migPublish = true;
+      this.migPublishMsg = '';
+      try {
+        // Salva edições do rascunho primeiro
+        await this.api('/api/migration/draft/' + this.migModal.id, {
+          method: 'PUT', body: JSON.stringify({ draft: this.migModal.draft }),
+        });
+        const r = await this.api('/api/migration/publish/' + this.migModal.id, {
+          method: 'POST', body: JSON.stringify({}),
+        });
+        if (r?.ok) {
+          this.migPublishOk = true;
+          this.migPublishMsg = '✓ Publicado! ID ' + r.published_item_id + ' — pareado automaticamente.';
+          await this.loadMigration();
+          setTimeout(() => { this.migModal = null; this.migPublishMsg = ''; }, 2500);
+        } else if (r?.blocked) {
+          this.migPublishOk = false;
+          this.migPublishMsg = '⛔ Bloqueado: ' + (r.errors || []).map(e => e.message).join(' | ');
+        } else {
+          this.migPublishOk = false;
+          this.migPublishMsg = '✗ ' + (r?.error || 'falha desconhecida');
+        }
+      } catch (e) {
+        this.migPublishOk = false;
+        this.migPublishMsg = '✗ ' + (e?.message || e);
+      } finally { this.loading.migPublish = false; }
     },
 
     getIcon(name) {
