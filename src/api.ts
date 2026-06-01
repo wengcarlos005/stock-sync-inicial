@@ -1223,16 +1223,17 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
   const meliBefore = prev?.meli_stock ?? null;
   const shopeeBefore = prev?.shopee_stock ?? null;
 
-  // Apply to both (if not shadow)
+  // Apply to both (if not shadow) — TODAS as plataformas EM PARALELO via Promise.allSettled
   let propagated: string[] = [];
   const errors: any[] = [];
   if (!shadow) {
     const mac = await import('./mac');
-    // ML
-    if (map.meli_item_id) {
+
+    // Promise pra ML (com fallback de variation_id quando faltando)
+    const mlTask = (async () => {
+      if (!map.meli_item_id) return;
       try {
         let meliVarId = map.meli_variation_id ? Number(map.meli_variation_id) : undefined;
-        // FALLBACK: se variation_id está faltando, busca live no ML e tenta achar a variação pelo SKU
         if (!meliVarId) {
           try {
             const item = await mac.meliGetItem(env, map.meli_item_id);
@@ -1241,14 +1242,16 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
               const matchBySku = vars.find((v: any) => mac.getMeliVariationSku(v)?.trim() === params.sku);
               if (matchBySku) {
                 meliVarId = Number(matchBySku.id);
-                // Persiste no mapping pra evitar lookup futuro
-                await env.DB.prepare(`UPDATE mappings SET meli_variation_id=? WHERE sku=?`).bind(String(meliVarId), params.sku).run();
+                // Persiste pra evitar lookup futuro (fire-and-forget pra não bloquear)
+                env.DB.prepare(`UPDATE mappings SET meli_variation_id=? WHERE sku=?`).bind(String(meliVarId), params.sku).run().catch(()=>{});
               } else {
                 errors.push({ platform: 'meli', error: `Item ${map.meli_item_id} tem ${vars.length} variações mas nenhuma com SKU=${params.sku}. Re-pareie manualmente.` });
+                return;
               }
             }
           } catch (e: any) {
             errors.push({ platform: 'meli', error: 'lookup falhou: ' + String(e.message) });
+            return;
           }
         }
         if (meliVarId || !map.meli_variation_id) {
@@ -1258,9 +1261,11 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
       } catch (e: any) {
         errors.push({ platform: 'meli', error: cleanApiError(e.message, 'meli') });
       }
-    }
-    // Shopee — rota pra conta correta via shopee_account_id se setado
-    if (map.shopee_item_id) {
+    })();
+
+    // Promise pra Shopee primary
+    const spPrimaryTask = (async () => {
+      if (!map.shopee_item_id) return;
       try {
         await mac.shopeeUpdateStock(
           env,
@@ -1273,26 +1278,32 @@ add('POST', '/api/products/:sku/set-stock', async (req, env, params) => {
       } catch (e: any) {
         errors.push({ platform: 'shopee', error: cleanApiError(e.message, 'shopee') });
       }
-    }
-    // Extras: outras lojas Shopee que compartilham este SKU
+    })();
+
+    // Promises pra cada loja Shopee extra (paralelo entre si também)
+    const extraTasks: Promise<void>[] = [];
     if (map.extra_shopee_stores) {
       let extras: any[] = [];
       try { extras = JSON.parse(map.extra_shopee_stores); } catch {}
       for (const ex of extras) {
-        try {
-          await mac.shopeeUpdateStock(
-            env,
-            Number(ex.item_id),
-            body.stock,
-            ex.model_id ? Number(ex.model_id) : undefined,
-            ex.account_id || undefined,
-          );
-          propagated.push('shopee:' + (ex.account_id || ex.item_id));
-        } catch (e: any) {
-          errors.push({ platform: 'shopee_extra:' + (ex.account_id || ex.item_id), error: cleanApiError(e.message, 'shopee') });
-        }
+        extraTasks.push((async () => {
+          try {
+            await mac.shopeeUpdateStock(
+              env,
+              Number(ex.item_id),
+              body.stock,
+              ex.model_id ? Number(ex.model_id) : undefined,
+              ex.account_id || undefined,
+            );
+            propagated.push('shopee:' + (ex.account_id || ex.item_id));
+          } catch (e: any) {
+            errors.push({ platform: 'shopee_extra:' + (ex.account_id || ex.item_id), error: cleanApiError(e.message, 'shopee') });
+          }
+        })());
       }
     }
+    // Espera TODAS em paralelo (latência total = max dos lados, não soma)
+    await Promise.allSettled([mlTask, spPrimaryTask, ...extraTasks]);
     if (propagated.length === 0 && errors.length > 0) {
       return json({ error: 'Falhou em todas as plataformas', details: errors }, 500);
     }
