@@ -1370,22 +1370,23 @@ export const html = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Migração: edição de UMA variação -->
+  <!-- Migração: edição de UMA variação. Tudo dentro de template x-if pra NÃO avaliar bindings quando null -->
   <div x-show="migVarModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4" @click.self="migVarModal=null" style="display:none">
+    <template x-if="migVarModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[92vh]">
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div>
           <h3 class="font-semibold">Migrar variação</h3>
-          <p class="text-xs text-slate-500" x-text="migVarModal ? ('Variação: ' + migVarModal.form.name) : ''"></p>
+          <p class="text-xs text-slate-500" x-text="'Variação: ' + migVarModal.form.name"></p>
         </div>
         <button @click="migVarModal=null" class="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-5 space-y-3" x-show="migVarModal">
+      <div class="flex-1 overflow-y-auto p-5 space-y-3">
         <!-- Seletor de loja destino -->
         <label class="block">
           <span class="text-xs text-slate-500">Migrar para qual loja?</span>
-          <select x-model="migVarModal.targetIdx" class="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white">
+          <select x-model.number="migVarModal.targetIdx" class="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white">
             <template x-for="(t,ti) in migVarModal.targets" :key="ti">
               <option :value="ti" x-text="t.icon + ' ' + t.label + (t.listingExists ? '' : ' — anúncio não existe lá')"></option>
             </template>
@@ -1411,7 +1412,7 @@ export const html = `<!DOCTYPE html>
             <input type="number" x-model.number="migVarModal.form.stock" class="w-full px-3 py-2 border border-slate-300 rounded text-sm" />
           </label>
         </div>
-        <template x-if="migVarModal && migVarModal.targets[migVarModal.targetIdx] && !migVarModal.targets[migVarModal.targetIdx].listingExists">
+        <template x-if="migVarModal.targets[migVarModal.targetIdx] && !migVarModal.targets[migVarModal.targetIdx].listingExists">
           <div class="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded p-2.5">
             ⚠️ O anúncio ainda não existe nessa loja. Não dá pra adicionar variação isolada a um anúncio inexistente — primeiro use <strong>"Migrar anúncio"</strong> pra criar o anúncio completo lá.
           </div>
@@ -1421,13 +1422,14 @@ export const html = `<!DOCTYPE html>
       <div class="px-5 py-4 border-t border-slate-200 flex gap-2 items-center">
         <span x-show="migVarMsg" class="text-xs flex-1" :class="migVarOk ? 'text-emerald-700' : 'text-red-600'" x-text="migVarMsg"></span>
         <button @click="migVarModal=null" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
-        <button @click="confirmVarMigrate()" :disabled="loading.migPublish || (migVarModal && migVarModal.targets[migVarModal.targetIdx] && !migVarModal.targets[migVarModal.targetIdx].listingExists)"
+        <button @click="confirmVarMigrate()" :disabled="loading.migPublish || (migVarModal.targets[migVarModal.targetIdx] && !migVarModal.targets[migVarModal.targetIdx].listingExists)"
           class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-medium rounded text-sm">
           <span x-show="!loading.migPublish">Migrar variação</span>
           <span x-show="loading.migPublish">Migrando...</span>
         </button>
       </div>
     </div>
+    </template>
   </div>
 
 </div>
