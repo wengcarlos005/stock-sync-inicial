@@ -39,13 +39,12 @@ export const html = `<!DOCTYPE html>
     header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); background-color: #ffffff !important; }
     /* Body sem scroll horizontal — garante que conteúdo não empurra a página */
     html, body { overflow-x: hidden; max-width: 100vw; }
-    /* Garantia explícita: content area é COLUNA com header em cima e main embaixo, full width. */
-    .content-wrap { display: flex !important; flex-direction: column !important; width: 100% !important; min-width: 0; }
-    .content-wrap > header { width: 100% !important; display: block; }
-    .content-wrap > main { width: 100% !important; display: block; flex: 1 1 auto; }
-    /* Sections: SOMENTE largura forçada. NÃO forçar display — senão sobrescreve x-show do Alpine
-       e todas as abas renderizam simultaneamente. */
-    .content-wrap > main > section { width: 100%; }
+    /* Layout principal: grid de 2 colunas (sidebar + conteúdo), 1 row */
+    .app-layout { display: grid !important; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    @media (max-width: 767px) { .app-layout { grid-template-columns: 1fr; } }
+    .app-layout > aside { grid-column: 1; }
+    .app-layout > .content-wrap { grid-column: 2; min-width: 0; display: block; }
+    @media (max-width: 767px) { .app-layout > .content-wrap { grid-column: 1; } }
     /* Brand logo container */
     .brand-mark { display: flex; align-items: center; justify-content: center; }
     .brand-mark svg { display: block; width: 100%; height: 100%; }
@@ -100,8 +99,8 @@ export const html = `<!DOCTYPE html>
   <template id="ico-sun"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg></template>
   <template id="ico-moon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 8.992-5.998Z"/></svg></template>
 
-  <!-- Main layout: sidebar + content -->
-  <div x-show="token" class="flex min-h-screen relative">
+  <!-- Main layout: grid 2-col (sidebar fixo + conteúdo flexível) -->
+  <div x-show="token" class="app-layout relative">
 
     <!-- Mobile sidebar overlay -->
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="sidebar-mobile-overlay fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
@@ -152,11 +151,11 @@ export const html = `<!DOCTYPE html>
       </div>
     </aside>
 
-    <!-- Content area — inline style pra forçar flex-col (Tailwind CDN tava conflitando) -->
-    <div class="content-wrap flex-1 min-w-0 overflow-x-hidden" style="display:flex !important; flex-direction:column !important; width:100% !important;">
+    <!-- Content area (grid column 2 via .content-wrap) -->
+    <div class="content-wrap overflow-x-hidden">
 
       <!-- Top bar -->
-      <header class="app-surface border-b border-slate-200 sticky top-0 z-30" style="display:block !important; width:100% !important;">
+      <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
@@ -208,7 +207,7 @@ export const html = `<!DOCTYPE html>
       </header>
 
       <!-- Tab content -->
-      <main class="flex-1 px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden" style="display:block !important; width:100% !important;">
+      <main class="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden">
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
