@@ -897,21 +897,10 @@ export const html = `<!DOCTYPE html>
                           </td>
                         </template>
                         <td class="px-3 py-2 text-right">
-                          <div x-show="variationMissingStores(a,v).length" x-data="{open:false}" @click.outside="open=false" class="relative inline-block">
-                            <button @click="open=!open" class="text-[11px] px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium inline-flex items-center gap-1">
-                              Migrar variação
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
-                            </button>
-                            <div x-show="open" x-transition.opacity class="absolute right-0 mt-1 z-30 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[180px]">
-                              <div class="text-[10px] uppercase tracking-wide text-slate-400 px-3 py-1">Migrar para:</div>
-                              <template x-for="t in variationMissingStores(a,v)" :key="t.label">
-                                <button @click="open=false; openVarMigrate(a,v,t)" class="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-50 flex items-center gap-2">
-                                  <span x-text="t.icon"></span><span x-text="t.label"></span>
-                                  <span x-show="!t.listingExists" class="text-[9px] text-amber-600 ml-auto">novo anúncio</span>
-                                </button>
-                              </template>
-                            </div>
-                          </div>
+                          <button x-show="variationMissingStores(a,v).length" @click="openVarMigrate(a,v)"
+                            class="text-[11px] px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium">
+                            Migrar variação
+                          </button>
                           <span x-show="!variationMissingStores(a,v).length" class="text-[10px] text-emerald-600">✓ completa</span>
                         </td>
                       </tr>
@@ -1387,13 +1376,23 @@ export const html = `<!DOCTYPE html>
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div>
           <h3 class="font-semibold">Migrar variação</h3>
-          <p class="text-xs text-slate-500" x-text="migVarModal ? ('→ ' + migVarModal.target.icon + ' ' + migVarModal.target.label + (migVarModal.target.listingExists ? ' (adiciona ao anúncio existente)' : ' (cria anúncio novo)')) : ''"></p>
+          <p class="text-xs text-slate-500" x-text="migVarModal ? ('Variação: ' + migVarModal.form.name) : ''"></p>
         </div>
         <button @click="migVarModal=null" class="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
       </div>
 
       <div class="flex-1 overflow-y-auto p-5 space-y-3" x-show="migVarModal">
-        <div class="text-[11px] text-slate-400">Dados preenchidos a partir da variação de origem. Edite o que precisar.</div>
+        <!-- Seletor de loja destino -->
+        <label class="block">
+          <span class="text-xs text-slate-500">Migrar para qual loja?</span>
+          <select x-model="migVarModal.targetIdx" class="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-white">
+            <template x-for="(t,ti) in migVarModal.targets" :key="ti">
+              <option :value="ti" x-text="t.icon + ' ' + t.label + (t.listingExists ? '' : ' — anúncio não existe lá')"></option>
+            </template>
+          </select>
+        </label>
+
+        <div class="border-t pt-3 text-[11px] text-slate-400">Dados da variação (preenchidos da origem — edite se quiser):</div>
         <label class="block">
           <span class="text-xs text-slate-500">Nome da variação</span>
           <input x-model="migVarModal.form.name" class="w-full px-3 py-2 border border-slate-300 rounded text-sm" />
@@ -1404,7 +1403,7 @@ export const html = `<!DOCTYPE html>
         </label>
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="text-xs text-slate-500">Preço R$ <span class="text-slate-400" x-text="migVarModal && migVarModal.target.kind==='meli' && !migVarModal.form.price ? '(usa preço do anúncio)' : ''"></span></span>
+            <span class="text-xs text-slate-500">Preço R$ <span class="text-slate-400">(vazio = preço do anúncio)</span></span>
             <input type="number" step="0.01" x-model.number="migVarModal.form.price" placeholder="auto" class="w-full px-3 py-2 border border-slate-300 rounded text-sm" />
           </label>
           <label class="block">
@@ -1412,9 +1411,9 @@ export const html = `<!DOCTYPE html>
             <input type="number" x-model.number="migVarModal.form.stock" class="w-full px-3 py-2 border border-slate-300 rounded text-sm" />
           </label>
         </div>
-        <template x-if="migVarModal && !migVarModal.target.listingExists">
+        <template x-if="migVarModal && migVarModal.targets[migVarModal.targetIdx] && !migVarModal.targets[migVarModal.targetIdx].listingExists">
           <div class="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded p-2.5">
-            ⚠️ O anúncio ainda não existe nessa loja. Não dá pra adicionar uma variação isolada a um anúncio inexistente — primeiro use <strong>"Migrar anúncio"</strong> pra criar o anúncio completo lá, depois complete as variações faltantes.
+            ⚠️ O anúncio ainda não existe nessa loja. Não dá pra adicionar variação isolada a um anúncio inexistente — primeiro use <strong>"Migrar anúncio"</strong> pra criar o anúncio completo lá.
           </div>
         </template>
       </div>
@@ -1422,7 +1421,7 @@ export const html = `<!DOCTYPE html>
       <div class="px-5 py-4 border-t border-slate-200 flex gap-2 items-center">
         <span x-show="migVarMsg" class="text-xs flex-1" :class="migVarOk ? 'text-emerald-700' : 'text-red-600'" x-text="migVarMsg"></span>
         <button @click="migVarModal=null" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
-        <button @click="confirmVarMigrate()" :disabled="loading.migPublish || (migVarModal && !migVarModal.target.listingExists)"
+        <button @click="confirmVarMigrate()" :disabled="loading.migPublish || (migVarModal && migVarModal.targets[migVarModal.targetIdx] && !migVarModal.targets[migVarModal.targetIdx].listingExists)"
           class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-medium rounded text-sm">
           <span x-show="!loading.migPublish">Migrar variação</span>
           <span x-show="loading.migPublish">Migrando...</span>
@@ -2332,10 +2331,15 @@ function app() {
       }
       return out;
     },
-    openVarMigrate(a, v, target) {
+    openVarMigrate(a, v) {
       this.migVarMsg = '';
+      const targets = this.variationMissingStores(a, v);
+      if (!targets.length) return;
+      // pré-seleciona a primeira loja onde o anúncio JÁ existe (se houver)
+      let idx = targets.findIndex(t => t.listingExists);
+      if (idx < 0) idx = 0;
       this.migVarModal = {
-        a, v, target,
+        a, v, targets, targetIdx: idx,
         form: {
           name: this.cleanVariation(v.variation) || v.sku || '',
           sku: v.sku || '',
@@ -2346,11 +2350,13 @@ function app() {
     },
     async confirmVarMigrate() {
       const mm = this.migVarModal;
-      if (!mm || !mm.target.listingExists) return;
+      if (!mm) return;
+      const t = mm.targets[mm.targetIdx];
+      if (!t || !t.listingExists) return;
       this.loading.migPublish = true;
       this.migVarMsg = '';
       try {
-        const a = mm.a, t = mm.target;
+        const a = mm.a;
         const variation = { name: mm.form.name, sku: mm.form.sku, qty: mm.form.stock, price: mm.form.price || 0 };
         let body;
         if (t.kind === 'meli') {
