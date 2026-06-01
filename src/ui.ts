@@ -625,7 +625,6 @@ export const html = `<!DOCTYPE html>
               </tr>
             </tbody>
           </table>
-        </div>
       </section>
 
       <!-- Movimentações -->
