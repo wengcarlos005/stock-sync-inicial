@@ -20,7 +20,8 @@ export default {
     const url = new URL(req.url);
 
     // Serve UI at root (sem auth — auth na UI por modal)
-    if (url.pathname === '/' || url.pathname === '/index.html') {
+    // /config: mesmo HTML, mas a UI detecta o pathname e renderiza só a aba Configurações sem sidebar/topbar
+    if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/config') {
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } });
     }
 

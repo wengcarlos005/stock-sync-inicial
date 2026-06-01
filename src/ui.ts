@@ -96,17 +96,14 @@ export const html = `<!DOCTYPE html>
   <template id="ico-sun"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg></template>
   <template id="ico-moon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 8.992-5.998Z"/></svg></template>
 
-  <!-- Main layout: grid 2-col (sidebar fixo + conteúdo flexível) -->
+  <!-- Main layout: sidebar + conteúdo (escondido quando aba Config tá em standalone) -->
   <div x-show="token" class="app-layout relative">
 
     <!-- Mobile sidebar overlay -->
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="sidebar-mobile-overlay fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
 
-    <!-- Sidebar
-         Mobile: fixed overlay (z-50) abre/fecha via sidebarOpen
-         Desktop (md+): sticky no fluxo normal, ocupa 240px do flex
-         bg controlado via CSS (.app-surface) pra evitar dark: do Tailwind brigar -->
-    <aside :class="sidebarOpen ? 'translate-x-0 fixed' : '-translate-x-full fixed'"
+    <!-- Sidebar (escondida em standalone /config) -->
+    <aside x-show="!isStandalone" :class="sidebarOpen ? 'translate-x-0 fixed' : '-translate-x-full fixed'"
       class="app-surface top-0 left-0 z-50 w-64 md:!w-60 md:!translate-x-0 md:!sticky md:!flex shrink-0 border-r border-slate-200 flex flex-col h-screen transition-transform duration-200">
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
@@ -125,7 +122,7 @@ export const html = `<!DOCTYPE html>
       <nav class="flex-1 px-2 py-3 overflow-y-auto">
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 mb-1.5">Operação</div>
         <template x-for="t in tabs" :key="t.id">
-          <button @click="tab = t.id; sidebarOpen = false"
+          <button @click="t.id === 'config' ? window.open('/config', '_blank') : (tab = t.id, sidebarOpen = false)"
             :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600'"
             class="w-full text-left px-3 py-2 mb-0.5 rounded-r-md text-sm flex items-center justify-between">
             <span class="flex items-center gap-2.5">
@@ -151,8 +148,8 @@ export const html = `<!DOCTYPE html>
     <!-- Content area (grid column 2 via .content-wrap) -->
     <div class="content-wrap overflow-x-hidden">
 
-      <!-- Top bar -->
-      <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
+      <!-- Top bar (escondida em standalone /config) -->
+      <header x-show="!isStandalone" class="app-surface border-b border-slate-200 sticky top-0 z-30">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
@@ -205,6 +202,11 @@ export const html = `<!DOCTYPE html>
 
       <!-- Tab content -->
       <main class="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden">
+      <!-- Standalone /config: header próprio com voltar + título -->
+      <div x-show="isStandalone" class="mb-6 max-w-4xl">
+        <a href="/" class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 mb-3">← Voltar ao app</a>
+        <h1 class="text-2xl font-bold text-slate-900">Configurações UniHub</h1>
+      </div>
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
@@ -1129,6 +1131,7 @@ function app() {
       { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
     sidebarOpen: false,
+    isStandalone: window.location.pathname === '/config',
     status: {},
     products: [],
     salesStats: [],
@@ -1187,6 +1190,8 @@ function app() {
     pairVarIncludePaired: false,
 
     async init() {
+      // Standalone /config: força tab=config e ignora layout principal
+      if (this.isStandalone) this.tab = 'config';
       if (!this.token) return;
       await this.loadAll();
       this.pollTimer = setInterval(() => this.loadStatus(), 30000);
