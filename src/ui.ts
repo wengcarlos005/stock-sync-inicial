@@ -39,12 +39,9 @@ export const html = `<!DOCTYPE html>
     header.app-surface { box-shadow: 0 2px 4px rgba(15,23,42,.06); background-color: #ffffff !important; }
     /* Body sem scroll horizontal — garante que conteúdo não empurra a página */
     html, body { overflow-x: hidden; max-width: 100vw; }
-    /* Layout principal: grid de 2 colunas (sidebar + conteúdo), 1 row */
-    .app-layout { display: grid !important; grid-template-columns: 240px 1fr; min-height: 100vh; }
-    @media (max-width: 767px) { .app-layout { grid-template-columns: 1fr; } }
-    .app-layout > aside { grid-column: 1; }
-    .app-layout > .content-wrap { grid-column: 2; min-width: 0; display: block; }
-    @media (max-width: 767px) { .app-layout > .content-wrap { grid-column: 1; } }
+    /* Layout principal: flex com sidebar fixo + conteúdo flexível */
+    .app-layout { display: flex; min-height: 100vh; }
+    .content-wrap { flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; }
     /* Brand logo container */
     .brand-mark { display: flex; align-items: center; justify-content: center; }
     .brand-mark svg { display: block; width: 100%; height: 100%; }
