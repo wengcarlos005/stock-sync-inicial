@@ -451,7 +451,7 @@ export async function buildShopeeDraftFromShopee(env: MigEnv, shopeeItemId: stri
 // Preencher variações faltantes num anúncio que JÁ existe
 // ────────────────────────────────────────────────────────────
 // ML: adiciona variações ao item existente via POST /items/:id/variations
-export async function fillMissingVariationsMeli(env: MigEnv, meliItemId: string, missing: { name: string; sku?: string; qty?: number }[]): Promise<any> {
+export async function fillMissingVariationsMeli(env: MigEnv, meliItemId: string, missing: { name: string; sku?: string; qty?: number; price?: number }[]): Promise<any> {
   const item: any = await mac.meliGetItem(env, meliItemId);
   if (!item) throw new Error('Item ML não encontrado: ' + meliItemId);
   const existing = item.variations || [];
@@ -472,7 +472,7 @@ export async function fillMissingVariationsMeli(env: MigEnv, meliItemId: string,
       const body: any = {
         attribute_combinations: combos,
         available_quantity: mv.qty ?? 0,
-        price: basePrice,
+        price: (mv.price && mv.price > 0) ? mv.price : basePrice,
       };
       if (mv.sku) body.seller_custom_field = mv.sku, body.attributes = [{ id: 'SELLER_SKU', value_name: mv.sku }];
       if (picIds.length) body.picture_ids = picIds.slice(0, 1);
