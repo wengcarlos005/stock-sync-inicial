@@ -102,8 +102,8 @@ export const html = `<!DOCTYPE html>
     <!-- Mobile sidebar overlay -->
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="sidebar-mobile-overlay fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
 
-    <!-- Sidebar (escondida em standalone /config) -->
-    <aside x-show="!isStandalone" :class="sidebarOpen ? 'translate-x-0 fixed' : '-translate-x-full fixed'"
+    <!-- Sidebar -->
+    <aside :class="sidebarOpen ? 'translate-x-0 fixed' : '-translate-x-full fixed'"
       class="app-surface top-0 left-0 z-50 w-64 md:!w-60 md:!translate-x-0 md:!sticky md:!flex shrink-0 border-r border-slate-200 flex flex-col h-screen transition-transform duration-200">
       <!-- Brand -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
@@ -122,7 +122,7 @@ export const html = `<!DOCTYPE html>
       <nav class="flex-1 px-2 py-3 overflow-y-auto">
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 mb-1.5">Operação</div>
         <template x-for="t in tabs" :key="t.id">
-          <button @click="t.id === 'config' ? window.open('/config', '_blank') : (tab = t.id, sidebarOpen = false)"
+          <button @click="tab = t.id; sidebarOpen = false"
             :class="tab === t.id ? 'nav-item active' : 'nav-item text-slate-600'"
             class="w-full text-left px-3 py-2 mb-0.5 rounded-r-md text-sm flex items-center justify-between">
             <span class="flex items-center gap-2.5">
@@ -148,8 +148,8 @@ export const html = `<!DOCTYPE html>
     <!-- Content area (grid column 2 via .content-wrap) -->
     <div class="content-wrap overflow-x-hidden">
 
-      <!-- Top bar (escondida em standalone /config) -->
-      <header x-show="!isStandalone" class="app-surface border-b border-slate-200 sticky top-0 z-30">
+      <!-- Top bar -->
+      <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
@@ -202,11 +202,6 @@ export const html = `<!DOCTYPE html>
 
       <!-- Tab content -->
       <main class="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden">
-      <!-- Standalone /config: header próprio com voltar + título -->
-      <div x-show="isStandalone" class="mb-6 max-w-4xl">
-        <a href="/" class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 mb-3">← Voltar ao app</a>
-        <h1 class="text-2xl font-bold text-slate-900">Configurações UniHub</h1>
-      </div>
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
@@ -809,7 +804,7 @@ export const html = `<!DOCTYPE html>
       </section>
 
       <!-- Config -->
-      <section x-show="tab === 'config'" x-cloak class="max-w-4xl">
+      <section x-show="tab === 'config'" x-cloak>
         <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-6 space-y-6">
           <!-- Contas conectadas -->
           <div>
@@ -1131,7 +1126,6 @@ function app() {
       { id: 'config',   label: 'Configurações', icon: 'config' },
     ],
     sidebarOpen: false,
-    isStandalone: window.location.pathname === '/config',
     status: {},
     products: [],
     salesStats: [],
@@ -1190,8 +1184,6 @@ function app() {
     pairVarIncludePaired: false,
 
     async init() {
-      // Standalone /config: força tab=config e ignora layout principal
-      if (this.isStandalone) this.tab = 'config';
       if (!this.token) return;
       await this.loadAll();
       this.pollTimer = setInterval(() => this.loadStatus(), 30000);
