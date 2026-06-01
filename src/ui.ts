@@ -152,11 +152,11 @@ export const html = `<!DOCTYPE html>
       </div>
     </aside>
 
-    <!-- Content area -->
-    <div class="content-wrap flex-1 min-w-0 overflow-x-hidden">
+    <!-- Content area — inline style pra forçar flex-col (Tailwind CDN tava conflitando) -->
+    <div class="content-wrap flex-1 min-w-0 overflow-x-hidden" style="display:flex !important; flex-direction:column !important; width:100% !important;">
 
       <!-- Top bar -->
-      <header class="app-surface border-b border-slate-200 sticky top-0 z-30">
+      <header class="app-surface border-b border-slate-200 sticky top-0 z-30" style="display:block !important; width:100% !important;">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-2 sm:gap-4">
           <button @click="sidebarOpen = true" class="md:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded hover:bg-slate-100" aria-label="Abrir menu">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="ico"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
@@ -208,7 +208,7 @@ export const html = `<!DOCTYPE html>
       </header>
 
       <!-- Tab content -->
-      <main class="flex-1 px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden">
+      <main class="flex-1 px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-10 overflow-x-hidden" style="display:block !important; width:100% !important;">
 
       <!-- Pedidos -->
       <section x-show="tab === 'orders'" x-cloak>
