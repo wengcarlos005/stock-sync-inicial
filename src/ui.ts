@@ -832,32 +832,75 @@ export const html = `<!DOCTYPE html>
 
         <div class="space-y-2">
           <template x-for="a in migrationList()" :key="a.key">
-            <div class="bg-white border border-slate-200 rounded-lg p-3 flex items-center gap-3">
-              <template x-if="a.image"><img :src="a.image" class="w-11 h-11 rounded object-cover border border-slate-200 shrink-0" loading="lazy" /></template>
-              <template x-if="!a.image"><div class="w-11 h-11 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300 shrink-0">📦</div></template>
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium truncate" x-text="(a.product_name||'(sem nome)').slice(0,90)"></div>
-                <div class="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-1.5 items-center">
-                  <span x-show="a.shopee_item_id" class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" x-text="'🟠 ' + (a.shopee_account_label || 'Shopee')"></span>
-                  <span x-show="a.meli_item_id" class="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded">🟡 ML</span>
-                  <span x-text="(a.variations?.length||0) + ' variação(ões)'"></span>
+            <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <!-- Cabeçalho clicável (expande) -->
+              <div @click="migExpanded[a.key] = !migExpanded[a.key]" class="p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="migExpanded[a.key] ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd"/></svg>
+                <template x-if="a.image"><img :src="a.image" class="w-11 h-11 rounded object-cover border border-slate-200 shrink-0" loading="lazy" /></template>
+                <template x-if="!a.image"><div class="w-11 h-11 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300 shrink-0">📦</div></template>
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium truncate" x-text="(a.product_name||'(sem nome)').slice(0,90)"></div>
+                  <div class="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-1.5 items-center">
+                    <span x-show="a.meli_item_id" class="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded">🟡 ML</span>
+                    <template x-for="acc in (accounts||[]).filter(x=>x.marketplace==='shopee')" :key="acc.external_id">
+                      <span x-show="(a.shopee_stores||[]).some(s=>String(s.account_id)===String(acc.external_id))" class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" x-text="'🟠 ' + (acc.label||acc.external_id)"></span>
+                    </template>
+                    <span x-text="(a.variations?.length||0) + ' variação(ões)'"></span>
+                    <span x-show="migIncompleteCount(a) > 0" class="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded" x-text="'⚠ ' + migIncompleteCount(a) + ' var. falta em alguma loja'"></span>
+                  </div>
+                </div>
+                <!-- Dropdown migrar anúncio inteiro -->
+                <div x-data="{open:false}" @click.outside="open=false" @click.stop class="relative shrink-0">
+                  <button @click="open=!open" :disabled="migrationTargets(a).length===0"
+                    class="text-xs px-3 py-1.5 rounded font-medium inline-flex items-center gap-1"
+                    :class="migrationTargets(a).length ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-emerald-50 text-emerald-600 cursor-default'">
+                    <span x-text="migrationTargets(a).length ? 'Migrar anúncio' : '✓ Em todas'"></span>
+                    <svg x-show="migrationTargets(a).length" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
+                  </button>
+                  <div x-show="open" x-transition.opacity class="absolute right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[200px]">
+                    <div class="text-[10px] uppercase tracking-wide text-slate-400 px-3 py-1">Migrar para:</div>
+                    <template x-for="t in migrationTargets(a)" :key="t.label">
+                      <button @click="open=false; startMigration(t)" class="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">
+                        <span x-text="t.icon"></span><span x-text="t.label"></span>
+                      </button>
+                    </template>
+                  </div>
                 </div>
               </div>
-              <!-- Dropdown de destinos -->
-              <div x-data="{open:false}" @click.outside="open=false" class="relative shrink-0">
-                <button @click="open=!open" :disabled="migrationTargets(a).length===0"
-                  class="text-xs px-3 py-1.5 rounded font-medium inline-flex items-center gap-1"
-                  :class="migrationTargets(a).length ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'">
-                  <span x-text="migrationTargets(a).length ? 'Migrar' : 'Em todas as lojas ✓'"></span>
-                  <svg x-show="migrationTargets(a).length" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
-                </button>
-                <div x-show="open" x-transition.opacity class="absolute right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[200px]">
-                  <div class="text-[10px] uppercase tracking-wide text-slate-400 px-3 py-1">Migrar para:</div>
-                  <template x-for="t in migrationTargets(a)" :key="t.label">
-                    <button @click="open=false; startMigration(t)" class="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">
-                      <span x-text="t.icon"></span><span x-text="t.label"></span>
-                    </button>
-                  </template>
+              <!-- Tabela de variações (expandida) — cobertura por loja -->
+              <div x-show="migExpanded[a.key]" x-cloak class="border-t border-slate-100 overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-[10px] uppercase text-slate-400">
+                    <tr>
+                      <th class="text-left px-3 py-2">Variação</th>
+                      <th class="text-left px-3 py-2">SKU</th>
+                      <th class="text-center px-3 py-2 w-16">🟡 ML</th>
+                      <template x-for="acc in (accounts||[]).filter(x=>x.marketplace==='shopee')" :key="acc.external_id">
+                        <th class="text-center px-3 py-2 w-20" x-text="'🟠 ' + (acc.label||acc.external_id)"></th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    <template x-for="(v,vi) in (a.variations||[])" :key="vi">
+                      <tr>
+                        <td class="px-3 py-2 text-xs" x-text="cleanVariation(v.variation) || '—'"></td>
+                        <td class="px-3 py-2 text-[10px] font-mono text-slate-400" x-text="v.sku || '—'"></td>
+                        <td class="px-3 py-2 text-center">
+                          <span x-show="v.meli_item_id" class="text-emerald-600">✓</span>
+                          <span x-show="!v.meli_item_id" class="text-slate-300">✗</span>
+                        </td>
+                        <template x-for="acc in (accounts||[]).filter(x=>x.marketplace==='shopee')" :key="acc.external_id">
+                          <td class="px-3 py-2 text-center">
+                            <span x-show="(v.shopee_stores||[]).some(s=>String(s.account_id)===String(acc.external_id))" class="text-emerald-600">✓</span>
+                            <span x-show="!(v.shopee_stores||[]).some(s=>String(s.account_id)===String(acc.external_id))" class="text-slate-300">✗</span>
+                          </td>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div class="px-3 py-2 text-[11px] text-slate-400 bg-slate-50 border-t border-slate-100">
+                  ✓ presente · ✗ falta nessa loja. Use "Migrar anúncio" pra criar o anúncio completo numa loja onde ele não existe.
                 </div>
               </div>
             </div>
@@ -1337,6 +1380,7 @@ function app() {
     migCandidates: [],
     migSearch: '',
     migFilter: 'all',
+    migExpanded: {},
     migModal: null,
     migPublishMsg: '',
     migPublishOk: false,
@@ -2180,6 +2224,21 @@ function app() {
           || (a.variations || []).some(v => (v.sku || '').toLowerCase().includes(q)));
       }
       return list;
+    },
+    // Quantas variações faltam em ALGUMA loja conectada
+    migIncompleteCount(a) {
+      const shopeeAccs = (this.accounts || []).filter(x => x.marketplace === 'shopee');
+      const hasMeli = (this.accounts || []).some(x => x.marketplace === 'meli');
+      let n = 0;
+      for (const v of (a.variations || [])) {
+        let incomplete = false;
+        if (hasMeli && !v.meli_item_id) incomplete = true;
+        for (const acc of shopeeAccs) {
+          if (!(v.shopee_stores || []).some(s => String(s.account_id) === String(acc.external_id))) incomplete = true;
+        }
+        if (incomplete) n++;
+      }
+      return n;
     },
     // Destinos possíveis pra migrar um anúncio (lojas onde ele NÃO está)
     migrationTargets(a) {
