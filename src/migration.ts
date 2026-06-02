@@ -584,9 +584,15 @@ async function addShopeeOptionAndModel(
     }
   }
   // 4) Adiciona o model na opção (nova ou existente)
+  //    Shopee exige seller_stock no formato [{ stock }] (por localização), não normal_stock
   const addRes = await mac.call(env, 'shopee_add_model', {
     shopId, item_id: itemId,
-    model_list: [{ tier_index: [idx], model_sku: model.sku, original_price: model.price, normal_stock: model.stock }],
+    model_list: [{
+      tier_index: [idx],
+      model_sku: model.sku,
+      original_price: model.price,
+      seller_stock: [{ stock: model.stock }],
+    }],
   });
   if (addRes?.error) return { ok: false, error: 'add_model: ' + (addRes.message || addRes.error) };
   // 5) Confirma que o model entrou
