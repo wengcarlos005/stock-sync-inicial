@@ -3794,6 +3794,40 @@ add('GET', '/api/orders', async (req, env) => {
 // ============= Toggle shadow mode (requires re-deploy to persist via vars) =============
 // Note: vars in wrangler.toml don't change at runtime. Documented in UI as "edit wrangler.toml + deploy".
 
+// ============= Enriquecer fotos por variação (Shopee option images) =============
+// Popula mappings.image_url com a foto REAL de cada variação (não a do anúncio).
+add('POST', '/api/variation-images/refresh', async (req, env) => {
+  const mac = await import('./mac');
+  const url = new URL(req.url);
+  const offset = Number(url.searchParams.get('offset') || 0);
+  const batch = Math.min(40, Number(url.searchParams.get('batch') || 40));
+  // Pega itens Shopee distintos dos mappings ativos (paginado pra não estourar subrequests)
+  const allRows = (await env.DB.prepare(
+    `SELECT DISTINCT shopee_item_id, shopee_account_id FROM mappings WHERE active=1 AND shopee_item_id IS NOT NULL AND shopee_model_id IS NOT NULL ORDER BY shopee_item_id`
+  ).all()).results as any[];
+  const totalItems = allRows.length;
+  const rows = allRows.slice(offset, offset + batch);
+  let updated = 0, items = 0, errors = 0;
+  for (const r of rows) {
+    items++;
+    try {
+      const { models, tierVariation } = await mac.shopeeGetModelsFull(env, Number(r.shopee_item_id), r.shopee_account_id || undefined);
+      const optList = tierVariation?.[0]?.option_list || [];
+      for (const m of models) {
+        const optIdx = Array.isArray(m.tier_index) ? m.tier_index[0] : null;
+        const imgUrl = (optIdx != null && optList[optIdx]?.image?.image_url) || null;
+        if (!imgUrl) continue;
+        const res = await env.DB.prepare(
+          `UPDATE mappings SET image_url=? WHERE shopee_item_id=? AND shopee_model_id=?`
+        ).bind(imgUrl, String(r.shopee_item_id), String(m.model_id)).run();
+        updated += (res.meta?.changes || 0);
+      }
+    } catch { errors++; }
+  }
+  const nextOffset = offset + batch;
+  return json({ ok: true, items, updated, errors, total_items: totalItems, next_offset: nextOffset < totalItems ? nextOffset : null });
+});
+
 // ============= Migração de anúncios (Shopee ↔ ML) =============
 import * as migration from './migration';
 

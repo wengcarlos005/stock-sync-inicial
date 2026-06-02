@@ -417,8 +417,12 @@ export const html = `<!DOCTYPE html>
                   <template x-for="(v, vi) in (anuncio.variations || [])" :key="vi">
                     <tr :class="v.mapped ? (v.active === 0 ? 'opacity-50' : '') : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
-                        <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
-                        <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
+                        <div class="flex items-center gap-2">
+                          <img x-show="v.image || anuncio.image" :src="v.image || anuncio.image" class="w-8 h-8 rounded object-cover border border-slate-200 shrink-0" loading="lazy" />
+                          <div x-show="!(v.image || anuncio.image)" class="w-8 h-8 rounded bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center text-slate-300 text-[10px]">—</div>
+                          <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
+                          <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
+                        </div>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs">
                         <span x-show="v.sku" x-text="v.sku"></span>
@@ -569,8 +573,12 @@ export const html = `<!DOCTYPE html>
                   <template x-for="(v, vi) in (anuncio.variations || [])" :key="vi">
                     <tr :class="v.paired ? '' : 'bg-amber-50/40'">
                       <td class="px-3 py-2">
-                        <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
-                        <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
+                        <div class="flex items-center gap-2">
+                          <img x-show="v.image || anuncio.image" :src="v.image || anuncio.image" class="w-8 h-8 rounded object-cover border border-slate-200 shrink-0" loading="lazy" />
+                          <div x-show="!(v.image || anuncio.image)" class="w-8 h-8 rounded bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center text-slate-300 text-[10px]">—</div>
+                          <span x-show="cleanVariation(v.variation)" class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded" x-text="cleanVariation(v.variation)"></span>
+                          <span x-show="!v.variation" class="text-xs text-slate-300">—</span>
+                        </div>
                       </td>
                       <td class="px-3 py-2 font-mono text-xs">
                         <span x-show="v.sku" x-text="v.sku"></span>
@@ -1040,6 +1048,18 @@ export const html = `<!DOCTYPE html>
           </div>
 
           <div class="border-t pt-6">
+            <h3 class="font-semibold mb-2">Atualizar fotos das variações</h3>
+            <p class="text-sm text-slate-500 mb-3">Busca a foto real de cada variação na Shopee (imagem da opção) e mostra como thumbnail nas abas <strong>Estoque</strong> e <strong>Produtos</strong>. Rode depois de migrar variações ou mexer em fotos.</p>
+            <button @click="refreshVariationImages()" :disabled="loading.varImages" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-medium rounded">
+              <span x-show="!loading.varImages">🖼️ Atualizar fotos das variações</span>
+              <span x-show="loading.varImages" x-text="'Processando... ' + (varImagesProgress||'')"></span>
+            </button>
+            <div x-show="varImagesResult" class="mt-3 p-3 bg-pink-50 border border-pink-200 rounded text-sm text-pink-900">
+              ✅ <strong x-text="varImagesResult?.updated||0"></strong> fotos de variação atualizadas (<span x-text="varImagesResult?.items||0"></span> anúncios).
+            </div>
+          </div>
+
+          <div class="border-t pt-6">
             <h3 class="font-semibold mb-2">Discovery</h3>
             <p class="text-sm text-slate-500 mb-3">Varre todos os produtos em ML e Shopee e pareia por SKU. Roda via <strong>GitHub Actions</strong> (sem limite de produtos). Também roda automaticamente todo dia às 6h.</p>
             <button @click="runDiscover()" :disabled="loading.discover" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded">
@@ -1470,6 +1490,8 @@ function app() {
     migPublishOk: false,
     migFillMsg: {},
     migFillOk: {},
+    varImagesResult: null,
+    varImagesProgress: '',
     migVarModal: null,
     migVarMsg: '',
     migVarOk: false,
@@ -1477,7 +1499,7 @@ function app() {
     runs: [],
     productSearch: '',
     productFilter: 'all',
-    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false, refreshAll: false, reprocessMl: false, matchSku: false, fixMlVar: false, superPair: false, acctSync: false, acctBackfill: false, migration: false, migDraft: false, migPublish: false },
+    loading: { sync: false, discover: false, setStock: false, pair: false, link: false, cleanup: false, backfill: false, rebuild: false, batchPair: false, refreshAll: false, reprocessMl: false, matchSku: false, fixMlVar: false, superPair: false, acctSync: false, acctBackfill: false, migration: false, migDraft: false, migPublish: false, varImages: false },
     refreshAllResult: null,
     reprocessMlResult: null,
     matchSkuResult: null,
@@ -2298,6 +2320,26 @@ function app() {
     setAccountFilter(id) {
       // Toggle: clicar de novo desmarca
       this.accountFilter = (this.accountFilter === id) ? '' : id;
+    },
+
+    async refreshVariationImages() {
+      this.loading.varImages = true;
+      this.varImagesResult = null;
+      let offset = 0, totalUpdated = 0, totalItems = 0, guard = 0;
+      try {
+        while (guard++ < 50) {
+          this.varImagesProgress = '(' + totalItems + ' anúncios)';
+          const r = await this.api('/api/variation-images/refresh?offset=' + offset + '&batch=40', { method: 'POST' });
+          totalUpdated += (r?.updated || 0);
+          totalItems += (r?.items || 0);
+          if (r?.next_offset == null) break;
+          offset = r.next_offset;
+        }
+        this.varImagesResult = { updated: totalUpdated, items: totalItems };
+        await this.loadMaster();
+      } catch (e) {
+        alert('Erro: ' + (e?.message || e));
+      } finally { this.loading.varImages = false; this.varImagesProgress = ''; }
     },
 
     // ───────── Migração de Anúncios ─────────
