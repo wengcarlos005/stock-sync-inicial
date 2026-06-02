@@ -477,7 +477,17 @@ export async function fillMissingVariationsMeli(env: MigEnv, meliItemId: string,
       if (mv.sku) body.seller_custom_field = mv.sku, body.attributes = [{ id: 'SELLER_SKU', value_name: mv.sku }];
       if (picIds.length) body.picture_ids = picIds.slice(0, 1);
       const res = await mac.meliRaw(env, 'POST', `/items/${meliItemId}/variations`, body);
+      // Validação HONESTA: ML retorna erro com {message,error,cause} OU sucesso com id
+      if (res?.error || res?.message && !res?.id || res?.cause) {
+        const msg = res.message || res.error || JSON.stringify(res?.cause || res).slice(0, 200);
+        results.push({ name: mv.name, ok: false, error: 'ML: ' + msg });
+        continue;
+      }
       const newVarId = res?.id || res?.variations?.slice(-1)?.[0]?.id;
+      if (!newVarId) {
+        results.push({ name: mv.name, ok: false, error: 'ML não retornou ID da variação criada: ' + JSON.stringify(res).slice(0, 150) });
+        continue;
+      }
       results.push({ name: mv.name, ok: true, variation_id: newVarId });
       // pareia no mapping se tiver sku
       if (mv.sku) {
@@ -494,26 +504,51 @@ export async function fillMissingVariationsMeli(env: MigEnv, meliItemId: string,
 
 // Shopee: adiciona models faltantes a um item existente na loja destino
 export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: string, targetShopId: string, sourceItemId: string, sourceShopId: string | undefined, missingSkus: string[]): Promise<any> {
-  // Lê tier + models da origem (que tem as variações) e do destino
+  // Lê tier + models da ORIGEM e do DESTINO (pra validar de verdade)
   const src = await mac.shopeeGetModelsFull(env, Number(sourceItemId), sourceShopId);
+  const tgt = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId);
   const results: any[] = [];
+
+  // Compatibilidade de tier: a opção da origem precisa existir no tier_variation do destino,
+  // senão o tier_index referencia opção errada e a Shopee cria/erra silenciosamente.
+  const srcTierOpts = (src.tierVariation?.[0]?.option_list || []).map((o: any) => String(o.option || '').trim().toLowerCase());
+  const tgtTierOpts = (tgt.tierVariation?.[0]?.option_list || []).map((o: any) => String(o.option || '').trim().toLowerCase());
+
   for (const sku of missingSkus) {
     try {
       const m = src.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
-      if (!m) { results.push({ sku, ok: false, error: 'modelo origem não encontrado' }); continue; }
+      if (!m) { results.push({ sku, ok: false, error: 'modelo de origem não encontrado' }); continue; }
+
+      // O destino JÁ tem esse SKU? Então não falta de verdade (só não estava pareado).
+      const already = tgt.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
+      if (already) { results.push({ sku, ok: false, error: 'já existe na loja destino (model ' + already.model_id + ') — corrija o SKU em vez de migrar' }); continue; }
+
+      // O nome da opção (Personagem) precisa existir no tier do destino
+      const srcOptName = (src.tierVariation?.[0]?.option_list?.[m.tier_index?.[0]]?.option || '').trim().toLowerCase();
+      const tgtOptIdx = tgtTierOpts.indexOf(srcOptName);
+      if (tgtOptIdx < 0) {
+        results.push({ sku, ok: false, error: `a opção "${srcOptName}" não existe no eixo do anúncio destino — precisa adicionar a opção no tier primeiro (não suportado ainda)` });
+        continue;
+      }
+
       const model = {
-        tier_index: m.tier_index,
+        tier_index: [tgtOptIdx],
         model_sku: m.model_sku || '',
         original_price: m.price_info?.[0]?.original_price ?? m.price_info?.[0]?.current_price ?? 0,
         normal_stock: m.stock_info_v2?.summary_info?.total_available_stock ?? 0,
       };
       const res = await mac.call(env, 'shopee_add_model', { shopId: targetShopId, item_id: Number(targetItemId), model_list: [model] });
-      results.push({ sku, ok: !!res, raw: res?.response ? 'ok' : res });
+      // Validação HONESTA: Shopee retorna {error, message, response}
+      if (res?.error) { results.push({ sku, ok: false, error: 'Shopee: ' + (res.message || res.error) }); continue; }
+      // Confirma que o model entrou: re-busca
+      const after = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId);
+      const added = after.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
+      results.push({ sku, ok: !!added, error: added ? null : 'API retornou ok mas o model não apareceu na re-consulta' });
     } catch (e: any) {
       results.push({ sku, ok: false, error: String(e.message).slice(0, 200) });
     }
   }
-  return { ok: results.every(r => r.ok), results };
+  return { ok: results.length > 0 && results.every(r => r.ok), results };
 }
 
 // ────────────────────────────────────────────────────────────
