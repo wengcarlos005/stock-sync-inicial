@@ -515,9 +515,13 @@ export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: str
       const m = src.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
       if (!m) { results.push({ sku, ok: false, error: 'modelo de origem não encontrado' }); continue; }
 
-      // O destino JÁ tem esse SKU? Então não falta de verdade (só não estava pareado).
+      // O destino JÁ tem esse SKU fisicamente? Então só registra no mapping (cobertura vira ✓).
       const already = tgtState.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
-      if (already) { results.push({ sku, ok: false, error: 'já existe na loja destino (model ' + already.model_id + ') — corrija o SKU em vez de migrar' }); continue; }
+      if (already) {
+        await recordShopeeStoreInMapping(env, sku, String(targetItemId), String(already.model_id), targetShopId);
+        results.push({ sku, ok: true, error: null, model_id: already.model_id, note: 'já existia na loja — registrado no sistema' });
+        continue;
+      }
 
       // Nome real da opção da origem (preserva acentuação/caixa)
       const srcOptNameRaw = src.tierVariation?.[0]?.option_list?.[m.tier_index?.[0]]?.option || '';
@@ -530,13 +534,32 @@ export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: str
 
       const r = await addShopeeOptionAndModel(env, Number(targetItemId), targetShopId, srcOptNameRaw, modelData, tgtState);
       results.push({ sku, ok: r.ok, error: r.ok ? null : r.error, model_id: r.model_id });
-      // atualiza estado do destino pra próximas iterações verem a opção nova
-      if (r.ok) { try { tgtState = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId); } catch {} }
+      if (r.ok) {
+        // Registra a loja destino no mapping (extra_shopee_stores) pra cobertura virar ✓
+        await recordShopeeStoreInMapping(env, sku, String(targetItemId), r.model_id != null ? String(r.model_id) : null, targetShopId);
+        // atualiza estado do destino pra próximas iterações verem a opção nova
+        try { tgtState = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId); } catch {}
+      }
     } catch (e: any) {
       results.push({ sku, ok: false, error: String(e.message).slice(0, 200) });
     }
   }
   return { ok: results.length > 0 && results.every(r => r.ok), results };
+}
+
+// Registra que um SKU agora também existe numa loja Shopee (atualiza extra_shopee_stores do mapping)
+// pra a cobertura (✓/✗) refletir a migração sem precisar rodar discovery.
+async function recordShopeeStoreInMapping(env: MigEnv, sku: string, itemId: string, modelId: string | null, accountId: string): Promise<void> {
+  const map = await env.DB.prepare(`SELECT * FROM mappings WHERE sku=?`).bind(sku).first<any>();
+  if (!map) return;
+  // Se o mapping principal já é essa loja, nada a fazer
+  if (String(map.shopee_item_id || '') === itemId && String(map.shopee_account_id || '') === accountId) return;
+  let extras: any[] = [];
+  try { extras = map.extra_shopee_stores ? JSON.parse(map.extra_shopee_stores) : []; } catch {}
+  if (extras.some(e => String(e.item_id) === itemId && String(e.account_id) === accountId)) return; // já registrado
+  extras.push({ item_id: itemId, model_id: modelId, account_id: accountId });
+  await env.DB.prepare(`UPDATE mappings SET extra_shopee_stores=?, updated_at=? WHERE sku=?`)
+    .bind(JSON.stringify(extras), Date.now(), sku).run().catch(() => {});
 }
 
 // Adiciona uma OPÇÃO nova ao eixo de variação Shopee + cria o model — preservando as existentes.
