@@ -551,7 +551,8 @@ async function addShopeeOptionAndModel(
     return { ok: false, error: 'anúncio destino tem múltiplos eixos de variação — não suportado' };
   }
   const tier = current.tierVariation[0];
-  const optList = (tier.option_list || []).map((o: any) => ({ option: o.option }));
+  // PRESERVA o campo image de cada opção — senão a Shopee apaga as fotos das variações!
+  const optList = (tier.option_list || []).map((o: any) => o.image ? { option: o.option, image: { image_id: o.image.image_id } } : { option: o.option });
   const norm = (s: string) => String(s || '').trim().toLowerCase();
 
   let idx = optList.findIndex((o: any) => norm(o.option) === norm(optionName));
