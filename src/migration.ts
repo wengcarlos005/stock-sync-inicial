@@ -509,46 +509,91 @@ export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: str
   const tgt = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId);
   const results: any[] = [];
 
-  // Compatibilidade de tier: a opção da origem precisa existir no tier_variation do destino,
-  // senão o tier_index referencia opção errada e a Shopee cria/erra silenciosamente.
-  const srcTierOpts = (src.tierVariation?.[0]?.option_list || []).map((o: any) => String(o.option || '').trim().toLowerCase());
-  const tgtTierOpts = (tgt.tierVariation?.[0]?.option_list || []).map((o: any) => String(o.option || '').trim().toLowerCase());
-
+  let tgtState = tgt;
   for (const sku of missingSkus) {
     try {
       const m = src.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
       if (!m) { results.push({ sku, ok: false, error: 'modelo de origem não encontrado' }); continue; }
 
       // O destino JÁ tem esse SKU? Então não falta de verdade (só não estava pareado).
-      const already = tgt.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
+      const already = tgtState.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
       if (already) { results.push({ sku, ok: false, error: 'já existe na loja destino (model ' + already.model_id + ') — corrija o SKU em vez de migrar' }); continue; }
 
-      // O nome da opção (Personagem) precisa existir no tier do destino
-      const srcOptName = (src.tierVariation?.[0]?.option_list?.[m.tier_index?.[0]]?.option || '').trim().toLowerCase();
-      const tgtOptIdx = tgtTierOpts.indexOf(srcOptName);
-      if (tgtOptIdx < 0) {
-        results.push({ sku, ok: false, error: `a opção "${srcOptName}" não existe no eixo do anúncio destino — precisa adicionar a opção no tier primeiro (não suportado ainda)` });
-        continue;
-      }
-
-      const model = {
-        tier_index: [tgtOptIdx],
-        model_sku: m.model_sku || '',
-        original_price: m.price_info?.[0]?.original_price ?? m.price_info?.[0]?.current_price ?? 0,
-        normal_stock: m.stock_info_v2?.summary_info?.total_available_stock ?? 0,
+      // Nome real da opção da origem (preserva acentuação/caixa)
+      const srcOptNameRaw = src.tierVariation?.[0]?.option_list?.[m.tier_index?.[0]]?.option || '';
+      if (!srcOptNameRaw) { results.push({ sku, ok: false, error: 'não consegui ler o nome da opção na origem' }); continue; }
+      const modelData = {
+        sku: m.model_sku || '',
+        price: m.price_info?.[0]?.original_price ?? m.price_info?.[0]?.current_price ?? 0,
+        stock: m.stock_info_v2?.summary_info?.total_available_stock ?? 0,
       };
-      const res = await mac.call(env, 'shopee_add_model', { shopId: targetShopId, item_id: Number(targetItemId), model_list: [model] });
-      // Validação HONESTA: Shopee retorna {error, message, response}
-      if (res?.error) { results.push({ sku, ok: false, error: 'Shopee: ' + (res.message || res.error) }); continue; }
-      // Confirma que o model entrou: re-busca
-      const after = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId);
-      const added = after.models.find((x: any) => (x.model_sku || '').trim() === sku.trim());
-      results.push({ sku, ok: !!added, error: added ? null : 'API retornou ok mas o model não apareceu na re-consulta' });
+
+      const r = await addShopeeOptionAndModel(env, Number(targetItemId), targetShopId, srcOptNameRaw, modelData, tgtState);
+      results.push({ sku, ok: r.ok, error: r.ok ? null : r.error, model_id: r.model_id });
+      // atualiza estado do destino pra próximas iterações verem a opção nova
+      if (r.ok) { try { tgtState = await mac.shopeeGetModelsFull(env, Number(targetItemId), targetShopId); } catch {} }
     } catch (e: any) {
       results.push({ sku, ok: false, error: String(e.message).slice(0, 200) });
     }
   }
   return { ok: results.length > 0 && results.every(r => r.ok), results };
+}
+
+// Adiciona uma OPÇÃO nova ao eixo de variação Shopee + cria o model — preservando as existentes.
+// Padrão seguro (Upseller): anexa a opção no FIM (índices das existentes não mudam),
+// re-mapeia models existentes com tier_index inalterado, valida antes/depois.
+async function addShopeeOptionAndModel(
+  env: MigEnv, itemId: number, shopId: string,
+  optionName: string, model: { sku: string; price: number; stock: number },
+  current: { models: any[]; tierVariation: any[] },
+): Promise<{ ok: boolean; error?: string; model_id?: any }> {
+  if ((current.tierVariation || []).length !== 1) {
+    return { ok: false, error: 'anúncio destino tem múltiplos eixos de variação — não suportado' };
+  }
+  const tier = current.tierVariation[0];
+  const optList = (tier.option_list || []).map((o: any) => ({ option: o.option }));
+  const norm = (s: string) => String(s || '').trim().toLowerCase();
+
+  let idx = optList.findIndex((o: any) => norm(o.option) === norm(optionName));
+  // SNAPSHOT das variações existentes (model_id → sku) pra validar integridade depois
+  const before = new Map<string, string>();
+  for (const m of current.models) before.set(String(m.model_id), (m.model_sku || '').trim());
+
+  if (idx < 0) {
+    // 1) Anexa a opção nova no FIM (preserva índices existentes)
+    optList.push({ option: optionName });
+    idx = optList.length - 1;
+    // 2) Re-mapeia models existentes com tier_index INALTERADO (não toca em sku/preço/estoque)
+    const remap = current.models.map((m: any) => ({ model_id: m.model_id, tier_index: m.tier_index }));
+    const upd = await mac.call(env, 'shopee_update_variation', {
+      shopId, item_id: itemId,
+      tier_variation: [{ name: tier.name, option_list: optList }],
+      model: remap,
+    });
+    if (upd?.error) return { ok: false, error: 'update_tier_variation: ' + (upd.message || upd.error) };
+    // 3) VALIDA integridade: todas as variações antigas continuam com o mesmo SKU?
+    const mid = await mac.shopeeGetModelsFull(env, itemId, shopId);
+    if (mid.models.length < current.models.length) {
+      return { ok: false, error: `ABORTADO: re-consulta mostra ${mid.models.length} models (antes ${current.models.length}) — algo se perdeu` };
+    }
+    for (const m of mid.models) {
+      const prevSku = before.get(String(m.model_id));
+      if (prevSku !== undefined && (m.model_sku || '').trim() !== prevSku) {
+        return { ok: false, error: `ABORTADO: variação ${m.model_id} mudou de SKU ("${prevSku}"→"${m.model_sku}") — integridade comprometida` };
+      }
+    }
+  }
+  // 4) Adiciona o model na opção (nova ou existente)
+  const addRes = await mac.call(env, 'shopee_add_model', {
+    shopId, item_id: itemId,
+    model_list: [{ tier_index: [idx], model_sku: model.sku, original_price: model.price, normal_stock: model.stock }],
+  });
+  if (addRes?.error) return { ok: false, error: 'add_model: ' + (addRes.message || addRes.error) };
+  // 5) Confirma que o model entrou
+  const after = await mac.shopeeGetModelsFull(env, itemId, shopId);
+  const added = after.models.find((m: any) => (m.model_sku || '').trim() === (model.sku || '').trim() && Array.isArray(m.tier_index) && m.tier_index[0] === idx);
+  if (!added) return { ok: false, error: 'API aceitou mas o model não apareceu na re-consulta' };
+  return { ok: true, model_id: added.model_id };
 }
 
 // ────────────────────────────────────────────────────────────
