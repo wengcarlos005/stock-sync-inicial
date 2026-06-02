@@ -523,8 +523,10 @@ export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: str
         continue;
       }
 
-      // Nome real da opção da origem (preserva acentuação/caixa)
-      const srcOptNameRaw = src.tierVariation?.[0]?.option_list?.[m.tier_index?.[0]]?.option || '';
+      // Nome + imagem da opção na origem (preserva acentuação/caixa + foto)
+      const srcOpt = src.tierVariation?.[0]?.option_list?.[m.tier_index?.[0]];
+      const srcOptNameRaw = srcOpt?.option || '';
+      const srcOptImageUrl = srcOpt?.image?.image_url || null;
       if (!srcOptNameRaw) { results.push({ sku, ok: false, error: 'não consegui ler o nome da opção na origem' }); continue; }
       const modelData = {
         sku: m.model_sku || '',
@@ -532,7 +534,7 @@ export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: str
         stock: m.stock_info_v2?.summary_info?.total_available_stock ?? 0,
       };
 
-      const r = await addShopeeOptionAndModel(env, Number(targetItemId), targetShopId, srcOptNameRaw, modelData, tgtState);
+      const r = await addShopeeOptionAndModel(env, Number(targetItemId), targetShopId, srcOptNameRaw, modelData, tgtState, srcOptImageUrl);
       results.push({ sku, ok: r.ok, error: r.ok ? null : r.error, model_id: r.model_id });
       if (r.ok) {
         // Registra a loja destino no mapping (extra_shopee_stores) pra cobertura virar ✓
@@ -569,6 +571,7 @@ async function addShopeeOptionAndModel(
   env: MigEnv, itemId: number, shopId: string,
   optionName: string, model: { sku: string; price: number; stock: number },
   current: { models: any[]; tierVariation: any[] },
+  newOptionImageUrl?: string | null,
 ): Promise<{ ok: boolean; error?: string; model_id?: any }> {
   if ((current.tierVariation || []).length !== 1) {
     return { ok: false, error: 'anúncio destino tem múltiplos eixos de variação — não suportado' };
@@ -577,6 +580,8 @@ async function addShopeeOptionAndModel(
   // PRESERVA o campo image de cada opção — senão a Shopee apaga as fotos das variações!
   const optList = (tier.option_list || []).map((o: any) => o.image ? { option: o.option, image: { image_id: o.image.image_id } } : { option: o.option });
   const norm = (s: string) => String(s || '').trim().toLowerCase();
+  // A Shopee exige: ou TODAS as opções têm imagem, ou nenhuma. Vê se as existentes têm.
+  const existingHaveImages = (tier.option_list || []).length > 0 && (tier.option_list || []).every((o: any) => o.image && o.image.image_id);
 
   let idx = optList.findIndex((o: any) => norm(o.option) === norm(optionName));
   // SNAPSHOT das variações existentes (model_id → sku) pra validar integridade depois
@@ -584,8 +589,23 @@ async function addShopeeOptionAndModel(
   for (const m of current.models) before.set(String(m.model_id), (m.model_sku || '').trim());
 
   if (idx < 0) {
+    // Se as existentes têm imagem, a opção nova TAMBÉM precisa ter — sobe a foto da origem
+    let newOpt: any = { option: optionName };
+    if (existingHaveImages) {
+      if (!newOptionImageUrl) {
+        return { ok: false, error: 'as outras variações têm foto e esta não tem foto na origem — a Shopee exige foto em todas. Adicione a foto manualmente.' };
+      }
+      try {
+        const up = await mac.call(env, 'shopee_upload_image', { shopId, image_url: newOptionImageUrl });
+        const imgId = up?.response?.image_info?.image_id || up?.image_id || up?.response?.image_id;
+        if (!imgId) return { ok: false, error: 'falha ao subir a foto da variação nova: ' + JSON.stringify(up).slice(0, 150) };
+        newOpt = { option: optionName, image: { image_id: imgId } };
+      } catch (e: any) {
+        return { ok: false, error: 'upload da foto falhou: ' + e.message };
+      }
+    }
     // 1) Anexa a opção nova no FIM (preserva índices existentes)
-    optList.push({ option: optionName });
+    optList.push(newOpt);
     idx = optList.length - 1;
     // 2) Re-mapeia models existentes com tier_index INALTERADO (não toca em sku/preço/estoque)
     const remap = current.models.map((m: any) => ({ model_id: m.model_id, tier_index: m.tier_index }));
