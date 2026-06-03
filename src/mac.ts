@@ -217,6 +217,29 @@ export function deriveMeliStatus(o: any): string {
   return base;
 }
 
+// Status preciso do pedido ML usando o SHIPMENT (o status do pedido é só de pagamento).
+export function deriveMeliStatusFromShipment(order: any, shipment: any): string {
+  const base = String(order.status || '').toLowerCase();
+  const tags: string[] = (order.tags || []).map((t: string) => String(t).toLowerCase());
+  if (base === 'cancelled' || tags.includes('cancelled')) return 'cancelled';
+  if (base === 'invalid') return 'invalid';
+  if (['payment_required', 'payment_in_process', 'pending'].includes(base)) return base; // aguardando pagto
+  const ss = String(shipment?.status || '').toLowerCase();
+  const sub = String(shipment?.substatus || '').toLowerCase();
+  if (ss === 'delivered') return 'delivered';
+  if (ss === 'shipped') return 'shipped';
+  // ready_to_ship: o substatus diz se já saiu pra entrega
+  const shippedSubs = ['dropped_off', 'in_hub', 'in_transit', 'out_for_delivery', 'soon_deliver', 'receiver_absent', 'delayed', 'at_the_door', 'measures_sent'];
+  if (ss === 'ready_to_ship' && shippedSubs.includes(sub)) return 'shipped';
+  if (ss === 'ready_to_ship') return 'ready_to_ship'; // a enviar (ready_to_print/printed)
+  if (ss === 'pending' || ss === 'handling') return base; // pago, a enviar
+  if (ss === 'not_delivered') return base; // problema de entrega — mantém
+  // sem shipment: cai no tags (delivered/shipped) ou base
+  if (tags.includes('delivered')) return 'delivered';
+  if (tags.includes('shipped')) return 'shipped';
+  return base;
+}
+
 /** Para Shopee: usa name real se disponível, senão buyer_username */
 export function deriveShopeeName(o: any): string {
   const recipName = o.recipient_address?.name;

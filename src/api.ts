@@ -3142,44 +3142,51 @@ add('POST', '/api/changes/rebuild', async (_req, env) => {
 });
 
 // ============= REPROCESS: corrige status ML usando tags via API =============
+// Sync ML robusto: pagina TODOS os pedidos, busca status real via shipment, e faz UPSERT
+// (insere faltantes + atualiza status). Paginado por offset pra não estourar subrequests.
 add('POST', '/api/orders/reprocess-ml-status', async (req, env) => {
   const userId = (env as any).MELI_USER_ID;
   if (!userId) return json({ error: 'MELI_USER_ID não configurado' }, 500);
   const mac = await import('./mac');
   const url = new URL(req.url);
-  const maxPages = Math.min(20, Number(url.searchParams.get('pages') || 10)); // até 1000 pedidos
+  const offset = Number(url.searchParams.get('offset') || 0);
+  const batch = Math.min(40, Number(url.searchParams.get('batch') || 40));
 
-  let fixed = 0, scanned = 0;
-  const stmts: D1PreparedStatement[] = [];
-  const stmt = env.DB.prepare(`UPDATE orders SET status=? WHERE platform='meli' AND order_id=?`);
+  const d: any = await macRaw(env, 'raw', {
+    method: 'GET',
+    path: `/orders/search?seller=${userId}&sort=date_desc&offset=${offset}&limit=${batch}`,
+  });
+  const results: any[] = (d?.data?.results || d?.results || []);
+  const total = d?.data?.paging?.total ?? d?.paging?.total ?? null;
 
-  for (let page = 0; page < maxPages; page++) {
-    const offset = page * 50;
-    const d: any = await macRaw(env, 'raw', {
-      method: 'GET',
-      path: `/orders/search?seller=${userId}&sort=date_desc&offset=${offset}&limit=50`,
-    });
-    const results: any[] = (d?.data?.results || d?.results || []);
-    if (!results.length) break;
-    for (const o of results) {
-      scanned++;
-      const newStatus = mac.deriveMeliStatus(o);
-      stmts.push(stmt.bind(newStatus, String(o.id)));
-    }
-    if (results.length < 50) break;
-  }
-
-  // Batch executa
-  for (let i = 0; i < stmts.length; i += 100) {
-    const slice = stmts.slice(i, i + 100);
+  let scanned = 0, updated = 0, inserted = 0, errors = 0;
+  for (const o of results) {
+    scanned++;
     try {
-      const res = await env.DB.batch(slice);
-      // conta apenas os que de fato mudaram
-      for (const r of res) fixed += (r.meta?.changes ?? 0);
-    } catch {}
+      const base = String(o.status || '').toLowerCase();
+      let shipment: any = null;
+      // só busca shipment pra pedidos pagos (não cancelados/aguardando) com envio
+      if (o.shipping?.id && !['cancelled', 'invalid', 'payment_required', 'payment_in_process'].includes(base)) {
+        try { shipment = (await mac.meliRaw(env, 'GET', `/shipments/${o.shipping.id}`)) || null; } catch {}
+      }
+      const status = mac.deriveMeliStatusFromShipment(o, shipment);
+      const buyer = [o.buyer?.first_name, o.buyer?.last_name].filter(Boolean).join(' ').trim() || o.buyer?.nickname || '';
+      const created = new Date(o.date_created || o.last_updated).getTime();
+      const items = (o.order_items || []).map((oi: any) => ({
+        item_id: String(oi.item?.id || ''), variation_id: oi.item?.variation_id ? String(oi.item.variation_id) : null,
+        qty: Number(oi.quantity || 1), name: oi.item?.title || '', sku: oi.item?.seller_sku || '',
+      }));
+      const res = await env.DB.prepare(`
+        INSERT INTO orders (platform, order_id, status, buyer, created_at, items_json, processed_at, pack_id)
+        VALUES ('meli',?,?,?,?,?,?,?)
+        ON CONFLICT(platform, order_id) DO UPDATE SET status=excluded.status,
+          buyer=CASE WHEN excluded.buyer!='' THEN excluded.buyer ELSE orders.buyer END
+      `).bind(String(o.id), status, buyer, created, JSON.stringify(items), Date.now(), o.pack_id ? String(o.pack_id) : null).run();
+      if ((res.meta?.changes ?? 0) > 0) { if (res.meta?.last_row_id) inserted++; else updated++; }
+    } catch { errors++; }
   }
-
-  return json({ ok: true, scanned, status_updates: fixed });
+  const nextOffset = offset + batch;
+  return json({ ok: true, scanned, updated, inserted, errors, total, status_updates: updated + inserted, next_offset: (results.length === batch) ? nextOffset : null });
 });
 
 // ============= REPROCESS: atualiza status dos pedidos Shopee (re-fetch live) =============
