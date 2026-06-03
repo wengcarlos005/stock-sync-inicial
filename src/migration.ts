@@ -327,6 +327,14 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
   const rawName = fixMojibake(item.title || '');
   const title = truncate(rawName, 120); // Shopee aceita mais
 
+  // Descrição REAL do ML vem de /items/:id/description (não está no objeto do item)
+  let mlDescription = '';
+  try {
+    const desc = await mac.meliRaw(env, 'GET', `/items/${meliItemId}/description`);
+    mlDescription = fixMojibake(desc?.plain_text || '');
+  } catch {}
+  if (!mlDescription) mlDescription = fixMojibake(item.descriptions?.[0]?.plain_text || rawName);
+
   // Prevê categoria Shopee (e resolve os NOMES das categorias sugeridas)
   let categoryId = 0; let categorySuggestions: { id: number; name: string }[] = [];
   try {
@@ -396,7 +404,7 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
     item_name: title,
     category_id: categoryId,
     category_suggestions: categorySuggestions,
-    description: fixMojibake((item.descriptions?.[0]?.plain_text) || rawName),
+    description: mlDescription,
     original_price: price,
     stock: qty,
     weight: weight ? weight / 1000 : 0.5,
