@@ -1357,7 +1357,18 @@ export const html = `<!DOCTYPE html>
                     <label class="block"><span class="text-xs text-slate-500">Peso (kg)</span>
                       <input type="number" step="0.01" x-model.number="migModal.draft.weight" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
                     <label class="block"><span class="text-xs text-slate-500">Marca</span>
-                      <input x-model="migModal.draft.brand.original_brand_name" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
+                      <select x-model="migModal.draft.brand_id_sel" class="w-full px-2 py-1 border border-slate-300 rounded text-sm bg-white">
+                        <option value="0">Sem marca</option>
+                        <template x-for="b in (migModal.draft.brand_options||[])" :key="b.brand_id">
+                          <option :value="b.brand_id" x-text="b.name"></option>
+                        </template>
+                      </select></label>
+                  </div>
+                  <label class="block"><span class="text-xs text-slate-500">Descrição</span>
+                    <textarea x-model="migModal.draft.description" rows="4" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" placeholder="Descrição do produto (preenchida do ML quando houver)"></textarea>
+                  </label>
+                  <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    ⚠️ Atributos da categoria (Material, Idade, Tipo de Bloco, INMETRO...) não estão disponíveis pela API da Shopee nesta conta — complete no painel da Shopee após publicar (ela mostra o formulário "1/10").
                   </div>
                 </div>
               </template>

@@ -400,6 +400,34 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
     validation.push({ field: 'variations', level: 'warn', message: `${variations.length} variações ML — confirme eixos na Shopee.` });
   }
 
+  // Marca: busca catálogo Shopee da categoria e tenta casar com a marca do ML
+  const mlBrand = (attrMap.get('BRAND') || '').trim();
+  let brandOptions: { brand_id: number; name: string }[] = [];
+  let brandIdSel = 0;
+  if (categoryId) {
+    try {
+      const nrm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      let offset = 0;
+      for (let p = 0; p < 6; p++) { // até 6 páginas (600 marcas) procurando match
+        const bl = await mac.call(env, 'shopee_get_brand_list', { shopId: targetShopId, category_id: categoryId, offset, page_size: 100, status: 1 });
+        const list = bl?.response?.brand_list || [];
+        for (const b of list) {
+          if (b.brand_id === 0) continue;
+          const nm = b.display_brand_name || b.original_brand_name;
+          if (mlBrand && nrm(nm) === nrm(mlBrand)) { brandIdSel = b.brand_id; brandOptions.unshift({ brand_id: b.brand_id, name: nm }); }
+        }
+        if (!bl?.response?.has_next_page) break;
+        offset = bl.response.next_offset;
+      }
+      // se não achou match exato, oferece as primeiras marcas da categoria como opções
+      if (!brandOptions.length) {
+        const bl = await mac.call(env, 'shopee_get_brand_list', { shopId: targetShopId, category_id: categoryId, offset: 0, page_size: 30, status: 1 });
+        brandOptions = (bl?.response?.brand_list || []).filter((b: any) => b.brand_id !== 0).slice(0, 25).map((b: any) => ({ brand_id: b.brand_id, name: b.display_brand_name || b.original_brand_name }));
+      }
+    } catch {}
+  }
+  if (mlBrand && !brandIdSel) validation.push({ field: 'brand', level: 'warn', message: `Marca "${mlBrand}" do ML não encontrada no catálogo Shopee — selecione no dropdown ou deixe "Sem marca".` });
+
   const draft = {
     item_name: title,
     category_id: categoryId,
@@ -410,7 +438,9 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
     weight: weight ? weight / 1000 : 0.5,
     dimension,
     condition: item.condition === 'used' ? 'USED' : 'NEW',
-    brand: { brand_id: 0, original_brand_name: attrMap.get('BRAND') || 'NoBrand' },
+    brand: { brand_id: brandIdSel, original_brand_name: mlBrand || 'NoBrand' },
+    brand_id_sel: brandIdSel,
+    brand_options: brandOptions,
     pictures: picUrls,
     variation_plan: variationPlan,
     source_sku: mac.getMeliSku(item) || item.seller_custom_field || '',
@@ -776,7 +806,8 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
         weight: Number(draft.weight) || 0.5,
         dimension: draft.dimension,
         condition: draft.condition || 'NEW',
-        brand: draft.brand,
+        // usa a marca escolhida no modal (brand_id_sel) — 0 = Sem marca
+        brand: { brand_id: Number(draft.brand_id_sel ?? draft.brand?.brand_id ?? 0), original_brand_name: draft.brand?.original_brand_name || 'NoBrand' },
         logistic_info: logisticInfo,
         image: { image_id_list: imageIds },
       };
