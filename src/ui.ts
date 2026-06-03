@@ -2583,6 +2583,7 @@ function app() {
             source_platform: t.source_platform,
             source_item_id: t.source_item_id,
             source_account_id: t.source_account_id,
+            target_platform: t.target_platform,
             target_shop_id: t.target_shop_id || null,
             product_name: t.product_name,
           }),

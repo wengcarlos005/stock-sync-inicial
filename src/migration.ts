@@ -507,10 +507,20 @@ export async function buildShopeeDraftFromShopee(env: MigEnv, shopeeItemId: stri
     validation.push({ field: 'variations', level: 'warn', message: `${models.length} variações — cópia de variações ainda em desenvolvimento.` });
   }
 
+  // Atributos: copia direto os do anúncio de origem (já estão no formato Shopee correto!)
+  const srcAttrs = (item.attribute_list || []).map((a: any) => ({
+    attribute_id: a.attribute_id,
+    name: a.original_attribute_name,
+    value_id: a.attribute_value_list?.[0]?.value_id ?? null,
+    value_name: a.attribute_value_list?.[0]?.original_value_name ?? '',
+    value_unit: a.attribute_value_list?.[0]?.value_unit ?? '',
+    is_mandatory: !!a.is_mandatory,
+    options: (a.attribute_value_list || []).map((v: any) => ({ value_id: v.value_id, name: v.original_value_name })),
+  }));
   const draft = {
     item_name: name,
     category_id: item.category_id,
-    category_suggestions: [item.category_id],
+    category_suggestions: [{ id: item.category_id, name: 'Mesma categoria da origem (' + item.category_id + ')' }],
     description: fixMojibake(item.description || ''),
     original_price: price,
     stock: qty,
@@ -518,6 +528,9 @@ export async function buildShopeeDraftFromShopee(env: MigEnv, shopeeItemId: stri
     dimension: item.dimension || { package_length: 20, package_width: 15, package_height: 10 },
     condition: item.condition || 'NEW',
     brand: item.brand || { brand_id: 0, original_brand_name: 'NoBrand' },
+    brand_id_sel: item.brand?.brand_id || 0,
+    brand_options: [],
+    attributes: srcAttrs,
     pictures: picUrls,
     variation_plan: variationPlan,
     source_sku: item.item_sku || '',
