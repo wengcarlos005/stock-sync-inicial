@@ -864,11 +864,11 @@ export const html = `<!DOCTYPE html>
                     <span x-text="migrationTargets(a).length ? 'Migrar anúncio' : '✓ Em todas'"></span>
                     <svg x-show="migrationTargets(a).length" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
                   </button>
-                  <div x-show="open" x-transition.opacity class="absolute right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[200px]">
-                    <div class="text-[10px] uppercase tracking-wide text-slate-400 px-3 py-1">Migrar para:</div>
+                  <div x-show="open" x-transition.opacity class="absolute right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[300px]">
+                    <div class="text-[10px] uppercase tracking-wide text-slate-400 px-3 py-1">Migrar para  ←  origem:</div>
                     <template x-for="t in migrationTargets(a)" :key="t.label">
-                      <button @click="open=false; startMigration(t)" class="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">
-                        <span x-text="t.icon"></span><span x-text="t.label"></span>
+                      <button @click="open=false; startMigration(t)" class="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2 whitespace-nowrap">
+                        <span x-text="t.icon" class="shrink-0"></span><span x-text="t.label"></span>
                       </button>
                     </template>
                   </div>
@@ -2530,33 +2530,46 @@ function app() {
       }
       return n;
     },
-    // Destinos possíveis pra migrar um anúncio (lojas onde ele NÃO está)
+    // Destinos possíveis pra migrar um anúncio (lojas onde ele NÃO está),
+    // oferecendo a ESCOLHA da origem (do ML ou de outra loja Shopee que já tenha).
     migrationTargets(a) {
       const targets = [];
       const shopeeStores = (a.shopee_stores || []).map(s => String(s.account_id));
-      // 1) Migrar pro ML (se não tem ML e tem origem Shopee)
-      if (!a.meli_item_id && a.shopee_item_id) {
+      const shopeeAccounts = (this.accounts || []).filter(acc => acc.marketplace === 'shopee');
+      // lojas Shopee que JÁ têm o produto (possíveis origens)
+      const sourceShopeeStores = (a.shopee_stores || []).map(s => ({
+        item_id: String(s.item_id), account_id: String(s.account_id),
+        label: (this.accounts.find(x => String(x.external_id) === String(s.account_id))?.label) || s.account_label || 'Shopee',
+      }));
+
+      // 1) Migrar pro ML (origem = uma loja Shopee)
+      if (!a.meli_item_id && sourceShopeeStores.length) {
+        const src = sourceShopeeStores[0];
         targets.push({
-          icon: '🟡', label: 'Mercado Livre',
-          source_platform: 'shopee', source_item_id: String(a.shopee_item_id),
-          source_account_id: a.shopee_account_id || null, target_platform: 'meli',
-          product_name: a.product_name || '',
+          icon: '🟡', label: 'Mercado Livre  ←  ' + src.label,
+          source_platform: 'shopee', source_item_id: src.item_id, source_account_id: src.account_id,
+          target_platform: 'meli', product_name: a.product_name || '',
         });
       }
-      // 2) Migrar pra cada loja Shopee conectada onde o produto ainda não existe
-      const shopeeAccounts = (this.accounts || []).filter(acc => acc.marketplace === 'shopee');
+      // 2) Migrar pra cada loja Shopee onde NÃO está — uma opção por ORIGEM disponível
       for (const acc of shopeeAccounts) {
-        if (shopeeStores.includes(String(acc.external_id))) continue; // já está nessa loja
-        // origem preferida: ML (se existir) senão a Shopee atual
-        const src = a.meli_item_id
-          ? { source_platform: 'meli', source_item_id: String(a.meli_item_id), source_account_id: null }
-          : (a.shopee_item_id ? { source_platform: 'shopee', source_item_id: String(a.shopee_item_id), source_account_id: a.shopee_account_id || null } : null);
-        if (!src) continue;
-        targets.push({
-          icon: '🟠', label: acc.label || acc.external_id,
-          ...src, target_platform: 'shopee', target_shop_id: String(acc.external_id),
-          product_name: a.product_name || '',
-        });
+        if (shopeeStores.includes(String(acc.external_id))) continue;
+        // origem ML
+        if (a.meli_item_id) {
+          targets.push({
+            icon: '🟠', label: (acc.label || acc.external_id) + '  ←  do Mercado Livre',
+            source_platform: 'meli', source_item_id: String(a.meli_item_id), source_account_id: null,
+            target_platform: 'shopee', target_shop_id: String(acc.external_id), product_name: a.product_name || '',
+          });
+        }
+        // origem: cada loja Shopee que já tem (cópia Shopee→Shopee, mais fácil)
+        for (const src of sourceShopeeStores) {
+          targets.push({
+            icon: '🟠', label: (acc.label || acc.external_id) + '  ←  ' + src.label + ' (Shopee, mais rápido)',
+            source_platform: 'shopee', source_item_id: src.item_id, source_account_id: src.account_id,
+            target_platform: 'shopee', target_shop_id: String(acc.external_id), product_name: a.product_name || '',
+          });
+        }
       }
       return targets;
     },
