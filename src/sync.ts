@@ -109,6 +109,26 @@ async function syncOrders(env: SyncEnv, stats: SyncStats, errs: string[], shadow
     db.setConfig(env.DB, 'meli_orders_last_check', String(now - 60_000)),   // 1 min de overlap p/ segurança
     db.setConfig(env.DB, 'shopee_orders_last_check', String(now - 60_000)),
   ]);
+
+  // Refresca o status dos pedidos ML AINDA ABERTOS (poucos): re-consulta o shipment e atualiza.
+  // Mantém "A enviar" preciso sem re-buscar tudo (o status do ML é só de pagamento).
+  if (userId) {
+    try {
+      const open = (await env.DB.prepare(
+        `SELECT order_id FROM orders WHERE platform='meli' AND LOWER(status) IN ('paid','confirmed','ready_to_ship','processed','retry_ship','pending_shipment') ORDER BY created_at DESC LIMIT 40`
+      ).all()).results as any[];
+      for (const row of open) {
+        try {
+          const o: any = await mac.meliRaw(env, 'GET', `/orders/${row.order_id}`);
+          if (!o) continue;
+          let shipment: any = null;
+          if (o.shipping?.id) { try { shipment = await mac.meliRaw(env, 'GET', `/shipments/${o.shipping.id}`); } catch {} }
+          const st = mac.deriveMeliStatusFromShipment(o, shipment);
+          await env.DB.prepare(`UPDATE orders SET status=? WHERE platform='meli' AND order_id=?`).bind(st, String(row.order_id)).run();
+        } catch {}
+      }
+    } catch (e: any) { errs.push('refresh ML open: ' + e.message); }
+  }
 }
 
 async function applyOrderItem(
