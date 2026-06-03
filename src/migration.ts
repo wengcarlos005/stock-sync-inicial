@@ -746,12 +746,14 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
           if (id) imageIds.push(id);
         } catch {}
       }
-      // Shopee exige pelo menos 1 canal de frete habilitado — busca os da loja destino
+      // Shopee exige pelo menos 1 canal de frete — formato create usa logistic_id + size_id + is_free
       let logisticInfo: any[] = [];
       try {
         const ch = await mac.call(env, 'shopee_get_logistics_channels', { shopId: targetShop });
         const list = ch?.response?.logistics_channel_list || ch?.logistics_channel_list || [];
-        logisticInfo = list.filter((c: any) => c.enabled).map((c: any) => ({ logistics_channel_id: c.logistics_channel_id, enabled: true }));
+        logisticInfo = list.filter((c: any) => c.enabled).map((c: any) => ({
+          logistic_id: c.logistics_channel_id, enabled: true, size_id: 0, is_free: false,
+        }));
       } catch {}
       if (!logisticInfo.length) throw new Error('nenhum canal de frete habilitado na loja destino — habilite um no painel da Shopee');
 
