@@ -400,6 +400,30 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
     validation.push({ field: 'variations', level: 'warn', message: `${variations.length} variações ML — confirme eixos na Shopee.` });
   }
 
+  // Atributos: copia o schema de um anúncio existente na MESMA categoria (técnica de ERP,
+  // já que shopee_get_attributes está suspenso) e preenche valores do ML quando casarem.
+  let shopeeAttributes: any[] = [];
+  if (categoryId) {
+    try {
+      const tpl = await findShopeeAttributeTemplate(env, targetShopId, categoryId);
+      // tenta casar valores do ML (Material, Idade) no template
+      const mlText = ((mlDescription || '') + ' ' + Array.from(attrMap.values()).join(' ')).toLowerCase();
+      shopeeAttributes = tpl.map((a: any) => {
+        // mantém o valor do template (já é válido pra categoria); marca pra revisão
+        const val = a.attribute_value_list?.[0];
+        return {
+          attribute_id: a.attribute_id,
+          name: a.original_attribute_name,
+          value_id: val?.value_id ?? null,
+          value_name: val?.original_value_name ?? '',
+          value_unit: val?.value_unit ?? '',
+          is_mandatory: !!a.is_mandatory,
+          options: (a.all_values || a.attribute_value_list || []).map((v: any) => ({ value_id: v.value_id, name: v.original_value_name })),
+        };
+      });
+    } catch {}
+  }
+
   // Marca: busca catálogo Shopee da categoria e tenta casar com a marca do ML
   const mlBrand = (attrMap.get('BRAND') || '').trim();
   let brandOptions: { brand_id: number; name: string }[] = [];
@@ -441,6 +465,7 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
     brand: { brand_id: brandIdSel, original_brand_name: mlBrand || 'NoBrand' },
     brand_id_sel: brandIdSel,
     brand_options: brandOptions,
+    attributes: shopeeAttributes,
     pictures: picUrls,
     variation_plan: variationPlan,
     source_sku: mac.getMeliSku(item) || item.seller_custom_field || '',
@@ -604,6 +629,47 @@ export async function fillMissingVariationsShopee(env: MigEnv, targetItemId: str
     }
   }
   return { ok: results.length > 0 && results.every(r => r.ok), results };
+}
+
+// Técnica de ERP: como a API de schema de atributos da Shopee está suspensa, lê os atributos
+// (id, value_id, nomes) de anúncios EXISTENTES na mesma categoria. Junta as opções de vários
+// itens e cacheia por (loja, categoria) pra não ficar lento.
+async function findShopeeAttributeTemplate(env: MigEnv, shopId: string | undefined, categoryId: number): Promise<any[]> {
+  const cacheKey = `${shopId || 'def'}:${categoryId}`;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS category_attr_cache (key TEXT PRIMARY KEY, attrs_json TEXT, updated_at INTEGER)`).run().catch(() => {});
+    const cached = await env.DB.prepare(`SELECT attrs_json, updated_at FROM category_attr_cache WHERE key=?`).bind(cacheKey).first<any>();
+    if (cached && (Date.now() - (cached.updated_at || 0) < 7 * 86400000)) {
+      return JSON.parse(cached.attrs_json || '[]');
+    }
+  } catch {}
+
+  const ids = await mac.shopeeListItemIds(env, shopId);
+  const acc = new Map<number, any>(); // attribute_id -> { name, mandatory, valueMap, first }
+  let scanned = 0;
+  for (const id of ids) {
+    if (scanned >= 15) break;
+    const it: any = await mac.shopeeGetItem(env, id, shopId);
+    if (!it || String(it.category_id) !== String(categoryId) || !(it.attribute_list || []).length) continue;
+    scanned++;
+    for (const a of it.attribute_list) {
+      let e = acc.get(a.attribute_id);
+      if (!e) { e = { attribute_id: a.attribute_id, original_attribute_name: a.original_attribute_name, is_mandatory: a.is_mandatory, valueMap: new Map(), first: null }; acc.set(a.attribute_id, e); }
+      for (const v of (a.attribute_value_list || [])) {
+        if (v.value_id) e.valueMap.set(v.value_id, { value_id: v.value_id, original_value_name: v.original_value_name, value_unit: v.value_unit || '' });
+        if (!e.first && v.value_id) e.first = { value_id: v.value_id, original_value_name: v.original_value_name, value_unit: v.value_unit || '' };
+      }
+    }
+  }
+  const out = [...acc.values()].map(e => ({
+    attribute_id: e.attribute_id,
+    original_attribute_name: e.original_attribute_name,
+    is_mandatory: e.is_mandatory,
+    attribute_value_list: e.first ? [e.first] : [],
+    all_values: [...e.valueMap.values()],
+  }));
+  try { await env.DB.prepare(`INSERT INTO category_attr_cache (key, attrs_json, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET attrs_json=excluded.attrs_json, updated_at=excluded.updated_at`).bind(cacheKey, JSON.stringify(out), Date.now()).run(); } catch {}
+  return out;
 }
 
 // Registra que um SKU agora também existe numa loja Shopee (atualiza extra_shopee_stores do mapping)
@@ -811,6 +877,14 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
         logistic_info: logisticInfo,
         image: { image_id_list: imageIds },
       };
+      // Atributos da categoria (preenchidos no modal) → formato attribute_list da Shopee
+      const attrs = (draft.attributes || []).filter((a: any) => a.value_id != null && a.value_id !== '');
+      if (attrs.length) {
+        payload.attribute_list = attrs.map((a: any) => ({
+          attribute_id: Number(a.attribute_id),
+          attribute_value_list: [{ value_id: Number(a.value_id), original_value_name: a.value_name || '', value_unit: a.value_unit || '' }],
+        }));
+      }
       const res = await mac.call(env, 'shopee_create_item', payload);
       if (res?.error) throw new Error('Shopee: ' + (res.message || res.error));
       publishedId = String(res?.response?.item_id || res?.item_id || '');

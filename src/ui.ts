@@ -1367,9 +1367,30 @@ export const html = `<!DOCTYPE html>
                   <label class="block"><span class="text-xs text-slate-500">Descrição</span>
                     <textarea x-model="migModal.draft.description" rows="4" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" placeholder="Descrição do produto (preenchida do ML quando houver)"></textarea>
                   </label>
-                  <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                    ⚠️ Atributos da categoria (Material, Idade, Tipo de Bloco, INMETRO...) não estão disponíveis pela API da Shopee nesta conta — complete no painel da Shopee após publicar (ela mostra o formulário "1/10").
-                  </div>
+                  <!-- Atributos da categoria (template de anúncio existente, editável) -->
+                  <template x-if="migModal.draft.attributes && migModal.draft.attributes.length">
+                    <div>
+                      <span class="text-xs text-slate-500">Atributos da categoria <span class="text-slate-400">(preenchidos de um anúncio da mesma categoria — ajuste se quiser)</span></span>
+                      <div class="space-y-1.5 mt-1">
+                        <template x-for="(at,ai) in migModal.draft.attributes" :key="ai">
+                          <div class="flex gap-1.5 items-center">
+                            <span class="text-[11px] text-slate-500 w-28 shrink-0 truncate" :title="at.name" x-text="at.name + (at.is_mandatory ? ' *' : '')"></span>
+                            <select x-model.number="at.value_id" class="flex-1 px-2 py-1 border border-slate-200 rounded text-xs bg-white">
+                              <option value="">(vazio)</option>
+                              <template x-for="o in (at.options||[])" :key="o.value_id">
+                                <option :value="o.value_id" x-text="o.name"></option>
+                              </template>
+                            </select>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="!(migModal.draft.attributes && migModal.draft.attributes.length)">
+                    <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      ⚠️ Não achei um anúncio existente nesta categoria pra copiar os atributos — complete no painel da Shopee após publicar.
+                    </div>
+                  </template>
                 </div>
               </template>
 
