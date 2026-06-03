@@ -134,7 +134,7 @@ add('GET', '/api/products/master', async (req, env) => {
 
   // ── 2. Unmapped ────────────────────────────────────────────
   const unmapped = (await env.DB.prepare(`
-    SELECT sku, platform, item_id, variation_id, product_name, shopee_account_id FROM unmapped WHERE resolved=0
+    SELECT sku, platform, item_id, variation_id, product_name, shopee_account_id, image_url FROM unmapped WHERE resolved=0
   `).all()).results as any[];
 
   // ── 2c. Labels das contas (pra mostrar nome amigável na UI) ──
@@ -352,7 +352,7 @@ add('GET', '/api/products/master', async (req, env) => {
       a.variations.push({
         sku: u.sku || '',
         variation: sales?.variation || fromSuffix || null,
-        image: sales?.image || null,
+        image: u.image_url || sales?.image || null,
         meli_item_id: null,
         meli_variation_id: null,
         shopee_item_id: u.item_id,
@@ -373,7 +373,7 @@ add('GET', '/api/products/master', async (req, env) => {
       a.variations.push({
         sku: u.sku || '',
         variation: sales?.variation || fromSuffix || null,
-        image: sales?.image || null,
+        image: u.image_url || sales?.image || null,
         meli_item_id: u.item_id,
         meli_variation_id: u.variation_id || null,
         shopee_item_id: null,
@@ -3800,33 +3800,71 @@ add('POST', '/api/variation-images/refresh', async (req, env) => {
   const mac = await import('./mac');
   const url = new URL(req.url);
   const offset = Number(url.searchParams.get('offset') || 0);
-  const batch = Math.min(40, Number(url.searchParams.get('batch') || 40));
-  // Pega itens Shopee distintos dos mappings ativos (paginado pra não estourar subrequests)
-  const allRows = (await env.DB.prepare(
-    `SELECT DISTINCT shopee_item_id, shopee_account_id FROM mappings WHERE active=1 AND shopee_item_id IS NOT NULL AND shopee_model_id IS NOT NULL ORDER BY shopee_item_id`
-  ).all()).results as any[];
-  const totalItems = allRows.length;
-  const rows = allRows.slice(offset, offset + batch);
+  const batch = Math.min(25, Number(url.searchParams.get('batch') || 25));
+  // garante colunas de imagem
+  await env.DB.prepare(`ALTER TABLE unmapped ADD COLUMN image_url TEXT`).run().catch(() => {});
+
+  // Lista UNIFICADA de itens (Shopee + ML) de mappings E unmapped — distintos por (platform,item,account)
+  const spMap = (await env.DB.prepare(`SELECT DISTINCT shopee_item_id AS item, shopee_account_id AS acc FROM mappings WHERE active=1 AND shopee_item_id IS NOT NULL`).all()).results as any[];
+  const spUn = (await env.DB.prepare(`SELECT DISTINCT item_id AS item, shopee_account_id AS acc FROM unmapped WHERE platform='shopee' AND resolved=0 AND (image_url IS NULL OR image_url='')`).all()).results as any[];
+  const mlMap = (await env.DB.prepare(`SELECT DISTINCT meli_item_id AS item FROM mappings WHERE active=1 AND meli_item_id IS NOT NULL AND (image_url IS NULL OR image_url='')`).all()).results as any[];
+  const mlUn = (await env.DB.prepare(`SELECT DISTINCT item_id AS item FROM unmapped WHERE platform='meli' AND resolved=0 AND (image_url IS NULL OR image_url='')`).all()).results as any[];
+
+  const jobs: any[] = [
+    ...dedupe(spMap.concat(spUn), (x: any) => 'sp:' + x.item + ':' + (x.acc || '')).map((x: any) => ({ platform: 'shopee', item: x.item, acc: x.acc })),
+    ...dedupe(mlMap.concat(mlUn), (x: any) => 'ml:' + x.item).map((x: any) => ({ platform: 'meli', item: x.item })),
+  ];
+  const totalItems = jobs.length;
+  const slice = jobs.slice(offset, offset + batch);
   let updated = 0, items = 0, errors = 0;
-  for (const r of rows) {
+
+  for (const j of slice) {
     items++;
     try {
-      const { models, tierVariation } = await mac.shopeeGetModelsFull(env, Number(r.shopee_item_id), r.shopee_account_id || undefined);
-      const optList = tierVariation?.[0]?.option_list || [];
-      for (const m of models) {
-        const optIdx = Array.isArray(m.tier_index) ? m.tier_index[0] : null;
-        const imgUrl = (optIdx != null && optList[optIdx]?.image?.image_url) || null;
-        if (!imgUrl) continue;
-        const res = await env.DB.prepare(
-          `UPDATE mappings SET image_url=? WHERE shopee_item_id=? AND shopee_model_id=?`
-        ).bind(imgUrl, String(r.shopee_item_id), String(m.model_id)).run();
-        updated += (res.meta?.changes || 0);
+      if (j.platform === 'shopee') {
+        const item = await mac.shopeeGetItem(env, Number(j.item), j.acc || undefined);
+        const itemImg = (item as any)?.image?.image_url_list?.[0] || null;
+        const { models, tierVariation } = await mac.shopeeGetModelsFull(env, Number(j.item), j.acc || undefined);
+        const optList = tierVariation?.[0]?.option_list || [];
+        for (const m of models) {
+          const optIdx = Array.isArray(m.tier_index) ? m.tier_index[0] : null;
+          const img = (optIdx != null && optList[optIdx]?.image?.image_url) || itemImg; // option image OU foto do item
+          if (!img) continue;
+          updated += (await env.DB.prepare(`UPDATE mappings SET image_url=? WHERE shopee_item_id=? AND shopee_model_id=?`).bind(img, String(j.item), String(m.model_id)).run()).meta?.changes || 0;
+          updated += (await env.DB.prepare(`UPDATE unmapped SET image_url=? WHERE platform='shopee' AND item_id=? AND COALESCE(variation_id,'')=?`).bind(img, String(j.item), String(m.model_id)).run()).meta?.changes || 0;
+        }
+      } else {
+        const it: any = await mac.meliGetItem(env, String(j.item));
+        const itemImg = (it?.pictures?.[0]?.secure_url || it?.pictures?.[0]?.url || it?.thumbnail) || null;
+        const vars = it?.variations || [];
+        // ML: cada variação tem picture_ids → mapeia pro pictures do item
+        const picById = new Map<string, string>();
+        for (const p of (it?.pictures || [])) picById.set(String(p.id), p.secure_url || p.url);
+        if (vars.length) {
+          for (const v of vars) {
+            const vimg = (v.picture_ids?.[0] && picById.get(String(v.picture_ids[0]))) || itemImg;
+            if (!vimg) continue;
+            updated += (await env.DB.prepare(`UPDATE mappings SET image_url=? WHERE meli_item_id=? AND meli_variation_id=?`).bind(vimg, String(j.item), String(v.id)).run()).meta?.changes || 0;
+            updated += (await env.DB.prepare(`UPDATE unmapped SET image_url=? WHERE platform='meli' AND item_id=? AND COALESCE(variation_id,'')=?`).bind(vimg, String(j.item), String(v.id)).run()).meta?.changes || 0;
+          }
+        }
+        // item sem variação OU fallback: usa foto do item pra qualquer linha desse item ainda sem imagem
+        if (itemImg) {
+          updated += (await env.DB.prepare(`UPDATE mappings SET image_url=? WHERE meli_item_id=? AND (image_url IS NULL OR image_url='')`).bind(itemImg, String(j.item)).run()).meta?.changes || 0;
+          updated += (await env.DB.prepare(`UPDATE unmapped SET image_url=? WHERE platform='meli' AND item_id=? AND (image_url IS NULL OR image_url='')`).bind(itemImg, String(j.item)).run()).meta?.changes || 0;
+        }
       }
     } catch { errors++; }
   }
   const nextOffset = offset + batch;
   return json({ ok: true, items, updated, errors, total_items: totalItems, next_offset: nextOffset < totalItems ? nextOffset : null });
 });
+
+function dedupe<T>(arr: T[], key: (x: T) => string): T[] {
+  const seen = new Set<string>(); const out: T[] = [];
+  for (const x of arr) { const k = key(x); if (!seen.has(k)) { seen.add(k); out.push(x); } }
+  return out;
+}
 
 // ============= Migração de anúncios (Shopee ↔ ML) =============
 import * as migration from './migration';

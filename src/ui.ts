@@ -839,9 +839,9 @@ export const html = `<!DOCTYPE html>
 
         <div class="space-y-2">
           <template x-for="a in migrationList()" :key="a.key">
-            <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded-lg" :class="migExpanded[a.key] ? 'overflow-hidden' : ''">
               <!-- Cabeçalho clicável (expande) -->
-              <div @click="migExpanded[a.key] = !migExpanded[a.key]" class="p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+              <div @click="migExpanded[a.key] = !migExpanded[a.key]" class="p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 rounded-lg">
                 <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="migExpanded[a.key] ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd"/></svg>
                 <template x-if="a.image"><img :src="a.image" class="w-11 h-11 rounded object-cover border border-slate-200 shrink-0" loading="lazy" /></template>
                 <template x-if="!a.image"><div class="w-11 h-11 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300 shrink-0">📦</div></template>
