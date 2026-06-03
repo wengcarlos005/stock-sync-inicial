@@ -1547,7 +1547,7 @@ function app() {
       await this.loadAll();
       this.pollTimer = setInterval(() => this.loadStatus(), 30000);
       // Lazy-load candidatos de migração ao abrir a aba pela 1ª vez
-      this.$watch('tab', (t) => { if (t === 'migration' && !this.migCandidates.length) this.loadMigration(); });
+      this.$watch('tab', (t) => { if (t === "migration") this.loadMaster(); });
     },
 
     async login() {
@@ -2573,7 +2573,7 @@ function app() {
         if (r?.ok) {
           this.migPublishOk = true;
           this.migPublishMsg = '✓ Publicado! ID ' + r.published_item_id + ' — pareado automaticamente.';
-          await this.loadMigration();
+          await this.loadMaster();
           setTimeout(() => { this.migModal = null; this.migPublishMsg = ''; }, 2500);
         } else if (r?.blocked) {
           this.migPublishOk = false;
