@@ -746,6 +746,15 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
           if (id) imageIds.push(id);
         } catch {}
       }
+      // Shopee exige pelo menos 1 canal de frete habilitado — busca os da loja destino
+      let logisticInfo: any[] = [];
+      try {
+        const ch = await mac.call(env, 'shopee_get_logistics_channels', { shopId: targetShop });
+        const list = ch?.response?.logistics_channel_list || ch?.logistics_channel_list || [];
+        logisticInfo = list.filter((c: any) => c.enabled).map((c: any) => ({ logistics_channel_id: c.logistics_channel_id, enabled: true }));
+      } catch {}
+      if (!logisticInfo.length) throw new Error('nenhum canal de frete habilitado na loja destino — habilite um no painel da Shopee');
+
       const payload: any = {
         shopId: targetShop,
         item_name: draft.item_name,
@@ -758,6 +767,7 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
         dimension: draft.dimension,
         condition: draft.condition || 'NEW',
         brand: draft.brand,
+        logistic_info: logisticInfo,
         image: { image_id_list: imageIds },
       };
       const res = await mac.call(env, 'shopee_create_item', payload);
