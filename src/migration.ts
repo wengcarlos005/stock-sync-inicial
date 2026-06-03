@@ -775,10 +775,11 @@ async function addShopeeOptionAndModel(
 export async function saveDraft(env: MigEnv, c: { source_platform: string; source_item_id: string; source_account_id: string | null; target_platform: string; target_shop_id?: string | null; product_name: string; image_url: string | null; }, result: DraftResult): Promise<number> {
   const now = Date.now();
   const tshop = c.target_shop_id || '';
-  // Upsert manual (não depende do UNIQUE exato): apaga rascunho equivalente não-publicado e reinsere
+  // Upsert manual: remove QUALQUER rascunho equivalente (inclui publicado e legado 3-col)
+  // pra não bater no UNIQUE antigo (source_platform, source_item_id, target_platform).
   await env.DB.prepare(
-    `DELETE FROM migration_drafts WHERE source_platform=? AND source_item_id=? AND target_platform=? AND COALESCE(target_shop_id,'')=? AND status!='published'`
-  ).bind(c.source_platform, c.source_item_id, c.target_platform, tshop).run();
+    `DELETE FROM migration_drafts WHERE source_platform=? AND source_item_id=? AND target_platform=?`
+  ).bind(c.source_platform, c.source_item_id, c.target_platform).run();
   await env.DB.prepare(`
     INSERT INTO migration_drafts (source_platform, source_item_id, source_account_id, target_platform, target_shop_id, product_name, image_url, draft_json, photos_json, validation_json, status, created_at, updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
