@@ -1343,8 +1343,8 @@ export const html = `<!DOCTYPE html>
                     <input x-model="migModal.draft.item_name" maxlength="120" class="w-full px-2 py-1 border border-slate-300 rounded text-sm" /></label>
                   <label class="block"><span class="text-xs text-slate-500">Categoria Shopee</span>
                     <select x-model="migModal.draft.category_id" class="w-full px-2 py-1 border border-slate-300 rounded text-sm bg-white">
-                      <template x-for="cs in (migModal.draft.category_suggestions||[])" :key="cs">
-                        <option :value="cs" x-text="cs"></option>
+                      <template x-for="cs in (migModal.draft.category_suggestions||[])" :key="(cs && cs.id) || cs">
+                        <option :value="(cs && cs.id) || cs" x-text="(cs && cs.name) ? cs.name : cs"></option>
                       </template>
                     </select></label>
                   <div class="grid grid-cols-2 gap-2">

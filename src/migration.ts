@@ -327,12 +327,31 @@ export async function buildShopeeDraftFromMeli(env: MigEnv, meliItemId: string, 
   const rawName = fixMojibake(item.title || '');
   const title = truncate(rawName, 120); // Shopee aceita mais
 
-  // Prevê categoria Shopee
-  let categoryId = 0; let categorySuggestions: number[] = [];
+  // Prevê categoria Shopee (e resolve os NOMES das categorias sugeridas)
+  let categoryId = 0; let categorySuggestions: { id: number; name: string }[] = [];
   try {
-    const rec = await mac.call(env, 'shopee_recommend_category', mac['withShop' as any] ? { item_name: rawName, shopId: targetShopId } : { item_name: rawName, shopId: targetShopId });
-    categorySuggestions = rec?.response?.category_id || rec?.category_id || [];
-    if (categorySuggestions.length) categoryId = categorySuggestions[0];
+    const rec = await mac.call(env, 'shopee_recommend_category', { item_name: rawName, shopId: targetShopId });
+    const ids: number[] = rec?.response?.category_id || rec?.category_id || [];
+    if (ids.length) {
+      categoryId = ids[0];
+      // mapa id→nome via lista de categorias da Shopee (caminho completo)
+      let nameMap = new Map<number, string>();
+      try {
+        const cats = await mac.call(env, 'shopee_get_categories', { shopId: targetShopId });
+        const list = cats?.response?.category_list || cats?.category_list || [];
+        const byId = new Map<number, any>();
+        for (const c of list) byId.set(c.category_id, c);
+        for (const c of list) {
+          // monta caminho "Pai > Filho" pra ficar claro
+          let path = c.display_category_name || c.category_name;
+          let p = byId.get(c.parent_category_id);
+          let guard = 0;
+          while (p && guard++ < 5) { path = (p.display_category_name || p.category_name) + ' > ' + path; p = byId.get(p.parent_category_id); }
+          nameMap.set(c.category_id, path);
+        }
+      } catch {}
+      categorySuggestions = ids.slice(0, 3).map(id => ({ id, name: nameMap.get(id) || ('Categoria ' + id) }));
+    }
   } catch (e: any) { validation.push({ field: 'category', level: 'warn', message: 'Predição categoria Shopee falhou: ' + e.message }); }
   if (!categoryId) validation.push({ field: 'category', level: 'error', message: 'Sem categoria Shopee — selecione manualmente.' });
 
