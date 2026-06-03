@@ -749,17 +749,19 @@ export async function publishDraft(env: MigEnv, draftId: number, overrides?: any
       const payload: any = {
         shopId: targetShop,
         item_name: draft.item_name,
-        category_id: draft.category_id,
+        category_id: Number(draft.category_id),
         description: draft.description,
-        original_price: draft.original_price,
-        normal_stock: draft.stock,
-        weight: draft.weight,
+        original_price: Number(draft.original_price) || 0,
+        // Shopee exige seller_stock no formato [{ stock }], não normal_stock
+        seller_stock: [{ stock: Number(draft.stock) || 0 }],
+        weight: Number(draft.weight) || 0.5,
         dimension: draft.dimension,
         condition: draft.condition || 'NEW',
         brand: draft.brand,
         image: { image_id_list: imageIds },
       };
       const res = await mac.call(env, 'shopee_create_item', payload);
+      if (res?.error) throw new Error('Shopee: ' + (res.message || res.error));
       publishedId = String(res?.response?.item_id || res?.item_id || '');
       if (!publishedId) throw new Error('Shopee create não retornou item_id: ' + JSON.stringify(res).slice(0, 300));
     }
