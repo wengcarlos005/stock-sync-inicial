@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Para Você, Esposa do Weng 💎</title>
+  <title>O Diário do Amor — Para a Esposa do Weng 💍</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -15,54 +15,65 @@
 
   <main id="app">
 
-    <!-- TELA 1: NOME (validação "Esposa do Weng") -->
+    <!-- TELA 1: CAPA DE JORNAL + NOME -->
     <section id="screen-name" class="screen active">
-      <div class="card">
-        <div class="plumbob" aria-hidden="true"></div>
-        <h1 class="title-sims">Bem-vinda ao jogo!</h1>
-        <p class="subtitle">Antes de começar, digite seu nome:</p>
+      <div class="card gazette">
+        <div class="gazette-dateline">
+          <span>VOL. I · Nº 1</span>
+          <span>EDIÇÃO ESPECIAL</span>
+          <span>12 DE JUNHO DE 2026</span>
+        </div>
+        <div class="rule-double"></div>
+        <h1 class="masthead">O Diário do Amor</h1>
+        <div class="rule-double"></div>
+        <p class="gazette-tagline">★ A mais bela notícia já publicada ★</p>
+
+        <p class="gazette-lead">
+          Prezada leitora, para acessar esta edição exclusiva,
+          por gentileza identifique-se abaixo:
+        </p>
 
         <form id="name-form" autocomplete="off">
-          <input type="text" id="name-input" placeholder="Digite seu nome..." />
-          <button type="submit" class="btn btn-primary">Confirmar</button>
+          <input type="text" id="name-input" placeholder="Seu nome..." />
+          <button type="submit" class="btn btn-primary">Entrar</button>
         </form>
 
         <p class="error-message hidden" id="name-error">
-          Hmm... você quis dizer <strong>"Esposa do Weng"</strong>, né? 😏
+          Hmm… acho que você quis dizer <em>“Esposa do Weng”</em>, não é? 😏
         </p>
+
+        <div class="gazette-foot">— continua na próxima página —</div>
       </div>
     </section>
 
     <!-- TELA 2: CRIAÇÃO DE PERSONAGEM (CAS) -->
     <section id="screen-cas" class="screen">
       <div class="card card-cas">
-        <h2 class="title-sims">Deixa eu ver como você... mesmo! 👀</h2>
-        <p class="subtitle small">Personalize sua Sim</p>
+        <span class="kicker">Atelier de Personagem</span>
+        <h2 class="title-serif">Deixa eu ver você… 💫</h2>
+        <p class="subtitle small">Monte a sua versãozinha</p>
 
         <div class="cas-stage">
-          <div class="plumbob plumbob-small" aria-hidden="true"></div>
-          <div class="avatar-stage" id="avatar-stage">
-            <div class="sim-hair" id="sim-hair"></div>
-            <div class="sim-head" id="sim-head">
-              <div class="sim-face">
-                <span class="sim-eye sim-eye-left"></span>
-                <span class="sim-eye sim-eye-right"></span>
-                <span class="sim-mouth"></span>
-              </div>
-              <span class="sim-accessory" id="sim-accessory"></span>
-            </div>
-            <div class="sim-body" id="sim-body"></div>
-          </div>
+          <div class="plumbob" aria-hidden="true"></div>
+          <div class="avatar-mount" id="avatar-mount"></div>
         </div>
 
         <div class="cas-options">
           <div class="cas-group">
-            <span class="cas-label">Tom de pele</span>
+            <span class="cas-label">Pele</span>
             <div class="swatches" id="swatches-skin"></div>
           </div>
           <div class="cas-group">
-            <span class="cas-label">Cabelo</span>
+            <span class="cas-label">Cor do cabelo</span>
             <div class="swatches" id="swatches-hair"></div>
+          </div>
+          <div class="cas-group">
+            <span class="cas-label">Estilo do cabelo</span>
+            <div class="swatches" id="swatches-hairstyle"></div>
+          </div>
+          <div class="cas-group">
+            <span class="cas-label">Olhos</span>
+            <div class="swatches" id="swatches-eyes"></div>
           </div>
           <div class="cas-group">
             <span class="cas-label">Roupa</span>
@@ -81,58 +92,254 @@
     <!-- TELA 3: REAÇÃO -->
     <section id="screen-reaction" class="screen">
       <div class="card">
-        <div class="avatar-stage avatar-stage-big" id="avatar-stage-reaction"></div>
-        <h2 class="title-sims">Nossa... que gatinha! 😻</h2>
-        <p class="subtitle">Fiu fiu! 🎶💃</p>
-        <button class="btn btn-primary" id="btn-go-letter">Continuar</button>
+        <span class="kicker">Manchete do dia</span>
+        <div class="avatar-mount avatar-mount-big" id="avatar-mount-reaction"></div>
+        <h2 class="title-serif">Nossa… que gatinha! 😻</h2>
+        <p class="subtitle script-line">fiu&nbsp;fiu ~ 🎶</p>
+        <button class="btn btn-primary" id="btn-go-letter">Continuar a leitura</button>
       </div>
     </section>
 
     <!-- TELA 4: CARTINHA PRINCIPAL -->
     <section id="screen-letter" class="screen">
       <div class="card card-letter">
+        <span class="kicker">Correspondência</span>
         <div class="envelope" id="envelope">
           <div class="envelope-flap"></div>
           <div class="envelope-body">
-            <span class="envelope-heart">💌</span>
+            <span class="wax-seal">W</span>
           </div>
         </div>
-        <h2 class="title-sims" id="letter-title">Você recebeu uma cartinha!</h2>
+        <h2 class="title-serif" id="letter-title">Uma carta chegou para você</h2>
         <p class="subtitle small" id="letter-hint">Toque no envelope para abrir</p>
 
         <div class="letter-paper hidden" id="letter-paper">
           <p id="letter-text"></p>
+          <p class="letter-sign" id="letter-sign"></p>
           <button class="btn btn-secondary hidden" id="btn-letter-next">Continuar</button>
         </div>
       </div>
     </section>
 
-    <!-- TELA 5: CAÇA ÀS CARTAS -->
+    <!-- TELA 5: CAÇA ÀS CARTINHAS -->
     <section id="screen-room" class="screen">
       <div class="card card-room">
-        <h2 class="title-sims">Caça às cartinhas! 🔍</h2>
-        <p class="subtitle small">Clique nos objetos do quarto e encontre as cartinhas escondidas</p>
+        <span class="kicker">Caça ao tesouro</span>
+        <h2 class="title-serif">As cartinhas escondidas 🔍</h2>
+        <p class="subtitle small">Toque nos objetos do quarto e encontre as 4 cartinhas</p>
         <p class="found-counter" id="found-counter">0 de 4 encontradas</p>
 
-        <div class="room" id="room">
-          <span class="room-deco deco-window">🪟</span>
-          <span class="room-deco deco-frame">🖼️</span>
-          <span class="room-deco deco-plant">🪴</span>
-          <span class="room-deco deco-sofa">🛋️</span>
-          <span class="room-deco deco-rug">🟪</span>
-          <!-- objetos clicáveis são inseridos via JS -->
+        <div class="room-wrap">
+          <svg class="room-svg" viewBox="0 0 800 560" role="img" aria-label="Quarto aconchegante">
+            <defs>
+              <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f3e7d7"/>
+                <stop offset="1" stop-color="#ecdcc8"/>
+              </linearGradient>
+              <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#cfe3ea"/>
+                <stop offset="1" stop-color="#e9f1ee"/>
+              </linearGradient>
+              <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#d8bd9a"/>
+                <stop offset="1" stop-color="#cbac82"/>
+              </linearGradient>
+              <linearGradient id="gLamp" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f7e3ad"/>
+                <stop offset="1" stop-color="#e9c87f"/>
+              </linearGradient>
+              <radialGradient id="gLampGlow" cx="0.5" cy="0.4" r="0.6">
+                <stop offset="0" stop-color="#fff4d2" stop-opacity="0.9"/>
+                <stop offset="1" stop-color="#fff4d2" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+
+            <!-- PAREDE E CHÃO -->
+            <rect x="0" y="0" width="800" height="430" fill="url(#gWall)"/>
+            <rect x="0" y="300" width="800" height="130" fill="#e7d6bf"/>
+            <rect x="0" y="296" width="800" height="6" fill="#d8c3a6"/>
+            <rect x="0" y="424" width="800" height="6" fill="#c7ad88"/>
+            <rect x="0" y="430" width="800" height="130" fill="url(#gFloor)"/>
+            <g stroke="#bd9d72" stroke-width="2" opacity="0.5">
+              <line x1="120" y1="430" x2="60" y2="560"/>
+              <line x1="300" y1="430" x2="270" y2="560"/>
+              <line x1="480" y1="430" x2="500" y2="560"/>
+              <line x1="660" y1="430" x2="720" y2="560"/>
+            </g>
+
+            <!-- TAPETE -->
+            <ellipse cx="400" cy="500" rx="250" ry="44" fill="#d9a7a7" opacity="0.55"/>
+            <ellipse cx="400" cy="500" rx="200" ry="33" fill="none" stroke="#f2e7d6" stroke-width="4" opacity="0.7"/>
+            <ellipse cx="400" cy="500" rx="150" ry="24" fill="#c98b8b" opacity="0.45"/>
+
+            <!-- VARAL DE LUZINHAS -->
+            <path d="M20,40 Q200,90 400,46 T780,42" fill="none" stroke="#b7a98f" stroke-width="2"/>
+            <g>
+              <circle cx="120" cy="64" r="7" fill="#e9b9b9"/>
+              <circle cx="220" cy="72" r="7" fill="#bfd2bf"/>
+              <circle cx="320" cy="64" r="7" fill="#e6cf9a"/>
+              <circle cx="470" cy="58" r="7" fill="#bfb0d2"/>
+              <circle cx="570" cy="62" r="7" fill="#e9b9b9"/>
+              <circle cx="680" cy="56" r="7" fill="#bfd2bf"/>
+            </g>
+
+            <!-- JANELA -->
+            <g>
+              <rect x="70" y="74" width="190" height="172" rx="10" fill="#efe2cd"/>
+              <rect x="84" y="88" width="162" height="144" rx="6" fill="url(#gSky)"/>
+              <circle cx="210" cy="120" r="16" fill="#f6e7b8" opacity="0.85"/>
+              <ellipse cx="120" cy="140" rx="22" ry="11" fill="#fbfdfb" opacity="0.9"/>
+              <ellipse cx="150" cy="150" rx="16" ry="9" fill="#fbfdfb" opacity="0.9"/>
+              <rect x="162" y="88" width="6" height="144" fill="#efe2cd"/>
+              <rect x="84" y="153" width="162" height="6" fill="#efe2cd"/>
+              <rect x="60" y="246" width="210" height="14" rx="4" fill="#dcc6a4"/>
+              <!-- cortinas -->
+              <path d="M70,74 q-26,90 6,172 q-34,-10 -26,-172 Z" fill="#cf9a9a"/>
+              <path d="M260,74 q26,90 -6,172 q34,-10 26,-172 Z" fill="#cf9a9a"/>
+              <!-- plantinha no parapeito -->
+              <rect x="200" y="226" width="34" height="22" rx="4" fill="#c98b8b"/>
+              <path d="M210,226 q-6,-26 -2,-34 q10,8 8,34 Z" fill="#8faf86"/>
+              <path d="M217,226 q0,-30 6,-38 q6,12 -2,38 Z" fill="#9bbf92"/>
+              <path d="M224,226 q8,-22 16,-26 q-2,14 -10,26 Z" fill="#8faf86"/>
+            </g>
+
+            <!-- QUADROS NA PAREDE -->
+            <g>
+              <rect x="600" y="96" width="92" height="74" rx="6" fill="#efe2cd" stroke="#c9a86a" stroke-width="4"/>
+              <path d="M646,118 c-8,-12 -26,-2 -16,10 l16,16 16,-16 c10,-12 -8,-22 -16,-10 Z" fill="#d98f9a"/>
+              <!-- quadro do plumbob (Sims easter egg) -->
+              <rect x="520" y="110" width="64" height="64" rx="6" fill="#fdfaf2" stroke="#c9a86a" stroke-width="4"/>
+              <rect x="544" y="126" width="22" height="22" fill="#9bb49a" transform="rotate(45 552 137)"/>
+            </g>
+
+            <!-- CABIDE DE PAREDE COM CHAPÉU (clicável) -->
+            <g>
+              <rect x="372" y="150" width="56" height="8" rx="4" fill="#b98f5e"/>
+              <circle cx="384" cy="162" r="4" fill="#9c7544"/>
+              <circle cx="416" cy="162" r="4" fill="#9c7544"/>
+            </g>
+            <g id="obj-hat" class="hidden-object" tabindex="0" role="button" aria-label="Chapéu mexicano">
+              <ellipse cx="416" cy="206" rx="40" ry="14" fill="#dcb877"/>
+              <ellipse cx="416" cy="204" rx="40" ry="12" fill="#e6c88a"/>
+              <ellipse cx="416" cy="196" rx="20" ry="14" fill="#dcb877"/>
+              <ellipse cx="416" cy="190" rx="18" ry="9" fill="#e6c88a"/>
+              <path d="M398,196 q18,8 36,0" fill="none" stroke="#c98b8b" stroke-width="5"/>
+              <g fill="#b06a6a">
+                <circle cx="384" cy="205" r="2.4"/><circle cx="396" cy="209" r="2.4"/>
+                <circle cx="416" cy="211" r="2.4"/><circle cx="436" cy="209" r="2.4"/>
+                <circle cx="448" cy="205" r="2.4"/>
+              </g>
+            </g>
+
+            <!-- ESTANTE (canto inferior esquerdo) -->
+            <g>
+              <rect x="64" y="300" width="236" height="130" rx="6" fill="#c39a68"/>
+              <rect x="64" y="300" width="236" height="130" rx="6" fill="none" stroke="#a9824f" stroke-width="3"/>
+              <rect x="74" y="360" width="216" height="8" fill="#a9824f"/>
+              <!-- livros prateleira de cima -->
+              <g>
+                <rect x="150" y="320" width="12" height="38" fill="#cf9a9a"/>
+                <rect x="164" y="316" width="12" height="42" fill="#9bb49a"/>
+                <rect x="178" y="322" width="12" height="36" fill="#b0a0c8"/>
+                <rect x="192" y="318" width="12" height="40" fill="#e0c483"/>
+                <rect x="206" y="324" width="12" height="34" fill="#cf9a9a"/>
+              </g>
+              <!-- livros prateleira de baixo -->
+              <g>
+                <rect x="180" y="378" width="12" height="44" fill="#9bb49a"/>
+                <rect x="194" y="374" width="12" height="48" fill="#cf9a9a"/>
+                <rect x="208" y="380" width="12" height="42" fill="#b0a0c8"/>
+                <rect x="222" y="376" width="12" height="46" fill="#e0c483"/>
+              </g>
+            </g>
+
+            <!-- PINTINHO DE PELÚCIA (clicável) - em cima da estante -->
+            <g id="obj-chick" class="hidden-object" tabindex="0" role="button" aria-label="Pintinho de pelúcia">
+              <ellipse cx="110" cy="292" rx="26" ry="22" fill="#f4d06a"/>
+              <circle cx="110" cy="266" r="20" fill="#f6d977"/>
+              <ellipse cx="92" cy="294" rx="9" ry="13" fill="#eebf52"/>
+              <path d="M110,262 l10,6 -10,6 Z" fill="#e8923a"/>
+              <circle cx="104" cy="262" r="2.6" fill="#3a2f28"/>
+              <circle cx="118" cy="262" r="2.6" fill="#3a2f28"/>
+              <path d="M101,312 l-4,8 M119,312 l4,8" stroke="#e8923a" stroke-width="3" stroke-linecap="round"/>
+              <path d="M126,256 q8,-8 14,-4 q-2,8 -12,10 Z" fill="#f6d977"/>
+            </g>
+
+            <!-- DVD DO COLDPLAY (clicável) - na prateleira de baixo -->
+            <g id="obj-dvd" class="hidden-object" tabindex="0" role="button" aria-label="DVD do Coldplay">
+              <rect x="96" y="372" width="44" height="50" rx="3" fill="#2f3a45"/>
+              <rect x="96" y="372" width="6" height="50" rx="2" fill="#1f272f"/>
+              <rect x="106" y="380" width="28" height="28" rx="2" fill="#13202b"/>
+              <rect x="110" y="384" width="8" height="8" fill="#e85d6a"/>
+              <rect x="120" y="384" width="8" height="8" fill="#e0c483"/>
+              <rect x="110" y="394" width="8" height="8" fill="#6fa8d6"/>
+              <rect x="120" y="394" width="8" height="8" fill="#9bb49a"/>
+              <rect x="106" y="412" width="28" height="3" fill="#9aa6ad"/>
+              <rect x="110" y="417" width="20" height="2.4" fill="#6d7980"/>
+            </g>
+
+            <!-- CRIADO-MUDO + ABAJUR -->
+            <g>
+              <rect x="348" y="356" width="64" height="74" rx="5" fill="#c39a68"/>
+              <rect x="356" y="372" width="48" height="3" fill="#a9824f"/>
+              <circle cx="380" cy="398" r="4" fill="#a9824f"/>
+              <ellipse cx="392" cy="318" rx="58" ry="48" fill="url(#gLampGlow)"/>
+              <rect x="388" y="326" width="8" height="30" fill="#b98f5e"/>
+              <path d="M372,300 l40,0 -6,26 -28,0 Z" fill="url(#gLamp)"/>
+            </g>
+
+            <!-- CAMA -->
+            <g>
+              <rect x="432" y="360" width="344" height="70" rx="8" fill="#c39a68"/>
+              <rect x="744" y="252" width="36" height="178" rx="8" fill="#b98f5e"/>
+              <rect x="430" y="332" width="320" height="40" rx="14" fill="#f1e7d4"/>
+              <!-- cobertor -->
+              <path d="M438,360 h300 v66 h-300 q-6,-30 0,-66 Z" fill="#a7c0a0"/>
+              <path d="M438,360 h300 v12 h-300 Z" fill="#bcd0b6"/>
+              <!-- travesseiros -->
+              <rect x="664" y="320" width="86" height="40" rx="14" fill="#f0dada"/>
+              <rect x="676" y="330" width="74" height="34" rx="12" fill="#e9cccc"/>
+            </g>
+
+            <!-- GATINHO DORMINDO (clicável) - na cama -->
+            <g id="obj-cat" class="hidden-object" tabindex="0" role="button" aria-label="Gatinho">
+              <ellipse cx="540" cy="362" rx="48" ry="26" fill="#9a8f84"/>
+              <path d="M576,360 q26,-6 30,12 q-16,6 -30,-2 Z" fill="#8b8075"/>
+              <g stroke="#7d7268" stroke-width="3" opacity="0.7">
+                <path d="M512,350 q6,8 0,18" fill="none"/>
+                <path d="M528,346 q6,9 0,20" fill="none"/>
+                <path d="M544,346 q6,9 0,20" fill="none"/>
+              </g>
+              <circle cx="508" cy="350" r="20" fill="#a89c90"/>
+              <path d="M494,338 l-4,-12 12,6 Z" fill="#a89c90"/>
+              <path d="M520,338 l6,-12 4,12 Z" fill="#a89c90"/>
+              <path d="M494,336 l-2,-7 7,4 Z" fill="#e6b6b6"/>
+              <path d="M520,336 l4,-7 1,7 Z" fill="#e6b6b6"/>
+              <path d="M500,350 q4,4 8,0" fill="none" stroke="#4a423b" stroke-width="2" stroke-linecap="round"/>
+              <path d="M512,350 q4,4 8,0" fill="none" stroke="#4a423b" stroke-width="2" stroke-linecap="round"/>
+              <path d="M508,356 l-3,3 6,0 Z" fill="#c98b8b"/>
+              <text x="556" y="330" class="cat-zzz">z</text>
+              <text x="568" y="318" class="cat-zzz" font-size="12">z</text>
+            </g>
+          </svg>
         </div>
       </div>
     </section>
 
     <!-- TELA 6: FINAL -->
     <section id="screen-final" class="screen">
-      <div class="card">
-        <div class="plumbob" aria-hidden="true"></div>
-        <h2 class="title-sims">Você encontrou todas as cartinhas! 🎉</h2>
-        <p class="subtitle">Cada uma com um pouquinho do meu amor por você 💖</p>
-        <p class="subtitle small">Feliz Dia dos Namorados, Esposa do Weng!</p>
-        <button class="btn btn-secondary" id="btn-replay">Jogar de novo</button>
+      <div class="card gazette">
+        <div class="rule-double"></div>
+        <h2 class="masthead masthead-sm">Edição Encerrada</h2>
+        <div class="rule-double"></div>
+        <p class="plumbob-stamp" aria-hidden="true"></p>
+        <p class="subtitle">Você encontrou todas as cartinhas 💌</p>
+        <p class="gazette-lead">
+          Cada uma delas guarda um pedacinho do meu amor por você.
+          Feliz Dia dos Namorados, <em>Esposa do Weng</em>. ❤️
+        </p>
+        <p class="letter-sign" id="final-sign">Com todo o meu amor, Weng</p>
+        <button class="btn btn-secondary" id="btn-replay">Reler do começo</button>
       </div>
     </section>
 
@@ -141,10 +348,12 @@
   <!-- MODAL: cartinha encontrada -->
   <div id="card-modal" class="modal hidden">
     <div class="modal-content">
-      <span class="modal-emoji" id="modal-emoji"></span>
-      <h3 class="title-sims" id="modal-title"></h3>
+      <div class="rule-thin"></div>
+      <span class="modal-kicker" id="modal-kicker">Cartinha encontrada</span>
+      <h3 class="title-serif" id="modal-title"></h3>
       <p id="modal-text"></p>
-      <button class="btn btn-primary" id="btn-modal-close">Fechar</button>
+      <div class="rule-thin"></div>
+      <button class="btn btn-primary" id="btn-modal-close">Guardar no coração</button>
     </div>
   </div>
 
