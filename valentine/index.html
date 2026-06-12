@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Para Você, Amor 💕</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="hearts-bg" aria-hidden="true"></div>
+
+  <main id="app">
+
+    <!-- TELA 1: CAPA / ENVELOPE -->
+    <section id="screen-cover" class="screen active">
+      <div class="card">
+        <div class="envelope" id="envelope">
+          <div class="envelope-flap"></div>
+          <div class="envelope-body">
+            <span class="envelope-heart">💌</span>
+          </div>
+        </div>
+        <h1 class="title-script">Para você,<br><span id="cover-name">Amor</span></h1>
+        <p class="subtitle">Feliz Dia dos Namorados! 🐼💕</p>
+        <button class="btn btn-primary" id="btn-open">Abrir presente</button>
+      </div>
+    </section>
+
+    <!-- TELA 2: QUIZ -->
+    <section id="screen-quiz" class="screen">
+      <div class="card card-quiz">
+        <h2 class="title-script">Quanto a gente se conhece?</h2>
+        <p class="subtitle small">Responda com o coração 💗</p>
+
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <p class="progress-label" id="progress-label">Pergunta 1 de 5</p>
+
+        <div id="quiz-question-box">
+          <h3 id="quiz-question">...</h3>
+          <div id="quiz-options" class="quiz-options"></div>
+        </div>
+
+        <div id="quiz-feedback" class="quiz-feedback hidden">
+          <p id="quiz-feedback-text"></p>
+          <button class="btn btn-secondary" id="btn-next-question">Próxima</button>
+        </div>
+      </div>
+
+      <!-- Resultado do quiz -->
+      <div class="card card-result hidden" id="quiz-result">
+        <div class="heart-meter">
+          <div class="heart-meter-fill" id="heart-meter-fill"></div>
+          <span class="heart-meter-icon">❤️</span>
+        </div>
+        <h2 class="title-script">Nosso amor é <span id="quiz-score">100</span>%!</h2>
+        <p class="subtitle">Não importa o placar... contigo, eu acerto sempre. 💞</p>
+        <button class="btn btn-primary" id="btn-go-gallery">Continuar</button>
+      </div>
+    </section>
+
+    <!-- TELA 3: GALERIA -->
+    <section id="screen-gallery" class="screen">
+      <div class="card card-gallery">
+        <h2 class="title-script">Nossos momentos</h2>
+        <p class="subtitle small">Cada foto, uma lembrança que eu guardo com carinho</p>
+
+        <div class="gallery-grid" id="gallery-grid"></div>
+
+        <button class="btn btn-primary" id="btn-go-letter">Ver minha carta</button>
+      </div>
+    </section>
+
+    <!-- TELA 4: CARTA FINAL -->
+    <section id="screen-letter" class="screen">
+      <div class="card card-letter">
+        <span class="letter-heart">💖</span>
+        <h2 class="title-script">Uma cartinha pra você</h2>
+        <div class="letter-paper">
+          <p id="letter-text"></p>
+          <p class="letter-signature" id="letter-signature"></p>
+        </div>
+        <button class="btn btn-secondary" id="btn-replay">Ver de novo</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
