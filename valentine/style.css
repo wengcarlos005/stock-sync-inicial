@@ -148,6 +148,26 @@ body::after {
   box-shadow: 0 0 18px rgba(155, 180, 154, 0.6);
 }
 
+/* ---------- Foto final ---------- */
+.final-photo-frame {
+  width: 100%; max-width: 320px; aspect-ratio: 4 / 3;
+  margin: 1rem auto 1.25rem;
+  border-radius: 8px; overflow: hidden;
+  border: 6px solid #fffaf0;
+  box-shadow: 0 6px 18px rgba(74,58,38,0.22);
+  background: linear-gradient(135deg, #e7d6bf, #f0e3cf);
+}
+.final-photo-frame img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.final-photo-placeholder {
+  width: 100%; height: 100%; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.4rem; line-height: 1.6;
+  color: var(--ink-soft); text-align: center;
+  font-family: 'EB Garamond', serif; font-size: 1rem; font-style: italic;
+}
+
 /* ---------- Plumbob (Sims) ---------- */
 .plumbob {
   width: 40px; height: 40px; margin: 0 auto 0.75rem;
@@ -424,18 +444,45 @@ body::after {
 }
 
 /* ---------- Contagem de dias ---------- */
-.counter-block {
-  margin: 0.75rem 0 1.5rem;
+.timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.9rem;
+  margin: 1.25rem 0 0.75rem;
 }
+.timeline-card {
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  background: #fffaf0; border: 1px solid var(--paper-edge); border-radius: 10px;
+  padding: 1.2rem 0.6rem 1.35rem;
+  box-shadow: 0 4px 12px rgba(74,58,38,0.12);
+}
+.timeline-icon { font-size: 1.6rem; }
 .counter-number {
   display: block;
   font-family: 'Playfair Display', serif; font-weight: 900;
-  font-size: clamp(2.4rem, 12vw, 3.4rem);
+  font-size: clamp(2rem, 10vw, 2.8rem);
   color: var(--sage-dark);
   line-height: 1.1;
 }
 .counter-label {
-  font-style: italic; color: var(--ink-soft); font-size: 0.95rem;
+  font-style: italic; color: var(--ink-soft); font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ---------- Jogo da plantinha ---------- */
+.card-plant { max-width: 560px; }
+.plant-stage {
+  width: 200px; max-width: 60%; margin: 0.5rem auto 1rem;
+}
+.plant-stage svg { width: 100%; height: auto; display: block; }
+.plant-counters {
+  display: flex; justify-content: center; gap: 1.5rem;
+  font-family: 'EB Garamond', serif; font-size: 1.05rem;
+  color: var(--ink-soft); margin-bottom: 1rem;
+}
+.plant-actions {
+  display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-bottom: 0.5rem;
 }
 
 /* ---------- Responsivo ---------- */

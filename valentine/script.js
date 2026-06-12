@@ -45,46 +45,46 @@ const CONFIG = {
     }
   },
 
+  // Carta da plantinha — exibida em sequência depois que a plantinha cresce
+  plantLetterParagraphs: [
+    "Meu amor,",
+    "Se existe algo que eu desejo para o nosso futuro, é continuar cultivando o que construímos juntos todos os dias. O amor não nasce pronto; ele cresce nos pequenos gestos, nas conversas de madrugada, nos abraços depois de um dia difícil, nas risadas compartilhadas e até nos desafios que enfrentamos lado a lado.",
+    "Eu quero cuidar de nós. Quero continuar aprendendo sobre você, descobrindo novas versões da mulher que amo (mesmo estressadinha) e encontrando novos motivos para me apaixonar todos os dias. Quero ser seu porto seguro quando precisar de apoio e sua companhia para celebrar cada conquista.",
+    "Quando penso no futuro, não imagino grandes riquezas ou lugares extraordinários (apesar de que ainda quero ser rico e viajar o mundo). Penso em momentos simples: acordar ao seu lado, compartilhar nossas histórias, construir nossos sonhos, cuidar dos nossos gatinhos e criar uma vida cheia de carinho, respeito e cumplicidade.",
+    "Você se tornou uma parte tão importante da minha vida que é difícil imaginar meus dias sem você. E, se eu puder fazer um pedido ao tempo, é que ele me permita passar o resto da minha vida ao seu lado, colecionando memórias, vivendo novas aventuras e amando você cada vez mais.",
+    "Obrigado por existir, por me escolher e por fazer meus dias mais felizes.",
+    "Com todo o meu amor, hoje e sempre."
+  ],
+
   // Jogo da memória — pares de cartas (troque "image" por um caminho de foto, ex: "fotos/foto1.jpg")
   memoryPairs: [
-    { emoji: "📸", label: "Foto 1", image: "" },
-    { emoji: "💑", label: "Foto 2", image: "" },
-    { emoji: "🌅", label: "Foto 3", image: "" },
-    { emoji: "🎉", label: "Foto 4", image: "" },
-    { emoji: "🍕", label: "Foto 5", image: "" },
-    { emoji: "✈️", label: "Foto 6", image: "" }
+    { emoji: "📸", label: "Foto 1", image: "fotos/foto1.jpg" },
+    { emoji: "💑", label: "Foto 2", image: "fotos/foto2.jpg" },
+    { emoji: "🌅", label: "Foto 3", image: "fotos/foto3.jpg" },
+    { emoji: "🎉", label: "Foto 4", image: "fotos/foto4.jpg" },
+    { emoji: "🎆", label: "Foto 5", image: "fotos/foto5.jpg" },
+    { emoji: "💕", label: "Foto 6", image: "" }
   ],
 
   // Opções de criação de personagem (ajuste à vontade)
   cas: {
-    // pele clara como padrão (índice 1)
     skinColors: ["#fbe0cd", "#f6cdb0", "#eebb96", "#d9a06f", "#bd7d4e", "#8d5a36"],
-    skinDefault: 1,
-    // castanho-escuro como padrão (índice 1)
     hairColors: ["#2b1b14", "#43291b", "#6b4423", "#9c6a35", "#c08a52", "#b06a6a", "#7c9a7b", "#b6a6cc"],
-    hairDefault: 1,
-    // cacheado como padrão
     hairStyles: [
       { id: "cacheado", label: "Cacheado" },
       { id: "ondulado", label: "Ondulado" },
       { id: "liso", label: "Liso" },
       { id: "coque", label: "Coque" }
     ],
-    hairStyleDefault: 0,
-    // olhos castanhos como padrão
     eyeColors: ["#5b3a1e", "#3d2817", "#7a5230", "#6b8e5a", "#4f7a9a"],
-    eyeDefault: 0,
-    // blusa branca como padrão (índice 0)
     outfitColors: ["#f3ead9", "#c98b8b", "#9bb49a", "#a7bdcc", "#b6a6cc", "#c4a059"],
-    outfitDefault: 0,
     accessories: [
       { emoji: "", label: "—" },
       { emoji: "🌸", label: "Flor" },
       { emoji: "🎀", label: "Laço" },
       { emoji: "👓", label: "Óculos" },
       { emoji: "👑", label: "Coroa" }
-    ],
-    accessoryDefault: 0
+    ]
   }
 };
 /* =========================================================
@@ -94,14 +94,13 @@ const CONFIG = {
 const avatar = {};
 
 document.addEventListener("DOMContentLoaded", () => {
-  // defaults
-  const c = CONFIG.cas;
-  avatar.skin = c.skinColors[c.skinDefault];
-  avatar.hair = c.hairColors[c.hairDefault];
-  avatar.hairStyle = c.hairStyles[c.hairStyleDefault].id;
-  avatar.eyes = c.eyeColors[c.eyeDefault];
-  avatar.outfit = c.outfitColors[c.outfitDefault];
-  avatar.accessory = c.accessories[c.accessoryDefault].emoji;
+  // o personagem começa em branco, sem nada escolhido ainda
+  avatar.skin = null;
+  avatar.hair = null;
+  avatar.hairStyle = null;
+  avatar.eyes = null;
+  avatar.outfit = null;
+  avatar.accessory = "";
 
   startFloaters();
   setupNameScreen();
@@ -112,6 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupRoom();
   setupMemoryGame();
   setupCounter();
+  setupPlantGame();
   setupFinal();
 
   document.getElementById("letter-sign").textContent = CONFIG.signature;
@@ -211,6 +211,7 @@ function curlsMarkup(coords, color) {
 }
 
 function hairBack(style, color) {
+  if (!style || !color) return "";
   const dark = shade(color, -22);
   if (style === "cacheado") {
     const back = [
@@ -240,6 +241,7 @@ function hairBack(style, color) {
 }
 
 function hairFront(style, color) {
+  if (!style || !color) return "";
   const dark = shade(color, -22);
   if (style === "cacheado") {
     const front = [
@@ -276,30 +278,44 @@ function accessoryMarkup(emoji) {
 }
 
 function buildAvatarSVG(o) {
-  const skinShade = shade(o.skin, -18);
+  const PLACEHOLDER = "#efe7d8";
+  const OUTLINE = "#c7bba0";
+
+  const hasSkin = !!o.skin;
+  const hasOutfit = !!o.outfit;
+  const hasEyes = !!o.eyes;
+
+  const skin = o.skin || PLACEHOLDER;
+  const skinShade = o.skin ? shade(o.skin, -18) : "#ddd0b8";
   const blush = "#e6a6a6";
-  const browColor = shade(o.hair, -10);
-  const outfitShade = shade(o.outfit, -22);
-  const outfitLight = shade(o.outfit, 16);
+  const browColor = o.hair ? shade(o.hair, -10) : OUTLINE;
+  const outfit = o.outfit || PLACEHOLDER;
+  const outfitShade = o.outfit ? shade(o.outfit, -22) : "#ddd0b8";
+  const outfitLight = o.outfit ? shade(o.outfit, 16) : "#f7f2e7";
+
+  const skinStroke = hasSkin ? "" : ` stroke="${OUTLINE}" stroke-width="1.5" stroke-dasharray="4 3"`;
+  const outfitStroke = hasOutfit ? "" : ` stroke="${OUTLINE}" stroke-width="1.5" stroke-dasharray="4 3"`;
+  const eyeFill = hasEyes ? o.eyes : "none";
+  const eyeStroke = hasEyes ? "" : ` stroke="${OUTLINE}" stroke-width="1.5" stroke-dasharray="2 2"`;
 
   return `<svg viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
     <!-- cabelo (trás) -->
     ${hairBack(o.hairStyle, o.hair)}
 
     <!-- corpo / blusa com mangas bufantes -->
-    <ellipse cx="58" cy="206" rx="26" ry="22" fill="${outfitLight}"/>
-    <ellipse cx="142" cy="206" rx="26" ry="22" fill="${outfitLight}"/>
+    <ellipse cx="58" cy="206" rx="26" ry="22" fill="${outfitLight}"${outfitStroke}/>
+    <ellipse cx="142" cy="206" rx="26" ry="22" fill="${outfitLight}"${outfitStroke}/>
     <path d="M50,250 Q52,196 78,188 L92,205 Q100,212 108,205 L122,188
-             Q148,196 150,250 Z" fill="${o.outfit}"/>
+             Q148,196 150,250 Z" fill="${outfit}"${outfitStroke}/>
     <path d="M92,205 Q100,214 108,205 L104,224 Q100,228 96,224 Z" fill="${outfitShade}"/>
 
     <!-- pescoço -->
-    <path d="M90,168 q10,10 20,0 l2,20 q-12,10 -24,0 Z" fill="${skinShade}"/>
+    <path d="M90,168 q10,10 20,0 l2,20 q-12,10 -24,0 Z" fill="${skinShade}"${skinStroke}/>
 
     <!-- rosto -->
-    <ellipse cx="100" cy="108" rx="42" ry="48" fill="${o.skin}"/>
-    <circle cx="60" cy="112" r="8" fill="${o.skin}"/>
-    <circle cx="140" cy="112" r="8" fill="${o.skin}"/>
+    <ellipse cx="100" cy="108" rx="42" ry="48" fill="${skin}"${skinStroke}/>
+    <circle cx="60" cy="112" r="8" fill="${skin}"${skinStroke}/>
+    <circle cx="140" cy="112" r="8" fill="${skin}"${skinStroke}/>
 
     <!-- bochechas -->
     <ellipse cx="70" cy="122" rx="9" ry="6" fill="${blush}" opacity="0.5"/>
@@ -312,12 +328,12 @@ function buildAvatarSVG(o) {
     <!-- olhos -->
     <ellipse cx="80" cy="104" rx="9" ry="7" fill="#fffaf2"/>
     <ellipse cx="120" cy="104" rx="9" ry="7" fill="#fffaf2"/>
-    <circle cx="80" cy="105" r="5.2" fill="${o.eyes}"/>
-    <circle cx="120" cy="105" r="5.2" fill="${o.eyes}"/>
-    <circle cx="80" cy="105" r="2.4" fill="#2a221c"/>
+    <circle cx="80" cy="105" r="5.2" fill="${eyeFill}"${eyeStroke}/>
+    <circle cx="120" cy="105" r="5.2" fill="${eyeFill}"${eyeStroke}/>
+    ${hasEyes ? `<circle cx="80" cy="105" r="2.4" fill="#2a221c"/>
     <circle cx="120" cy="105" r="2.4" fill="#2a221c"/>
     <circle cx="82" cy="103" r="1.4" fill="#fff"/>
-    <circle cx="122" cy="103" r="1.4" fill="#fff"/>
+    <circle cx="122" cy="103" r="1.4" fill="#fff"/>` : ""}
     <path d="M71,101 q9,-5 18,0" fill="none" stroke="#3a2f28" stroke-width="2" stroke-linecap="round"/>
     <path d="M111,101 q9,-5 18,0" fill="none" stroke="#3a2f28" stroke-width="2" stroke-linecap="round"/>
 
@@ -346,18 +362,18 @@ function renderAvatar() {
 function setupCAS() {
   const c = CONFIG.cas;
 
-  buildColorSwatches("swatches-skin", c.skinColors, c.skinDefault, (v) => { avatar.skin = v; renderAvatar(); });
-  buildColorSwatches("swatches-hair", c.hairColors, c.hairDefault, (v) => { avatar.hair = v; renderAvatar(); });
-  buildColorSwatches("swatches-eyes", c.eyeColors, c.eyeDefault, (v) => { avatar.eyes = v; renderAvatar(); });
-  buildColorSwatches("swatches-outfit", c.outfitColors, c.outfitDefault, (v) => { avatar.outfit = v; renderAvatar(); });
+  buildColorSwatches("swatches-skin", c.skinColors, -1, (v) => { avatar.skin = v; renderAvatar(); });
+  buildColorSwatches("swatches-hair", c.hairColors, -1, (v) => { avatar.hair = v; renderAvatar(); });
+  buildColorSwatches("swatches-eyes", c.eyeColors, -1, (v) => { avatar.eyes = v; renderAvatar(); });
+  buildColorSwatches("swatches-outfit", c.outfitColors, -1, (v) => { avatar.outfit = v; renderAvatar(); });
 
   buildChipSwatches("swatches-hairstyle",
     c.hairStyles.map((s) => ({ value: s.id, label: s.label })),
-    c.hairStyleDefault, (v) => { avatar.hairStyle = v; renderAvatar(); });
+    -1, (v) => { avatar.hairStyle = v; renderAvatar(); });
 
   buildChipSwatches("swatches-accessory",
     c.accessories.map((a) => ({ value: a.emoji, label: a.emoji || "—" })),
-    c.accessoryDefault, (v) => { avatar.accessory = v; renderAvatar(); });
+    -1, (v) => { avatar.accessory = v; renderAvatar(); });
 
   renderAvatar();
 
@@ -433,7 +449,7 @@ function setupLetter() {
     (function typeChar() {
       if (i < text.length) {
         textEl.textContent += text.charAt(i++);
-        typingTimeout = setTimeout(typeChar, 24);
+        typingTimeout = setTimeout(typeChar, 45);
       } else {
         textEl.classList.remove("typing-cursor");
         const last = idx === CONFIG.letterParagraphs.length - 1;
@@ -583,7 +599,7 @@ function setupMemoryGame() {
 function setupCounter() {
   const metEl = document.getElementById("counter-met");
   const datingEl = document.getElementById("counter-dating");
-  const btn = document.getElementById("btn-go-final");
+  const btn = document.getElementById("btn-go-plant");
 
   function daysSince(dateStr) {
     const start = new Date(dateStr + "T00:00:00");
@@ -595,10 +611,98 @@ function setupCounter() {
   metEl.textContent = daysSince(CONFIG.metDate);
   datingEl.textContent = daysSince(CONFIG.datingDate);
 
-  btn.addEventListener("click", () => goToScreen("screen-final"));
+  btn.addEventListener("click", () => goToScreen("screen-plant"));
 }
 
-/* ---------- Tela 8: Final ---------- */
+/* ---------- Efeito de digitação (reutilizável) ---------- */
+function typeText(el, text, speed, onDone) {
+  el.textContent = "";
+  el.classList.add("typing-cursor");
+  let i = 0;
+  (function step() {
+    if (i < text.length) {
+      el.textContent += text.charAt(i++);
+      setTimeout(step, speed);
+    } else {
+      el.classList.remove("typing-cursor");
+      if (onDone) onDone();
+    }
+  })();
+}
+
+/* ---------- Tela 8: Jogo da plantinha ---------- */
+function plantStageMarkup(stage) {
+  if (stage <= 0) {
+    return `<ellipse cx="100" cy="149" rx="7" ry="4" fill="#8aab7c"/>`;
+  }
+  const stemTop = stage === 1 ? 124 : stage === 2 ? 98 : 70;
+  let markup = `<path d="M100,150 L100,${stemTop}" stroke="#7a9b6e" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+  markup += `<path d="M100,140 q-22,-6 -28,8 q16,10 28,-2 Z" fill="#9bb49a"/>`;
+  markup += `<path d="M100,140 q22,-6 28,8 q-16,10 -28,-2 Z" fill="#a9c2a4"/>`;
+  if (stage >= 2) {
+    markup += `<path d="M100,112 q-20,-6 -26,7 q15,9 26,-2 Z" fill="#9bb49a"/>`;
+    markup += `<path d="M100,112 q20,-6 26,7 q-15,9 -26,-2 Z" fill="#a9c2a4"/>`;
+  }
+  if (stage >= 3) {
+    markup += `
+      <circle cx="100" cy="64" r="6" fill="#e6c87a"/>
+      <ellipse cx="100" cy="52" rx="8" ry="12" fill="#e8a9bd"/>
+      <ellipse cx="100" cy="76" rx="8" ry="12" fill="#e8a9bd"/>
+      <ellipse cx="88" cy="64" rx="12" ry="8" fill="#f0bcd0"/>
+      <ellipse cx="112" cy="64" rx="12" ry="8" fill="#f0bcd0"/>`;
+  }
+  return markup;
+}
+
+function setupPlantGame() {
+  const growthEl = document.getElementById("plant-growth");
+  const waterCountEl = document.getElementById("plant-water-count");
+  const fertCountEl = document.getElementById("plant-fert-count");
+  const actions = document.getElementById("plant-actions");
+  const letterBox = document.getElementById("plant-letter");
+  const letterText = document.getElementById("plant-letter-text");
+  const nextBtn = document.getElementById("btn-plant-next");
+  const waterBtn = document.getElementById("btn-water");
+  const fertBtn = document.getElementById("btn-fertilize");
+
+  const MAX = 3;
+  let water = 0;
+  let fert = 0;
+  let letterIdx = 0;
+
+  function render() {
+    waterCountEl.textContent = `💧 ${water}/${MAX}`;
+    fertCountEl.textContent = `🌿 ${fert}/${MAX}`;
+    growthEl.innerHTML = plantStageMarkup(Math.min(water, fert));
+
+    if (water >= MAX && fert >= MAX) {
+      actions.classList.add("hidden");
+      letterBox.classList.remove("hidden");
+      typeLetterParagraph();
+    }
+  }
+
+  function typeLetterParagraph() {
+    const text = CONFIG.plantLetterParagraphs[letterIdx];
+    nextBtn.classList.add("hidden");
+    typeText(letterText, text, 45, () => nextBtn.classList.remove("hidden"));
+  }
+
+  waterBtn.addEventListener("click", () => {
+    if (water < MAX) { water++; render(); }
+  });
+  fertBtn.addEventListener("click", () => {
+    if (fert < MAX) { fert++; render(); }
+  });
+  nextBtn.addEventListener("click", () => {
+    if (letterIdx < CONFIG.plantLetterParagraphs.length - 1) { letterIdx++; typeLetterParagraph(); }
+    else goToScreen("screen-final");
+  });
+
+  render();
+}
+
+/* ---------- Tela 9: Final ---------- */
 function setupFinal() {
   document.getElementById("btn-replay").addEventListener("click", () => location.reload());
 }

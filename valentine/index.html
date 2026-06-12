@@ -282,15 +282,16 @@
               </g>
             </g>
 
-            <!-- EMOJI 💛 (clicável) - em cima da estante, como um adesivo/almofada -->
-            <g id="obj-chick" class="hidden-object" tabindex="0" role="button" aria-label="Emoji especial">
-              <circle cx="110" cy="282" r="34" fill="#f6d977"/>
-              <circle cx="110" cy="282" r="34" fill="none" stroke="#e8923a" stroke-width="2" opacity="0.4"/>
-              <ellipse cx="98" cy="272" rx="5" ry="7" fill="#3a2f28"/>
-              <ellipse cx="122" cy="272" rx="5" ry="7" fill="#3a2f28"/>
-              <ellipse cx="89" cy="276" rx="4" ry="6" fill="#f9e6a8" opacity="0.7"/>
-              <ellipse cx="113" cy="276" rx="4" ry="6" fill="#f9e6a8" opacity="0.7"/>
-              <path d="M92,292 q18,18 36,0" fill="none" stroke="#3a2f28" stroke-width="4" stroke-linecap="round"/>
+            <!-- PINTINHO DE PELÚCIA (clicável) - em cima da estante -->
+            <g id="obj-chick" class="hidden-object" tabindex="0" role="button" aria-label="Pintinho de pelúcia">
+              <ellipse cx="110" cy="292" rx="26" ry="22" fill="#f4d06a"/>
+              <circle cx="110" cy="266" r="20" fill="#f6d977"/>
+              <ellipse cx="92" cy="294" rx="9" ry="13" fill="#eebf52"/>
+              <path d="M110,262 l10,6 -10,6 Z" fill="#e8923a"/>
+              <circle cx="104" cy="262" r="2.6" fill="#3a2f28"/>
+              <circle cx="118" cy="262" r="2.6" fill="#3a2f28"/>
+              <path d="M101,312 l-4,8 M119,312 l4,8" stroke="#e8923a" stroke-width="3" stroke-linecap="round"/>
+              <path d="M126,256 q8,-8 14,-4 q-2,8 -12,10 Z" fill="#f6d977"/>
             </g>
 
             <!-- DISCO DE VINIL DO COLDPLAY (clicável) - encostado na estante -->
@@ -368,35 +369,83 @@
     <!-- TELA 7: CONTAGEM DE DIAS -->
     <section id="screen-counter" class="screen">
       <div class="card gazette">
+        <div class="gazette-dateline">
+          <span>VOL. I · Nº 3</span>
+          <span>EDIÇÃO ESPECIAL</span>
+          <span>12 DE JUNHO DE 2026</span>
+        </div>
         <div class="rule-double"></div>
         <h2 class="masthead masthead-sm">Nossa Linha do Tempo</h2>
+        <p class="gazette-tagline">★ cada dia é uma nova página da nossa história ★</p>
         <div class="rule-double"></div>
 
-        <div class="counter-block">
-          <span class="counter-number" id="counter-met">0</span>
-          <span class="counter-label">dias desde que nos conhecemos</span>
-        </div>
-        <div class="counter-block">
-          <span class="counter-number" id="counter-dating">0</span>
-          <span class="counter-label">dias namorando</span>
+        <div class="timeline-grid">
+          <div class="timeline-card">
+            <span class="timeline-icon">✨</span>
+            <span class="counter-number" id="counter-met">0</span>
+            <span class="counter-label">dias desde que nos conhecemos</span>
+          </div>
+          <div class="timeline-card">
+            <span class="timeline-icon">💞</span>
+            <span class="counter-number" id="counter-dating">0</span>
+            <span class="counter-label">dias namorando</span>
+          </div>
         </div>
 
-        <button class="btn btn-primary" id="btn-go-final">Continuar</button>
+        <p class="gazette-foot">e essa contagem nunca para de crescer…</p>
+        <button class="btn btn-primary" id="btn-go-plant">Continuar</button>
       </div>
     </section>
 
-    <!-- TELA 8: FINAL -->
+    <!-- TELA 8: JOGO DA PLANTINHA -->
+    <section id="screen-plant" class="screen">
+      <div class="card card-plant">
+        <span class="kicker">Mais um joguinho</span>
+        <h2 class="title-serif">Cultive o nosso amor 🌱</h2>
+        <p class="subtitle small">Regue e adube a plantinha para ela crescer</p>
+
+        <div class="plant-stage" id="plant-stage">
+          <svg viewBox="0 0 200 200" role="img" aria-label="Vaso com plantinha">
+            <ellipse cx="100" cy="186" rx="58" ry="8" fill="#00000014"/>
+            <path d="M60,150 h80 l-10,40 q-30,8 -60,0 Z" fill="#c98b6a"/>
+            <path d="M58,150 h84 v10 h-84 Z" fill="#d9a07c"/>
+            <g id="plant-growth"></g>
+          </svg>
+        </div>
+
+        <div class="plant-counters">
+          <span id="plant-water-count">💧 0/3</span>
+          <span id="plant-fert-count">🌿 0/3</span>
+        </div>
+
+        <div class="plant-actions" id="plant-actions">
+          <button class="btn btn-secondary" id="btn-water">💧 Regar</button>
+          <button class="btn btn-secondary" id="btn-fertilize">🌿 Adubar</button>
+        </div>
+
+        <div class="letter-paper hidden" id="plant-letter">
+          <p id="plant-letter-text"></p>
+          <button class="btn btn-primary hidden" id="btn-plant-next">Continuar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TELA 9: FINAL -->
     <section id="screen-final" class="screen">
       <div class="card gazette">
         <div class="rule-double"></div>
-        <h2 class="masthead masthead-sm">Feliz Dia dos Namorados, gatinha!</h2>
+        <h2 class="masthead masthead-sm">Feliz Dia dos Namorados, neném!</h2>
         <div class="rule-double"></div>
-        <p class="plumbob-stamp" aria-hidden="true"></p>
+        <div class="final-photo-frame" id="final-photo-frame">
+          <img src="fotos/foto-final.jpg" alt="Nós dois" id="final-photo"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+          <div class="final-photo-placeholder">📷<br>nossa fotinha especial em breve</div>
+        </div>
         <p class="subtitle">Você encontrou todas as surpresinhas 💌</p>
         <p class="gazette-lead">
           Cada cartinha, cada foto e cada dia contado aqui guardam
           um pedacinho do meu amor por você.
-          Feliz Dia dos Namorados, <em>Esposa do Weng</em>. ❤️
+          Feliz Dia dos Namorados, <em>neném</em>. ❤️
         </p>
         <p class="letter-sign" id="final-sign">Com todo o meu amor, Weng</p>
         <button class="btn btn-secondary" id="btn-replay">Reler do começo</button>
