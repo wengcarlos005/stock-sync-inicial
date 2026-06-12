@@ -63,7 +63,7 @@ const CONFIG = {
     { emoji: "🌅", label: "Foto 3", image: "fotos/foto3.jpg" },
     { emoji: "🎉", label: "Foto 4", image: "fotos/foto4.jpg" },
     { emoji: "🎆", label: "Foto 5", image: "fotos/foto5.jpg" },
-    { emoji: "💕", label: "Foto 6", image: "" }
+    { emoji: "💕", label: "Foto 6", image: "fotos/foto6.jpg" }
   ],
 
   // Opções de criação de personagem (ajuste à vontade)
@@ -635,48 +635,61 @@ function plantStageMarkup(stage) {
   if (stage <= 0) {
     return `<ellipse cx="100" cy="149" rx="7" ry="4" fill="#8aab7c"/>`;
   }
-  const stemTop = stage === 1 ? 124 : stage === 2 ? 98 : 70;
+  const stemTops = { 1: 138, 2: 122, 3: 104, 4: 84, 5: 65 };
+  const stemTop = stemTops[stage] || stemTops[5];
+  const leafPair = (y) => `
+    <path d="M100,${y} q-22,-6 -28,8 q16,10 28,-2 Z" fill="#9bb49a"/>
+    <path d="M100,${y} q22,-6 28,8 q-16,10 -28,-2 Z" fill="#a9c2a4"/>`;
+
   let markup = `<path d="M100,150 L100,${stemTop}" stroke="#7a9b6e" stroke-width="5" fill="none" stroke-linecap="round"/>`;
-  markup += `<path d="M100,140 q-22,-6 -28,8 q16,10 28,-2 Z" fill="#9bb49a"/>`;
-  markup += `<path d="M100,140 q22,-6 28,8 q-16,10 -28,-2 Z" fill="#a9c2a4"/>`;
-  if (stage >= 2) {
-    markup += `<path d="M100,112 q-20,-6 -26,7 q15,9 26,-2 Z" fill="#9bb49a"/>`;
-    markup += `<path d="M100,112 q20,-6 26,7 q-15,9 -26,-2 Z" fill="#a9c2a4"/>`;
+  if (stage >= 2) markup += leafPair(136);
+  if (stage >= 3) markup += leafPair(112);
+  if (stage >= 4) markup += leafPair(90);
+
+  if (stage === 4) {
+    markup += `<circle cx="100" cy="${stemTop - 4}" r="6" fill="#e8a9bd"/>`;
   }
-  if (stage >= 3) {
+  if (stage >= 5) {
     markup += `
-      <circle cx="100" cy="64" r="6" fill="#e6c87a"/>
-      <ellipse cx="100" cy="52" rx="8" ry="12" fill="#e8a9bd"/>
-      <ellipse cx="100" cy="76" rx="8" ry="12" fill="#e8a9bd"/>
-      <ellipse cx="88" cy="64" rx="12" ry="8" fill="#f0bcd0"/>
-      <ellipse cx="112" cy="64" rx="12" ry="8" fill="#f0bcd0"/>`;
+      <circle cx="100" cy="${stemTop + 1}" r="6" fill="#e6c87a"/>
+      <ellipse cx="100" cy="${stemTop - 11}" rx="8" ry="12" fill="#e8a9bd"/>
+      <ellipse cx="100" cy="${stemTop + 13}" rx="8" ry="12" fill="#e8a9bd"/>
+      <ellipse cx="88" cy="${stemTop + 1}" rx="12" ry="8" fill="#f0bcd0"/>
+      <ellipse cx="112" cy="${stemTop + 1}" rx="12" ry="8" fill="#f0bcd0"/>`;
   }
   return markup;
 }
 
 function setupPlantGame() {
+  const stageBox = document.getElementById("plant-stage");
   const growthEl = document.getElementById("plant-growth");
+  const dropzone = document.getElementById("plant-dropzone");
   const waterCountEl = document.getElementById("plant-water-count");
   const fertCountEl = document.getElementById("plant-fert-count");
-  const actions = document.getElementById("plant-actions");
+  const tools = document.getElementById("plant-tools");
   const letterBox = document.getElementById("plant-letter");
   const letterText = document.getElementById("plant-letter-text");
   const nextBtn = document.getElementById("btn-plant-next");
-  const waterBtn = document.getElementById("btn-water");
-  const fertBtn = document.getElementById("btn-fertilize");
+  const hint = document.getElementById("plant-hint");
 
-  const MAX = 3;
+  const MAX = 5;
   let water = 0;
   let fert = 0;
   let letterIdx = 0;
+  let ghost = null;
+  let dragType = null;
 
   function render() {
     waterCountEl.textContent = `💧 ${water}/${MAX}`;
     fertCountEl.textContent = `🌿 ${fert}/${MAX}`;
     growthEl.innerHTML = plantStageMarkup(Math.min(water, fert));
 
+    document.getElementById("tool-water").classList.toggle("disabled", water >= MAX);
+    document.getElementById("tool-fert").classList.toggle("disabled", fert >= MAX);
+
     if (water >= MAX && fert >= MAX) {
-      actions.classList.add("hidden");
+      hint.textContent = "Olha só como ela cresceu! 🌸";
+      tools.classList.add("hidden");
       letterBox.classList.remove("hidden");
       typeLetterParagraph();
     }
@@ -688,12 +701,76 @@ function setupPlantGame() {
     typeText(letterText, text, 45, () => nextBtn.classList.remove("hidden"));
   }
 
-  waterBtn.addEventListener("click", () => {
-    if (water < MAX) { water++; render(); }
+  function applyAction(type) {
+    if (type === "water" && water < MAX) {
+      water++;
+      stageBox.classList.add("watered");
+      setTimeout(() => stageBox.classList.remove("watered"), 500);
+      render();
+    } else if (type === "fert" && fert < MAX) {
+      fert++;
+      stageBox.classList.add("fertilized");
+      setTimeout(() => stageBox.classList.remove("fertilized"), 500);
+      render();
+    }
+  }
+
+  function isOverDropzone(x, y) {
+    const rect = dropzone.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  function startDrag(tool, e) {
+    if (tool.classList.contains("disabled")) return;
+    dragType = tool.dataset.type;
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    ghost = document.createElement("div");
+    ghost.className = "plant-tool-ghost";
+    ghost.innerHTML = `<span>${tool.dataset.type === "water" ? "💧" : "🌿"}</span>`;
+    document.body.appendChild(ghost);
+    moveGhost(startX, startY);
+
+    function moveGhost(x, y) {
+      ghost.style.left = `${x}px`;
+      ghost.style.top = `${y}px`;
+      dropzone.classList.toggle("drag-over", isOverDropzone(x, y));
+    }
+
+    function onMove(ev) {
+      moveGhost(ev.clientX, ev.clientY);
+    }
+
+    function onUp(ev) {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      const dropped = isOverDropzone(ev.clientX, ev.clientY);
+      dropzone.classList.remove("drag-over");
+      ghost.remove();
+      ghost = null;
+      if (dropped) applyAction(dragType);
+      dragType = null;
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  ["tool-water", "tool-fert"].forEach((id) => {
+    const tool = document.getElementById(id);
+    tool.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      startDrag(tool, e);
+    });
+    tool.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        applyAction(tool.dataset.type);
+      }
+    });
   });
-  fertBtn.addEventListener("click", () => {
-    if (fert < MAX) { fert++; render(); }
-  });
+
   nextBtn.addEventListener("click", () => {
     if (letterIdx < CONFIG.plantLetterParagraphs.length - 1) { letterIdx++; typeLetterParagraph(); }
     else goToScreen("screen-final");

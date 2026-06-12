@@ -402,7 +402,7 @@
       <div class="card card-plant">
         <span class="kicker">Mais um joguinho</span>
         <h2 class="title-serif">Cultive o nosso amor 🌱</h2>
-        <p class="subtitle small">Regue e adube a plantinha para ela crescer</p>
+        <p class="subtitle small" id="plant-hint">Arraste a água e o adubo até o vaso para a plantinha crescer</p>
 
         <div class="plant-stage" id="plant-stage">
           <svg viewBox="0 0 200 200" role="img" aria-label="Vaso com plantinha">
@@ -411,16 +411,23 @@
             <path d="M58,150 h84 v10 h-84 Z" fill="#d9a07c"/>
             <g id="plant-growth"></g>
           </svg>
+          <div class="plant-dropzone" id="plant-dropzone"></div>
         </div>
 
         <div class="plant-counters">
-          <span id="plant-water-count">💧 0/3</span>
-          <span id="plant-fert-count">🌿 0/3</span>
+          <span id="plant-water-count">💧 0/5</span>
+          <span id="plant-fert-count">🌿 0/5</span>
         </div>
 
-        <div class="plant-actions" id="plant-actions">
-          <button class="btn btn-secondary" id="btn-water">💧 Regar</button>
-          <button class="btn btn-secondary" id="btn-fertilize">🌿 Adubar</button>
+        <div class="plant-tools" id="plant-tools">
+          <div class="plant-tool" id="tool-water" data-type="water" tabindex="0" role="button" aria-label="Arrastar água">
+            <span class="plant-tool-icon">💧</span>
+            <span class="plant-tool-label">Água</span>
+          </div>
+          <div class="plant-tool" id="tool-fert" data-type="fert" tabindex="0" role="button" aria-label="Arrastar adubo">
+            <span class="plant-tool-icon">🌿</span>
+            <span class="plant-tool-label">Adubo</span>
+          </div>
         </div>
 
         <div class="letter-paper hidden" id="plant-letter">
