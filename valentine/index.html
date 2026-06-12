@@ -46,7 +46,36 @@
       </div>
     </section>
 
-    <!-- TELA 2: CRIAÇÃO DE PERSONAGEM (CAS) -->
+    <!-- TELA 1.5: SENHA -->
+    <section id="screen-password" class="screen">
+      <div class="card gazette">
+        <div class="gazette-dateline">
+          <span>VOL. I · Nº 2</span>
+          <span>ÁREA RESTRITA</span>
+          <span>12 DE JUNHO DE 2026</span>
+        </div>
+        <div class="rule-double"></div>
+        <h1 class="masthead masthead-sm">Acesso Restrito</h1>
+        <div class="rule-double"></div>
+        <p class="gazette-tagline">★ Somente para pessoas muito especiais ★</p>
+
+        <p class="gazette-lead">
+          Identidade confirmada! Agora, para continuar, digite a senha de acesso:
+        </p>
+
+        <form id="password-form" autocomplete="off">
+          <input type="text" id="password-input" inputmode="numeric" placeholder="Senha..." />
+          <button type="submit" class="btn btn-primary">Desbloquear</button>
+        </form>
+
+        <p class="error-message hidden" id="password-error">
+          Hmmmm… 🤔 a senha é uma data especial.
+        </p>
+
+        <div class="gazette-foot">— continua na próxima página —</div>
+      </div>
+    </section>
+
     <section id="screen-cas" class="screen">
       <div class="card card-cas">
         <span class="kicker">Atelier de Personagem</span>
@@ -121,12 +150,12 @@
       </div>
     </section>
 
-    <!-- TELA 5: CAÇA ÀS CARTINHAS -->
+    <!-- TELA 5: QUARTO COM SURPRESAS ESCONDIDAS -->
     <section id="screen-room" class="screen">
       <div class="card card-room">
-        <span class="kicker">Caça ao tesouro</span>
-        <h2 class="title-serif">As cartinhas escondidas 🔍</h2>
-        <p class="subtitle small">Toque nos objetos do quarto e encontre as 4 cartinhas</p>
+        <span class="kicker">Seu quartinho</span>
+        <h2 class="title-serif">Bem-vinda ao seu quartinho 🏡</h2>
+        <p class="subtitle small">Esse quarto guarda algumas surpresinhas escondidas… dá uma olhadinha por aí 👀</p>
         <p class="found-counter" id="found-counter">0 de 4 encontradas</p>
 
         <div class="room-wrap">
@@ -253,29 +282,27 @@
               </g>
             </g>
 
-            <!-- PINTINHO DE PELÚCIA (clicável) - em cima da estante -->
-            <g id="obj-chick" class="hidden-object" tabindex="0" role="button" aria-label="Pintinho de pelúcia">
-              <ellipse cx="110" cy="292" rx="26" ry="22" fill="#f4d06a"/>
-              <circle cx="110" cy="266" r="20" fill="#f6d977"/>
-              <ellipse cx="92" cy="294" rx="9" ry="13" fill="#eebf52"/>
-              <path d="M110,262 l10,6 -10,6 Z" fill="#e8923a"/>
-              <circle cx="104" cy="262" r="2.6" fill="#3a2f28"/>
-              <circle cx="118" cy="262" r="2.6" fill="#3a2f28"/>
-              <path d="M101,312 l-4,8 M119,312 l4,8" stroke="#e8923a" stroke-width="3" stroke-linecap="round"/>
-              <path d="M126,256 q8,-8 14,-4 q-2,8 -12,10 Z" fill="#f6d977"/>
+            <!-- EMOJI 💛 (clicável) - em cima da estante, como um adesivo/almofada -->
+            <g id="obj-chick" class="hidden-object" tabindex="0" role="button" aria-label="Emoji especial">
+              <circle cx="110" cy="282" r="34" fill="#f6d977"/>
+              <circle cx="110" cy="282" r="34" fill="none" stroke="#e8923a" stroke-width="2" opacity="0.4"/>
+              <ellipse cx="98" cy="272" rx="5" ry="7" fill="#3a2f28"/>
+              <ellipse cx="122" cy="272" rx="5" ry="7" fill="#3a2f28"/>
+              <ellipse cx="89" cy="276" rx="4" ry="6" fill="#f9e6a8" opacity="0.7"/>
+              <ellipse cx="113" cy="276" rx="4" ry="6" fill="#f9e6a8" opacity="0.7"/>
+              <path d="M92,292 q18,18 36,0" fill="none" stroke="#3a2f28" stroke-width="4" stroke-linecap="round"/>
             </g>
 
-            <!-- DVD DO COLDPLAY (clicável) - na prateleira de baixo -->
-            <g id="obj-dvd" class="hidden-object" tabindex="0" role="button" aria-label="DVD do Coldplay">
-              <rect x="96" y="372" width="44" height="50" rx="3" fill="#2f3a45"/>
-              <rect x="96" y="372" width="6" height="50" rx="2" fill="#1f272f"/>
-              <rect x="106" y="380" width="28" height="28" rx="2" fill="#13202b"/>
-              <rect x="110" y="384" width="8" height="8" fill="#e85d6a"/>
-              <rect x="120" y="384" width="8" height="8" fill="#e0c483"/>
-              <rect x="110" y="394" width="8" height="8" fill="#6fa8d6"/>
-              <rect x="120" y="394" width="8" height="8" fill="#9bb49a"/>
-              <rect x="106" y="412" width="28" height="3" fill="#9aa6ad"/>
-              <rect x="110" y="417" width="20" height="2.4" fill="#6d7980"/>
+            <!-- DISCO DE VINIL DO COLDPLAY (clicável) - encostado na estante -->
+            <g id="obj-dvd" class="hidden-object" tabindex="0" role="button" aria-label="Disco de vinil do Coldplay">
+              <ellipse cx="240" cy="492" rx="40" ry="9" fill="#00000022"/>
+              <circle cx="240" cy="456" r="38" fill="#23232a"/>
+              <circle cx="240" cy="456" r="38" fill="none" stroke="#3a3a42" stroke-width="1.5"/>
+              <circle cx="240" cy="456" r="30" fill="none" stroke="#34343c" stroke-width="1"/>
+              <circle cx="240" cy="456" r="22" fill="none" stroke="#34343c" stroke-width="1"/>
+              <circle cx="240" cy="456" r="12" fill="#e6c87a"/>
+              <circle cx="240" cy="456" r="2.5" fill="#23232a"/>
+              <path d="M220,444 a24,24 0 0 1 16,-10" fill="none" stroke="#55555f" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
             </g>
 
             <!-- CRIADO-MUDO + ABAJUR -->
@@ -326,16 +353,49 @@
       </div>
     </section>
 
-    <!-- TELA 6: FINAL -->
+    <!-- TELA 6: JOGO DA MEMÓRIA -->
+    <section id="screen-memory" class="screen">
+      <div class="card card-memory">
+        <span class="kicker">Mais um joguinho</span>
+        <h2 class="title-serif">Jogo da memória 💕</h2>
+        <p class="subtitle small">Encontre os pares das nossas fotinhos</p>
+        <p class="found-counter" id="memory-counter">0 de 6 pares</p>
+
+        <div class="memory-grid" id="memory-grid"></div>
+      </div>
+    </section>
+
+    <!-- TELA 7: CONTAGEM DE DIAS -->
+    <section id="screen-counter" class="screen">
+      <div class="card gazette">
+        <div class="rule-double"></div>
+        <h2 class="masthead masthead-sm">Nossa Linha do Tempo</h2>
+        <div class="rule-double"></div>
+
+        <div class="counter-block">
+          <span class="counter-number" id="counter-met">0</span>
+          <span class="counter-label">dias desde que nos conhecemos</span>
+        </div>
+        <div class="counter-block">
+          <span class="counter-number" id="counter-dating">0</span>
+          <span class="counter-label">dias namorando</span>
+        </div>
+
+        <button class="btn btn-primary" id="btn-go-final">Continuar</button>
+      </div>
+    </section>
+
+    <!-- TELA 8: FINAL -->
     <section id="screen-final" class="screen">
       <div class="card gazette">
         <div class="rule-double"></div>
-        <h2 class="masthead masthead-sm">Edição Encerrada</h2>
+        <h2 class="masthead masthead-sm">Feliz Dia dos Namorados, gatinha!</h2>
         <div class="rule-double"></div>
         <p class="plumbob-stamp" aria-hidden="true"></p>
-        <p class="subtitle">Você encontrou todas as cartinhas 💌</p>
+        <p class="subtitle">Você encontrou todas as surpresinhas 💌</p>
         <p class="gazette-lead">
-          Cada uma delas guarda um pedacinho do meu amor por você.
+          Cada cartinha, cada foto e cada dia contado aqui guardam
+          um pedacinho do meu amor por você.
           Feliz Dia dos Namorados, <em>Esposa do Weng</em>. ❤️
         </p>
         <p class="letter-sign" id="final-sign">Com todo o meu amor, Weng</p>
@@ -349,7 +409,7 @@
   <div id="card-modal" class="modal hidden">
     <div class="modal-content">
       <div class="rule-thin"></div>
-      <span class="modal-kicker" id="modal-kicker">Cartinha encontrada</span>
+      <span class="modal-kicker" id="modal-kicker">Surpresinha encontrada</span>
       <h3 class="title-serif" id="modal-title"></h3>
       <p id="modal-text"></p>
       <div class="rule-thin"></div>

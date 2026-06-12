@@ -5,6 +5,14 @@ const CONFIG = {
   // Resposta exigida na tela inicial (normalizada: sem acento e minúscula)
   requiredName: "esposa do weng",
 
+  // Senha da tela seguinte — qualquer formato é aceito (25/11/2023, 25112023, 251123...)
+  // pois é comparada só pelos números digitados.
+  passwordAnswers: ["251123", "25112023"],
+
+  // Datas usadas na contagem de dias (formato AAAA-MM-DD)
+  metDate: "2023-09-06",     // dia em que se conheceram
+  datingDate: "2023-11-25",  // dia em que começaram a namorar
+
   // Assinatura usada na carta
   signature: "Com todo o meu amor, Weng 💌",
 
@@ -17,25 +25,35 @@ const CONFIG = {
     "Te amo, benzinho. ❤️"
   ],
 
-  // Cartinhas escondidas no quarto (id deve casar com o id do objeto no SVG)
+  // Surpresinhas escondidas no quarto (id deve casar com o id do objeto no SVG)
   hiddenCards: {
     "obj-chick": {
-      title: "A cartinha do Pintinho",
-      message: "Esse pintinho é fofo, mas perde feio pra você. Toda vez que bato o olho nele, lembro do seu sorriso e do quanto você é meiga comigo."
+      title: "💛",
+      message: "Lembra desse emoji? Você sempre usava ele, e eu achava a coisa mais fofa do mundo. Com o tempo, ele acabou se tornando uma lembrança sua para mim. Até hoje, quando vejo esse emoji, não consigo evitar de pensar em você e rir."
     },
     "obj-hat": {
-      title: "A cartinha do Chapéu",
-      message: "Esse chapéu me lembra que eu quero viver mil aventuras e viagens ao seu lado. Pra onde você for, eu quero ir junto."
+      title: "O restaurante mexicano",
+      message: "Haha, quem diria que acabaríamos naquele restaurante mexicano naquele dia? Foi um daqueles momentos simples que se transformaram em uma memória inesquecível. Foi mágico e especial, o moço até nos deu uma pequena cortesia. E é engraçado como os melhores momentos costumam acontecer quando menos esperamos."
     },
     "obj-dvd": {
-      title: "A cartinha do Coldplay",
-      message: "Toda vez que ouço Coldplay, é em você que eu penso. Você é a melhor música que já tocou na minha vida — e eu quero ouvir pra sempre."
+      title: "🎵 Coldplay",
+      message: "Eu amo o quanto você ama Coldplay. Sempre que escuto Yellow, é impossível não lembrar de você. É uma daquelas músicas que ganharam um significado especial porque carregam um pedacinho da sua presença. De alguma forma, ela sempre me leva de volta para você."
     },
     "obj-cat": {
-      title: "A cartinha do Gatinho",
-      message: "Fiu fiu! 😻 Essa gatinha aqui é a coisa mais linda do quarto… empatada só com você. Te amo, benzinho."
+      title: "🐱 Gatinhos",
+      message: "Os gatinhos sempre vão fazer parte da nossa história. Seja vendo vídeos, mandando fotos um para o outro ou imaginando nossos futuros pequeninos, eles sempre me lembram do carinho, da leveza e dos sonhos que compartilhamos juntos."
     }
   },
+
+  // Jogo da memória — pares de cartas (troque "image" por um caminho de foto, ex: "fotos/foto1.jpg")
+  memoryPairs: [
+    { emoji: "📸", label: "Foto 1", image: "" },
+    { emoji: "💑", label: "Foto 2", image: "" },
+    { emoji: "🌅", label: "Foto 3", image: "" },
+    { emoji: "🎉", label: "Foto 4", image: "" },
+    { emoji: "🍕", label: "Foto 5", image: "" },
+    { emoji: "✈️", label: "Foto 6", image: "" }
+  ],
 
   // Opções de criação de personagem (ajuste à vontade)
   cas: {
@@ -87,10 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   startFloaters();
   setupNameScreen();
+  setupPasswordScreen();
   setupCAS();
   setupReaction();
   setupLetter();
   setupRoom();
+  setupMemoryGame();
+  setupCounter();
   setupFinal();
 
   document.getElementById("letter-sign").textContent = CONFIG.signature;
@@ -140,6 +161,26 @@ function setupNameScreen() {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     if (normalizeName(input.value) === CONFIG.requiredName) {
+      goToScreen("screen-password");
+      return;
+    }
+    error.classList.remove("hidden");
+    const card = form.closest(".card");
+    card.classList.remove("shake");
+    requestAnimationFrame(() => card.classList.add("shake"));
+  });
+}
+
+/* ---------- Tela 1.5: Senha ---------- */
+function setupPasswordScreen() {
+  const form = document.getElementById("password-form");
+  const input = document.getElementById("password-input");
+  const error = document.getElementById("password-error");
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const digits = input.value.replace(/\D/g, "");
+    if (CONFIG.passwordAnswers.includes(digits)) {
       goToScreen("screen-cas");
       return;
     }
@@ -454,11 +495,110 @@ function setupRoom() {
 
   modalClose.addEventListener("click", () => {
     modal.classList.add("hidden");
-    if (allFound) goToScreen("screen-final");
+    if (allFound) goToScreen("screen-memory");
   });
 }
 
-/* ---------- Tela 6: Final ---------- */
+/* ---------- Tela 6: Jogo da memória ---------- */
+function setupMemoryGame() {
+  const grid = document.getElementById("memory-grid");
+  const counter = document.getElementById("memory-counter");
+  const pairs = CONFIG.memoryPairs;
+  const total = pairs.length;
+
+  // monta baralho: cada par aparece duas vezes, embaralhado
+  let deck = [];
+  pairs.forEach((pair, i) => {
+    deck.push({ pairId: i, ...pair });
+    deck.push({ pairId: i, ...pair });
+  });
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+
+  grid.innerHTML = "";
+  let matched = 0;
+  let locked = false;
+  let first = null;
+
+  counter.textContent = `0 de ${total} pares`;
+
+  deck.forEach((card, idx) => {
+    const cardEl = document.createElement("button");
+    cardEl.type = "button";
+    cardEl.className = "memory-card";
+    cardEl.dataset.pairId = card.pairId;
+    cardEl.dataset.index = idx;
+
+    const front = card.image
+      ? `<img src="${card.image}" alt="${card.label}" />`
+      : `<span>${card.emoji}</span>`;
+
+    cardEl.innerHTML = `
+      <div class="memory-card-inner">
+        <div class="memory-face memory-face-back">💌</div>
+        <div class="memory-face memory-face-front">${front}</div>
+      </div>
+    `;
+
+    cardEl.addEventListener("click", () => {
+      if (locked) return;
+      if (cardEl.classList.contains("flipped") || cardEl.classList.contains("matched")) return;
+
+      cardEl.classList.add("flipped");
+
+      if (!first) {
+        first = cardEl;
+        return;
+      }
+
+      locked = true;
+      const second = cardEl;
+      if (first.dataset.pairId === second.dataset.pairId) {
+        first.classList.add("matched");
+        second.classList.add("matched");
+        matched++;
+        counter.textContent = `${matched} de ${total} pares`;
+        first = null;
+        locked = false;
+        if (matched === total) {
+          setTimeout(() => goToScreen("screen-counter"), 700);
+        }
+      } else {
+        setTimeout(() => {
+          first.classList.remove("flipped");
+          second.classList.remove("flipped");
+          first = null;
+          locked = false;
+        }, 800);
+      }
+    });
+
+    grid.appendChild(cardEl);
+  });
+}
+
+/* ---------- Tela 7: Contagem de dias ---------- */
+function setupCounter() {
+  const metEl = document.getElementById("counter-met");
+  const datingEl = document.getElementById("counter-dating");
+  const btn = document.getElementById("btn-go-final");
+
+  function daysSince(dateStr) {
+    const start = new Date(dateStr + "T00:00:00");
+    const now = new Date();
+    const diff = now.setHours(0, 0, 0, 0) - start.setHours(0, 0, 0, 0);
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  }
+
+  metEl.textContent = daysSince(CONFIG.metDate);
+  datingEl.textContent = daysSince(CONFIG.datingDate);
+
+  btn.addEventListener("click", () => goToScreen("screen-final"));
+}
+
+/* ---------- Tela 8: Final ---------- */
 function setupFinal() {
   document.getElementById("btn-replay").addEventListener("click", () => location.reload());
 }
