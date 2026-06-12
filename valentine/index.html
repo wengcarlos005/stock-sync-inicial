@@ -3,93 +3,150 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Para Você, Amor 💕</title>
+  <title>Para Você, Esposa do Weng 💎</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div id="hearts-bg" aria-hidden="true"></div>
+  <div id="floaters-bg" aria-hidden="true"></div>
 
   <main id="app">
 
-    <!-- TELA 1: CAPA / ENVELOPE -->
-    <section id="screen-cover" class="screen active">
+    <!-- TELA 1: NOME (validação "Esposa do Weng") -->
+    <section id="screen-name" class="screen active">
       <div class="card">
+        <div class="plumbob" aria-hidden="true"></div>
+        <h1 class="title-sims">Bem-vinda ao jogo!</h1>
+        <p class="subtitle">Antes de começar, digite seu nome:</p>
+
+        <form id="name-form" autocomplete="off">
+          <input type="text" id="name-input" placeholder="Digite seu nome..." />
+          <button type="submit" class="btn btn-primary">Confirmar</button>
+        </form>
+
+        <p class="error-message hidden" id="name-error">
+          Hmm... você quis dizer <strong>"Esposa do Weng"</strong>, né? 😏
+        </p>
+      </div>
+    </section>
+
+    <!-- TELA 2: CRIAÇÃO DE PERSONAGEM (CAS) -->
+    <section id="screen-cas" class="screen">
+      <div class="card card-cas">
+        <h2 class="title-sims">Deixa eu ver como você... mesmo! 👀</h2>
+        <p class="subtitle small">Personalize sua Sim</p>
+
+        <div class="cas-stage">
+          <div class="plumbob plumbob-small" aria-hidden="true"></div>
+          <div class="avatar-stage" id="avatar-stage">
+            <div class="sim-hair" id="sim-hair"></div>
+            <div class="sim-head" id="sim-head">
+              <div class="sim-face">
+                <span class="sim-eye sim-eye-left"></span>
+                <span class="sim-eye sim-eye-right"></span>
+                <span class="sim-mouth"></span>
+              </div>
+              <span class="sim-accessory" id="sim-accessory"></span>
+            </div>
+            <div class="sim-body" id="sim-body"></div>
+          </div>
+        </div>
+
+        <div class="cas-options">
+          <div class="cas-group">
+            <span class="cas-label">Tom de pele</span>
+            <div class="swatches" id="swatches-skin"></div>
+          </div>
+          <div class="cas-group">
+            <span class="cas-label">Cabelo</span>
+            <div class="swatches" id="swatches-hair"></div>
+          </div>
+          <div class="cas-group">
+            <span class="cas-label">Roupa</span>
+            <div class="swatches" id="swatches-outfit"></div>
+          </div>
+          <div class="cas-group">
+            <span class="cas-label">Acessório</span>
+            <div class="swatches" id="swatches-accessory"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-cas-done">Pronto!</button>
+      </div>
+    </section>
+
+    <!-- TELA 3: REAÇÃO -->
+    <section id="screen-reaction" class="screen">
+      <div class="card">
+        <div class="avatar-stage avatar-stage-big" id="avatar-stage-reaction"></div>
+        <h2 class="title-sims">Nossa... que gatinha! 😻</h2>
+        <p class="subtitle">Fiu fiu! 🎶💃</p>
+        <button class="btn btn-primary" id="btn-go-letter">Continuar</button>
+      </div>
+    </section>
+
+    <!-- TELA 4: CARTINHA PRINCIPAL -->
+    <section id="screen-letter" class="screen">
+      <div class="card card-letter">
         <div class="envelope" id="envelope">
           <div class="envelope-flap"></div>
           <div class="envelope-body">
             <span class="envelope-heart">💌</span>
           </div>
         </div>
-        <h1 class="title-script">Para você,<br><span id="cover-name">Amor</span></h1>
-        <p class="subtitle">Feliz Dia dos Namorados! 🐼💕</p>
-        <button class="btn btn-primary" id="btn-open">Abrir presente</button>
-      </div>
-    </section>
+        <h2 class="title-sims" id="letter-title">Você recebeu uma cartinha!</h2>
+        <p class="subtitle small" id="letter-hint">Toque no envelope para abrir</p>
 
-    <!-- TELA 2: QUIZ -->
-    <section id="screen-quiz" class="screen">
-      <div class="card card-quiz">
-        <h2 class="title-script">Quanto a gente se conhece?</h2>
-        <p class="subtitle small">Responda com o coração 💗</p>
-
-        <div class="progress-bar">
-          <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <p class="progress-label" id="progress-label">Pergunta 1 de 5</p>
-
-        <div id="quiz-question-box">
-          <h3 id="quiz-question">...</h3>
-          <div id="quiz-options" class="quiz-options"></div>
-        </div>
-
-        <div id="quiz-feedback" class="quiz-feedback hidden">
-          <p id="quiz-feedback-text"></p>
-          <button class="btn btn-secondary" id="btn-next-question">Próxima</button>
-        </div>
-      </div>
-
-      <!-- Resultado do quiz -->
-      <div class="card card-result hidden" id="quiz-result">
-        <div class="heart-meter">
-          <div class="heart-meter-fill" id="heart-meter-fill"></div>
-          <span class="heart-meter-icon">❤️</span>
-        </div>
-        <h2 class="title-script">Nosso amor é <span id="quiz-score">100</span>%!</h2>
-        <p class="subtitle">Não importa o placar... contigo, eu acerto sempre. 💞</p>
-        <button class="btn btn-primary" id="btn-go-gallery">Continuar</button>
-      </div>
-    </section>
-
-    <!-- TELA 3: GALERIA -->
-    <section id="screen-gallery" class="screen">
-      <div class="card card-gallery">
-        <h2 class="title-script">Nossos momentos</h2>
-        <p class="subtitle small">Cada foto, uma lembrança que eu guardo com carinho</p>
-
-        <div class="gallery-grid" id="gallery-grid"></div>
-
-        <button class="btn btn-primary" id="btn-go-letter">Ver minha carta</button>
-      </div>
-    </section>
-
-    <!-- TELA 4: CARTA FINAL -->
-    <section id="screen-letter" class="screen">
-      <div class="card card-letter">
-        <span class="letter-heart">💖</span>
-        <h2 class="title-script">Uma cartinha pra você</h2>
-        <div class="letter-paper">
+        <div class="letter-paper hidden" id="letter-paper">
           <p id="letter-text"></p>
-          <p class="letter-signature" id="letter-signature"></p>
+          <button class="btn btn-secondary hidden" id="btn-letter-next">Continuar</button>
         </div>
-        <button class="btn btn-secondary" id="btn-replay">Ver de novo</button>
+      </div>
+    </section>
+
+    <!-- TELA 5: CAÇA ÀS CARTAS -->
+    <section id="screen-room" class="screen">
+      <div class="card card-room">
+        <h2 class="title-sims">Caça às cartinhas! 🔍</h2>
+        <p class="subtitle small">Clique nos objetos do quarto e encontre as cartinhas escondidas</p>
+        <p class="found-counter" id="found-counter">0 de 4 encontradas</p>
+
+        <div class="room" id="room">
+          <span class="room-deco deco-window">🪟</span>
+          <span class="room-deco deco-frame">🖼️</span>
+          <span class="room-deco deco-plant">🪴</span>
+          <span class="room-deco deco-sofa">🛋️</span>
+          <span class="room-deco deco-rug">🟪</span>
+          <!-- objetos clicáveis são inseridos via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TELA 6: FINAL -->
+    <section id="screen-final" class="screen">
+      <div class="card">
+        <div class="plumbob" aria-hidden="true"></div>
+        <h2 class="title-sims">Você encontrou todas as cartinhas! 🎉</h2>
+        <p class="subtitle">Cada uma com um pouquinho do meu amor por você 💖</p>
+        <p class="subtitle small">Feliz Dia dos Namorados, Esposa do Weng!</p>
+        <button class="btn btn-secondary" id="btn-replay">Jogar de novo</button>
       </div>
     </section>
 
   </main>
+
+  <!-- MODAL: cartinha encontrada -->
+  <div id="card-modal" class="modal hidden">
+    <div class="modal-content">
+      <span class="modal-emoji" id="modal-emoji"></span>
+      <h3 class="title-sims" id="modal-title"></h3>
+      <p id="modal-text"></p>
+      <button class="btn btn-primary" id="btn-modal-close">Fechar</button>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

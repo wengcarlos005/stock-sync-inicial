@@ -1,23 +1,22 @@
-# 💕 Presente Digital - Dia dos Namorados
+# 💎 Presente Digital - Dia dos Namorados (tema The Sims)
 
 Um site único (uma página, sem dependências externas) com:
 
-1. **Capa/envelope** animado para abrir o presente
-2. **Quiz** romântico sobre a relação de vocês
-3. **Galeria** de momentos especiais
-4. **Carta final** com efeito de digitação
+1. **Tela de nome**: ela digita o nome e só avança escrevendo "Esposa do Weng" 😏
+2. **Create-a-Sim**: criação de personagem (tom de pele, cabelo, roupa e acessório)
+3. **Reação**: "Nossa... que gatinha! Fiu fiu 🎶"
+4. **Cartinha principal**: envelope que revela uma mensagem em sequência, com efeito de digitação
+5. **Caça às cartinhas**: um quarto com 4 objetos clicáveis (pintinho, chapéu mexicano, DVD do Coldplay e gatinho), cada um revela uma cartinha extra
+6. **Tela final** de celebração
 
 ## Como personalizar
 
 Tudo o que você precisa editar está no topo do arquivo [`script.js`](./script.js), dentro do objeto `CONFIG`:
 
-- `herName`: nome de quem vai receber
-- `yourName`: usado na assinatura da carta
-- `quizQuestions`: array com 5 perguntas (pergunta, opções, índice da opção correta e mensagens de feedback)
-- `gallery`: 6 itens da galeria. Para usar fotos reais:
-  1. Coloque os arquivos de imagem dentro da pasta `valentine/photos/`
-  2. No item correspondente, adicione `image: "photos/sua-foto.jpg"` (substitui o ícone)
-- `letter`: texto da carta final (use `\n` para quebras de linha)
+- `requiredName`: resposta exigida na tela inicial (normalizada: sem acento e minúsculo)
+- `letterParagraphs`: parágrafos da carta principal, exibidos em sequência
+- `cas`: cores/opções disponíveis na criação do personagem (pele, cabelo, roupa, acessórios)
+- `hiddenCards`: os 4 objetos do quarto — `emoji`, posição (`top`/`left` em %), `title` e `message` de cada cartinha encontrada
 
 Depois de editar, é só salvar o arquivo — não precisa instalar nada.
 

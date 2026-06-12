@@ -1,90 +1,87 @@
 /* =========================================================
    PERSONALIZE AQUI! ✏️
-   Edite os textos abaixo para deixar o presente com a sua história.
    ========================================================= */
 const CONFIG = {
-  // Nome de quem vai receber o presente
-  herName: "Amor",
+  // Resposta correta para a tela inicial (sem acento/maiúsculas, é normalizado)
+  requiredName: "esposa do weng",
 
-  // Quem está enviando (assinatura da carta)
-  yourName: "Weng",
+  // Carta principal (tela do envelope). Cada item do array é exibido em sequência.
+  letterParagraphs: [
+    "Oi benzinho! Fiz uma surpresa :)",
+    "Se você está lendo isso, significa que encontrou uma das minhas cartinhas escondidas. Eu queria deixar um pedacinho de mim aqui para te fazer sorrir, mesmo quando eu não estiver por perto.",
+    "Obrigado por tornar meus dias mais leves, pelas nossas conversas, pelas risadas e por todos os momentos que compartilhamos. Você é uma das pessoas mais especiais da minha vida, e cada dia ao seu lado é uma dádiva que eu amo viver.",
+    "Espero que essa pequena surpresa tenha deixado seu dia um pouquinho mais feliz e que sempre tem alguém pensando em você com muito carinho.",
+    "Te amo, benzinho. ❤️"
+  ],
 
-  // Perguntas do quiz sobre o relacionamento de vocês.
-  // "correct" é o índice (0, 1, 2 ou 3) da opção correta no array "options".
-  // Troque pelas suas perguntas e respostas reais! 💕
-  quizQuestions: [
+  // Opções de personalização do personagem (Create-a-Sim)
+  cas: {
+    skinColors: ["#ffdbac", "#f1c27d", "#e0ac69", "#c68642", "#8d5524"],
+    hairColors: ["#2c1b18", "#6b4226", "#b55239", "#d6b370", "#7c5cff", "#ff7aa8"],
+    outfitColors: ["#7c5cff", "#4cd9b0", "#ff7aa8", "#4f8ff7", "#ffce54", "#2f2a4a"],
+    accessories: [
+      { emoji: "", label: "Nenhum" },
+      { emoji: "😎", label: "Óculos" },
+      { emoji: "🎀", label: "Laço" },
+      { emoji: "👑", label: "Coroa" },
+      { emoji: "🌸", label: "Flor" },
+      { emoji: "🎩", label: "Chapéu" }
+    ]
+  },
+
+  // Caça às cartinhas: objetos escondidos no quarto.
+  // "top"/"left" são porcentagens dentro do quarto.
+  hiddenCards: [
     {
-      question: "Onde a gente se conheceu?",
-      options: ["Na escola/faculdade", "Em um aplicativo", "Por amigos em comum", "Em uma festa"],
-      correct: 1,
-      correctFeedback: "Isso! Foi ali que tudo começou. 🥹",
-      incorrectFeedback: "Quase! Mas o importante é que a gente se encontrou. 💞"
+      id: "chick",
+      emoji: "🐥",
+      name: "Pintinho de pelúcia",
+      top: "62%",
+      left: "10%",
+      title: "Cartinha do Pintinho",
+      message: "Você é fofa(o) que nem esse pintinho! Esse bichinho me lembra você toda vez que olho pra ele na estante."
     },
     {
-      question: "Qual foi o nosso primeiro encontro?",
-      options: ["Cinema", "Um café", "Um passeio no parque", "Um jantar"],
-      correct: 2,
-      correctFeedback: "Perfeito! Lembro de cada detalhe daquele dia. 🌷",
-      incorrectFeedback: "Foi um momento tão especial que merece estar na memória pra sempre. 💗"
+      id: "hat",
+      emoji: "👒",
+      name: "Chapéu Mexicano",
+      top: "12%",
+      left: "68%",
+      title: "Cartinha do Chapéu",
+      message: "Lembra desse chapéu? Quero viver muitas aventuras e viagens novas com você, igual aquele dia."
     },
     {
-      question: "Qual é a nossa música do casal?",
-      options: ["Aquela que toca sempre no carro", "A que tocou no nosso encontro", "Uma que cantamos juntos", "Surpresa! Eu escolhi uma nova"],
-      correct: 0,
-      correctFeedback: "Com certeza! Essa música é a nossa trilha sonora. 🎶",
-      incorrectFeedback: "Toda música boa vira 'a nossa música' quando é com você. 🎵"
+      id: "dvd",
+      emoji: "💿",
+      name: "DVD do Coldplay",
+      top: "52%",
+      left: "78%",
+      title: "Cartinha do Coldplay",
+      message: "Toda vez que ouço Coldplay penso em você. Quero que a gente tenha muitas trilhas sonoras pra nossa história."
     },
     {
-      question: "O que mais me encanta em você?",
-      options: ["Seu sorriso", "Seu jeito de cuidar de mim", "Sua risada", "Tudo isso e muito mais"],
-      correct: 3,
-      correctFeedback: "Exatamente, é tudo isso e muito mais! 😍",
-      incorrectFeedback: "Pode até ser, mas a verdade é: é tudo isso e muito mais! 😍"
-    },
-    {
-      question: "Qual é o nosso próximo sonho juntos?",
-      options: ["Viajar para um lugar novo", "Morar juntos", "Realizar um grande projeto", "Viver muitas surpresas como essa"],
-      correct: 0,
-      correctFeedback: "Sim! Esse é o próximo destino da nossa lista. ✈️",
-      incorrectFeedback: "Seja qual for, quero viver com você. 🌍"
+      id: "cat",
+      emoji: "🐱",
+      name: "Gatinho",
+      top: "70%",
+      left: "42%",
+      title: "Cartinha do Gatinho",
+      message: "Fiu fiu! 😻 Essa gatinha aqui é a coisa mais linda que existe... assim como você."
     }
-  ],
-
-  // Galeria de momentos. Troque o "icon" por uma foto real adicionando:
-  // "image": "photos/foto1.jpg"  (coloque o arquivo dentro da pasta /valentine/photos)
-  gallery: [
-    { icon: "📍", caption: "Onde nos conhecemos" },
-    { icon: "💌", caption: "Nosso primeiro encontro" },
-    { icon: "🎶", caption: "Nossa música" },
-    { icon: "🌅", caption: "Aquela viagem inesquecível" },
-    { icon: "🥳", caption: "Uma data especial" },
-    { icon: "💍", caption: "O futuro que sonhamos" }
-  ],
-
-  // Carta final — escreva do fundo do coração 💕
-  letter: `Meu amor,
-
-Hoje eu quis fazer algo diferente para te mostrar o quanto você é especial pra mim.
-Cada pergunta desse jogo, cada foto, cada palavra... são só uma pequena parte de tudo que sinto.
-
-Obrigado por estar comigo, por rir comigo, por sonhar comigo.
-Você faz os meus dias mais bonitos e a minha vida mais leve.
-
-Feliz Dia dos Namorados! Te amo muito. 🐼💖`
+  ]
 };
 /* =========================================================
    Fim das personalizações — o código abaixo cuida da mágica ✨
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Personaliza nomes
-  document.getElementById("cover-name").textContent = CONFIG.herName;
-
-  startFloatingHearts();
-  setupCover();
-  setupQuiz();
-  setupGallery();
+  startFloaters();
+  setupNameScreen();
+  setupCAS();
+  setupReaction();
   setupLetter();
+  setupRoom();
+  setupFinal();
 });
 
 /* ---------- Navegação entre telas ---------- */
@@ -94,188 +91,265 @@ function goToScreen(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* ---------- Corações flutuando no fundo ---------- */
-function startFloatingHearts() {
-  const container = document.getElementById("hearts-bg");
-  const emojis = ["❤️", "💕", "💖", "💗", "💝"];
+/* ---------- Itens flutuando no fundo ---------- */
+function startFloaters() {
+  const container = document.getElementById("floaters-bg");
+  const emojis = ["💎", "❤️", "✨", "🐱", "💚"];
 
-  function spawnHeart() {
-    const heart = document.createElement("span");
-    heart.className = "floating-heart";
-    heart.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-    heart.style.left = `${Math.random() * 100}vw`;
-    heart.style.fontSize = `${1 + Math.random() * 1.5}rem`;
+  function spawn() {
+    const item = document.createElement("span");
+    item.className = "floating-item";
+    item.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    item.style.left = `${Math.random() * 100}vw`;
+    item.style.fontSize = `${1 + Math.random() * 1.5}rem`;
     const duration = 6 + Math.random() * 6;
-    heart.style.animationDuration = `${duration}s`;
-    container.appendChild(heart);
-    setTimeout(() => heart.remove(), duration * 1000);
+    item.style.animationDuration = `${duration}s`;
+    container.appendChild(item);
+    setTimeout(() => item.remove(), duration * 1000);
   }
 
-  for (let i = 0; i < 6; i++) setTimeout(spawnHeart, i * 400);
-  setInterval(spawnHeart, 1200);
+  for (let i = 0; i < 6; i++) setTimeout(spawn, i * 400);
+  setInterval(spawn, 1200);
 }
 
-/* ---------- Tela 1: Capa ---------- */
-function setupCover() {
-  const open = () => goToScreen("screen-quiz");
-  document.getElementById("btn-open").addEventListener("click", open);
-  document.getElementById("envelope").addEventListener("click", open);
+/* ---------- Tela 1: Nome ---------- */
+function normalizeName(str) {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
-/* ---------- Tela 2: Quiz ---------- */
-function setupQuiz() {
-  let currentIndex = 0;
-  let score = 0;
+function setupNameScreen() {
+  const form = document.getElementById("name-form");
+  const input = document.getElementById("name-input");
+  const error = document.getElementById("name-error");
 
-  const questionEl = document.getElementById("quiz-question");
-  const optionsEl = document.getElementById("quiz-options");
-  const feedbackBox = document.getElementById("quiz-feedback");
-  const feedbackText = document.getElementById("quiz-feedback-text");
-  const progressFill = document.getElementById("progress-fill");
-  const progressLabel = document.getElementById("progress-label");
-  const nextBtn = document.getElementById("btn-next-question");
-  const questionBox = document.getElementById("quiz-question-box");
-  const resultCard = document.getElementById("quiz-result");
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = normalizeName(input.value);
 
-  function renderQuestion() {
-    const q = CONFIG.quizQuestions[currentIndex];
-    questionEl.textContent = q.question;
-    optionsEl.innerHTML = "";
-    feedbackBox.classList.add("hidden");
-    questionBox.classList.remove("hidden");
-
-    const total = CONFIG.quizQuestions.length;
-    progressFill.style.width = `${((currentIndex) / total) * 100 + (100 / total)}%`;
-    progressLabel.textContent = `Pergunta ${currentIndex + 1} de ${total}`;
-
-    q.options.forEach((optionText, i) => {
-      const btn = document.createElement("button");
-      btn.className = "quiz-option";
-      btn.textContent = optionText;
-      btn.addEventListener("click", () => selectAnswer(i));
-      optionsEl.appendChild(btn);
-    });
-  }
-
-  function selectAnswer(selectedIndex) {
-    const q = CONFIG.quizQuestions[currentIndex];
-    const buttons = optionsEl.querySelectorAll(".quiz-option");
-    buttons.forEach((btn, i) => {
-      btn.disabled = true;
-      if (i === q.correct) btn.classList.add("correct");
-      if (i === selectedIndex && selectedIndex !== q.correct) btn.classList.add("incorrect");
-    });
-
-    const isCorrect = selectedIndex === q.correct;
-    if (isCorrect) score++;
-
-    feedbackText.textContent = isCorrect ? q.correctFeedback : q.incorrectFeedback;
-    feedbackBox.classList.remove("hidden");
-
-    nextBtn.textContent = currentIndex === CONFIG.quizQuestions.length - 1 ? "Ver resultado" : "Próxima";
-  }
-
-  nextBtn.addEventListener("click", () => {
-    currentIndex++;
-    if (currentIndex < CONFIG.quizQuestions.length) {
-      renderQuestion();
-    } else {
-      showResult();
-    }
-  });
-
-  function showResult() {
-    questionBox.classList.add("hidden");
-    feedbackBox.classList.add("hidden");
-    progressFill.style.width = "100%";
-    progressLabel.textContent = "Quiz completo!";
-    resultCard.classList.remove("hidden");
-
-    document.getElementById("quiz-score").textContent = "100";
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        document.getElementById("heart-meter-fill").style.height = "100%";
-      }, 200);
-    });
-  }
-
-  document.getElementById("btn-go-gallery").addEventListener("click", () => {
-    goToScreen("screen-gallery");
-  });
-
-  renderQuestion();
-}
-
-/* ---------- Tela 3: Galeria ---------- */
-function setupGallery() {
-  const grid = document.getElementById("gallery-grid");
-  grid.innerHTML = "";
-
-  CONFIG.gallery.forEach((item) => {
-    const div = document.createElement("div");
-    div.className = "gallery-item";
-
-    if (item.image) {
-      div.style.backgroundImage = `url('${item.image}')`;
-    } else {
-      const icon = document.createElement("span");
-      icon.className = "icon";
-      icon.textContent = item.icon;
-      div.appendChild(icon);
+    if (value === CONFIG.requiredName) {
+      goToScreen("screen-cas");
+      return;
     }
 
-    const caption = document.createElement("span");
-    caption.textContent = item.caption;
-    div.appendChild(caption);
+    error.classList.remove("hidden");
+    const card = form.closest(".card");
+    card.classList.remove("shake");
+    requestAnimationFrame(() => card.classList.add("shake"));
+  });
+}
 
-    grid.appendChild(div);
+/* ---------- Tela 2: Create-a-Sim ---------- */
+let currentAvatar = {
+  skin: CONFIG.cas.skinColors[0],
+  hair: CONFIG.cas.hairColors[0],
+  outfit: CONFIG.cas.outfitColors[0],
+  accessory: CONFIG.cas.accessories[0].emoji
+};
+
+function applyAvatarVars(stage) {
+  stage.style.setProperty("--skin-color", currentAvatar.skin);
+  stage.style.setProperty("--hair-color", currentAvatar.hair);
+  stage.style.setProperty("--outfit-color", currentAvatar.outfit);
+  const accessoryEl = stage.querySelector(".sim-accessory");
+  if (accessoryEl) accessoryEl.textContent = currentAvatar.accessory;
+}
+
+function setupCAS() {
+  const stage = document.getElementById("avatar-stage");
+
+  buildColorSwatches("swatches-skin", CONFIG.cas.skinColors, (color) => {
+    currentAvatar.skin = color;
+    applyAvatarVars(stage);
   });
 
+  buildColorSwatches("swatches-hair", CONFIG.cas.hairColors, (color) => {
+    currentAvatar.hair = color;
+    applyAvatarVars(stage);
+  });
+
+  buildColorSwatches("swatches-outfit", CONFIG.cas.outfitColors, (color) => {
+    currentAvatar.outfit = color;
+    applyAvatarVars(stage);
+  });
+
+  buildAccessorySwatches("swatches-accessory", CONFIG.cas.accessories, (emoji) => {
+    currentAvatar.accessory = emoji;
+    applyAvatarVars(stage);
+  });
+
+  applyAvatarVars(stage);
+
+  document.getElementById("btn-cas-done").addEventListener("click", () => {
+    goToScreen("screen-reaction");
+  });
+}
+
+function buildColorSwatches(containerId, colors, onSelect) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+
+  colors.forEach((color, i) => {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "swatch";
+    swatch.style.background = color;
+    if (i === 0) swatch.classList.add("selected");
+
+    swatch.addEventListener("click", () => {
+      container.querySelectorAll(".swatch").forEach((el) => el.classList.remove("selected"));
+      swatch.classList.add("selected");
+      onSelect(color);
+    });
+
+    container.appendChild(swatch);
+  });
+}
+
+function buildAccessorySwatches(containerId, accessories, onSelect) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+
+  accessories.forEach((acc, i) => {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "swatch-accessory";
+    swatch.textContent = acc.emoji || "✖️";
+    swatch.title = acc.label;
+    if (i === 0) swatch.classList.add("selected");
+
+    swatch.addEventListener("click", () => {
+      container.querySelectorAll(".swatch-accessory").forEach((el) => el.classList.remove("selected"));
+      swatch.classList.add("selected");
+      onSelect(acc.emoji);
+    });
+
+    container.appendChild(swatch);
+  });
+}
+
+/* ---------- Tela 3: Reação ---------- */
+function setupReaction() {
   document.getElementById("btn-go-letter").addEventListener("click", () => {
+    const casStage = document.getElementById("avatar-stage");
+    const reactionStage = document.getElementById("avatar-stage-reaction");
+    reactionStage.innerHTML = casStage.innerHTML;
+    reactionStage.style.cssText = casStage.style.cssText;
+
     goToScreen("screen-letter");
   });
 }
 
-/* ---------- Tela 4: Carta com efeito de digitação ---------- */
+/* ---------- Tela 4: Cartinha principal ---------- */
 function setupLetter() {
+  const envelope = document.getElementById("envelope");
+  const paper = document.getElementById("letter-paper");
+  const hint = document.getElementById("letter-hint");
+  const title = document.getElementById("letter-title");
   const textEl = document.getElementById("letter-text");
-  const signatureEl = document.getElementById("letter-signature");
-  signatureEl.textContent = `Com amor, ${CONFIG.yourName} 💌`;
+  const nextBtn = document.getElementById("btn-letter-next");
 
+  let paragraphIndex = 0;
   let typingTimeout;
 
-  function typeLetter() {
+  function typeParagraph() {
+    const text = CONFIG.letterParagraphs[paragraphIndex];
     textEl.textContent = "";
     textEl.classList.add("typing-cursor");
-    signatureEl.style.opacity = "0";
+    nextBtn.classList.add("hidden");
 
-    const fullText = CONFIG.letter;
     let i = 0;
-
     clearTimeout(typingTimeout);
     function typeChar() {
-      if (i < fullText.length) {
-        textEl.textContent += fullText.charAt(i);
+      if (i < text.length) {
+        textEl.textContent += text.charAt(i);
         i++;
         typingTimeout = setTimeout(typeChar, 22);
       } else {
         textEl.classList.remove("typing-cursor");
-        signatureEl.style.transition = "opacity 0.6s ease";
-        signatureEl.style.opacity = "1";
+        nextBtn.textContent = paragraphIndex === CONFIG.letterParagraphs.length - 1
+          ? "Ir para o quarto"
+          : "Continuar";
+        nextBtn.classList.remove("hidden");
       }
     }
     typeChar();
   }
 
-  // Inicia a digitação quando a tela da carta fica visível
-  const observer = new MutationObserver(() => {
-    if (document.getElementById("screen-letter").classList.contains("active")) {
-      typeLetter();
+  envelope.addEventListener("click", () => {
+    if (!paper.classList.contains("hidden")) return;
+    paper.classList.remove("hidden");
+    hint.classList.add("hidden");
+    title.textContent = "Sua cartinha 💌";
+    typeParagraph();
+  });
+
+  nextBtn.addEventListener("click", () => {
+    if (paragraphIndex < CONFIG.letterParagraphs.length - 1) {
+      paragraphIndex++;
+      typeParagraph();
+    } else {
+      goToScreen("screen-room");
     }
   });
-  observer.observe(document.getElementById("screen-letter"), { attributes: true, attributeFilter: ["class"] });
+}
 
+/* ---------- Tela 5: Caça às cartinhas ---------- */
+function setupRoom() {
+  const room = document.getElementById("room");
+  const counter = document.getElementById("found-counter");
+  const modal = document.getElementById("card-modal");
+  const modalEmoji = document.getElementById("modal-emoji");
+  const modalTitle = document.getElementById("modal-title");
+  const modalText = document.getElementById("modal-text");
+  const modalClose = document.getElementById("btn-modal-close");
+
+  let foundCount = 0;
+  const total = CONFIG.hiddenCards.length;
+
+  CONFIG.hiddenCards.forEach((card) => {
+    const el = document.createElement("span");
+    el.className = "hidden-object";
+    el.textContent = card.emoji;
+    el.style.top = card.top;
+    el.style.left = card.left;
+    el.title = card.name;
+    el.dataset.id = card.id;
+
+    el.addEventListener("click", () => {
+      if (el.classList.contains("found")) return;
+
+      el.classList.add("found");
+      foundCount++;
+      counter.textContent = `${foundCount} de ${total} encontradas`;
+
+      modalEmoji.textContent = card.emoji;
+      modalTitle.textContent = card.title;
+      modalText.textContent = card.message;
+      modal.classList.remove("hidden");
+      modal.dataset.lastCard = foundCount === total ? "last" : "";
+    });
+
+    room.appendChild(el);
+  });
+
+  counter.textContent = `0 de ${total} encontradas`;
+
+  modalClose.addEventListener("click", () => {
+    modal.classList.add("hidden");
+    if (modal.dataset.lastCard === "last") {
+      goToScreen("screen-final");
+    }
+  });
+}
+
+/* ---------- Tela 6: Final ---------- */
+function setupFinal() {
   document.getElementById("btn-replay").addEventListener("click", () => {
-    goToScreen("screen-cover");
+    location.reload();
   });
 }
